@@ -1,4 +1,4 @@
-// Treasury Manager Simulator — Main entry point
+// Treasury Manager Simulator — Competition Edition
 // Screen router, event bus, and app bootstrap
 
 import { gameState } from './engine/GameState.js';
@@ -18,6 +18,9 @@ import { EventScreen } from './screens/EventScreen.js';
 import { LevelCompleteScreen } from './screens/LevelCompleteScreen.js';
 import { GameOverScreen } from './screens/GameOverScreen.js';
 import { HowToPlayScreen } from './screens/HowToPlayScreen.js';
+import { RegistrationScreen } from './screens/RegistrationScreen.js';
+import { trackEvent, submitScore } from './utils/api.js';
+import { getRegistration, getPendingScore, clearPendingScore } from './utils/storage.js';
 
 class App {
     constructor() {
@@ -36,6 +39,7 @@ class App {
         // Initialize screens
         this.screens = {
             title: new TitleScreen(this),
+            registration: new RegistrationScreen(this),
             setup: new SetupScreen(this),
             dashboard: new DashboardScreen(this),
             event: new EventScreen(this),
@@ -51,6 +55,12 @@ class App {
         gameLoop.onPhaseChange = (phase) => {
             this.onPhaseChange(phase);
         };
+
+        // Track site visit (fire-and-forget)
+        trackEvent('visit');
+
+        // Flush any pending score submission from a previous session
+        this.flushPendingScore();
 
         // Always start at title screen
         this.showScreen('title');
@@ -116,6 +126,14 @@ class App {
     }
 
     showScreen(screenId) {
+        // Redirect to registration when setup is requested but no valid token exists
+        if (screenId === 'setup') {
+            const reg = getRegistration();
+            if (!reg || reg.gameTokenExpiry < Date.now()) {
+                screenId = 'registration';
+            }
+        }
+
         // Unmount current screen
         if (this.currentScreen && this.screens[this.currentScreen]) {
             this.screens[this.currentScreen].unmount();
@@ -130,6 +148,19 @@ class App {
             this.container.appendChild(screenEl);
             this.screens[screenId].mount();
             this.currentScreen = screenId;
+        }
+    }
+
+    async flushPendingScore() {
+        const pending = getPendingScore();
+        if (!pending) return;
+        const reg = getRegistration();
+        if (!reg?.gameToken || reg.gameTokenExpiry < Date.now()) return;
+        try {
+            await submitScore(pending);
+            clearPendingScore();
+        } catch {
+            // Will retry next visit
         }
     }
 

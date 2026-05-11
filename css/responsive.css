@@ -112,7 +112,18 @@
         align-items: center;
     }
 
-    /* Compact stress face on mobile */
+    /* Stress face: fixed to bottom-left corner on mobile to free quarter-bar space */
+    #stress-face-slot {
+        position: fixed;
+        bottom: 56px; /* above the fixed footer */
+        left: 6px;
+        z-index: 50;
+        background: rgba(8, 16, 32, 0.8);
+        border: 1px solid var(--border-inner);
+        padding: 2px;
+        pointer-events: none;
+    }
+
     #stress-face-slot .stress-face-canvas {
         width: 28px !important;
         height: 28px !important;

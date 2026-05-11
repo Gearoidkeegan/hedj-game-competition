@@ -10,6 +10,7 @@ import { careerEngine } from '../engine/CareerEngine.js';
 import { HEDGING_POLICY_TYPES } from '../utils/constants.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { SeededRandom, generateSeed } from '../utils/random.js';
+import { getRegistration } from '../utils/storage.js';
 
 export class SetupScreen {
     constructor(app) {
@@ -23,6 +24,10 @@ export class SetupScreen {
         this.el.className = 'screen active setup-screen';
 
         const industries = this.app.industriesData?.industries || [];
+
+        // Pre-fill display name from registration record
+        const reg = getRegistration();
+        const prefillName = reg?.playerName || '';
 
         // Career mode header
         const isCareer = this.app.gameMode === 'career' && careerEngine.careerActive;
@@ -57,7 +62,7 @@ export class SetupScreen {
                 <div class="setup-fields">
                     <div class="setup-field">
                         <label>YOUR NAME</label>
-                        <input type="text" id="player-name" placeholder="Treasury Manager" maxlength="20">
+                        <input type="text" id="player-name" placeholder="Treasury Manager" maxlength="20" value="${prefillName}">
                     </div>
                     <div class="setup-field">
                         <label>CHARACTER</label>
@@ -71,14 +76,6 @@ export class SetupScreen {
                                 <span class="char-label">Female</span>
                             </button>
                         </div>
-                    </div>
-                    <div class="setup-field">
-                        <label>COMPANY NAME</label>
-                        <input type="text" id="company-name" placeholder="(optional)" maxlength="30">
-                    </div>
-                    <div class="setup-field">
-                        <label>CONTACT EMAIL</label>
-                        <input type="email" id="contact-email" placeholder="(for prizes)" maxlength="50">
                     </div>
                 </div>
                 <div class="setup-actions">
@@ -215,9 +212,10 @@ export class SetupScreen {
             industry = rng.pick(industries);
         }
 
-        // Capture extra fields
-        const companyName = this.el.querySelector('#company-name')?.value.trim() || '';
-        const contactEmail = this.el.querySelector('#contact-email')?.value.trim() || '';
+        // Read company and email from competition registration record
+        const reg = getRegistration();
+        const companyName = reg?.company || '';
+        const contactEmail = reg?.email || '';
 
         const rng = new SeededRandom(seed + 1);
 

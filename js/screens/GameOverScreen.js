@@ -1,10 +1,11 @@
-// Game Over Screen — final score, grade, leaderboard entry
+// Game Over Screen — final score, grade, global leaderboard submission
 
 import { gameState } from '../engine/GameState.js';
 import { scoreEngine } from '../engine/ScoreEngine.js';
 import { GRADES, GAME_CONFIG } from '../utils/constants.js';
 import { formatPnL, formatPercent, formatCurrency } from '../utils/formatters.js';
-import { addLeaderboardEntry, getLeaderboard, exportLeaderboardCSV } from '../utils/storage.js';
+import { addLeaderboardEntry, getLeaderboard, getRegistration, savePendingScore, clearPendingScore } from '../utils/storage.js';
+import { submitScore, fetchLeaderboard } from '../utils/api.js';
 import { soundFX } from '../ui/SoundFX.js';
 
 export class GameOverScreen {
@@ -12,6 +13,7 @@ export class GameOverScreen {
         this.app = app;
         this.el = null;
         this.yearFacts = null;
+        this.submitted = false;
     }
 
     async loadYearFacts() {
@@ -157,50 +159,32 @@ export class GameOverScreen {
                 <button class="btn" id="btn-copy-score" style="font-size:14px;min-height:28px;padding:4px 12px;">📋 Copy Score</button>
             </div>
 
+            <!-- Global leaderboard submission status -->
+            <div id="submit-status" class="submit-status" style="min-height:24px;margin-bottom:8px;text-align:center;"></div>
+
             <div class="gameover-buttons">
                 <button class="btn btn-gold" id="btn-play-again">PLAY AGAIN</button>
                 <button class="btn" id="btn-leaderboard">LEADERBOARD</button>
             </div>
 
             ${(state.firedByBoard || stressedOut) ? `
-                <div class="panel" style="max-width:500px;width:100%;margin-bottom:16px;border-color:var(--gold);text-align:center;">
-                    <div class="readable-text" style="font-size:16px;color:var(--text-primary);font-style:italic;margin-bottom:8px;">
-                        Lucky this was a simulation. If you need real help with your treasury risk,
-                        talk to <a href="https://www.hedj.eu" target="_blank" rel="noopener" style="color:var(--cyan);text-decoration:underline;">Hedj</a> today.
-                    </div>
-                    <a href="https://www.hedj.eu" target="_blank" rel="noopener" class="btn btn-gold" style="display:inline-block;font-size:13px;padding:6px 14px;text-decoration:none;">VISIT HEDJ.EU</a>
+                <div class="readable-text" style="font-size:15px;color:var(--text-muted);font-style:italic;margin:12px 0;text-align:center;">
+                    Lucky this was a simulation —
+                    <a href="https://www.hedj.eu" target="_blank" rel="noopener" style="color:var(--cyan);">find out how Hedj can help →</a>
                 </div>
             ` : ''}
 
             <!-- Hedj branding -->
-            <div style="margin-top:20px;text-align:center;">
-                <div style="margin-bottom:8px;">
-                    <a href="https://hedj.eu" target="_blank" rel="noopener">
-                        <img id="qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=4&data=https%3A%2F%2Fhedj.eu" alt="Scan to visit hedj.eu" width="100" height="100" style="border:2px solid var(--border-inner);background:#fff;display:block;margin:0 auto;" />
-                    </a>
-                </div>
+            <div style="margin-top:20px;text-align:center;padding-bottom:20px;">
                 <div class="pixel-text" style="font-size:8px;color:var(--gold);margin-bottom:4px;">POWERED BY HEDJ</div>
                 <div class="readable-text" style="font-size:14px;color:var(--text-secondary);">
                     Treasury Risk Management Solutions
                 </div>
                 <div class="readable-text" style="font-size:13px;margin-top:4px;">
-                    <a href="https://hedj.eu" target="_blank" rel="noopener" style="color:var(--cyan);text-decoration:underline;">hedj.eu</a>
+                    <a href="https://www.hedj.eu" target="_blank" rel="noopener" style="color:var(--cyan);text-decoration:underline;">www.hedj.eu →</a>
                 </div>
             </div>
         `;
-
-        // Save to leaderboard
-        addLeaderboardEntry({
-            playerName: state.playerName,
-            companyName: state.companyName || '',
-            contactEmail: state.contactEmail || '',
-            industry: state.industry?.name || 'Unknown',
-            industryId: state.industryId,
-            score: Math.round(finalScore),
-            grade: gradeInfo.grade,
-            quartersPlayed: state.totalQuartersPlayed,
-            seed: state.seed
-        });
 
         return this.el;
     }
@@ -234,6 +218,81 @@ export class GameOverScreen {
 
         // Reveal the hidden year after a dramatic pause
         this.revealYear();
+
+        // Submit score to global leaderboard
+        this.submitScoreToApi();
+    }
+
+    unmount() {
+        this.submitted = false;
+    }
+
+    async submitScoreToApi() {
+        if (this.submitted) return;
+        this.submitted = true;
+
+        const state = gameState.get();
+        const scores = scoreEngine.calculateScores(state);
+        const finalScore = Math.round(scores.total);
+        const gradeInfo = scoreEngine.getGrade(finalScore);
+
+        const entry = {
+            playerName: state.playerName,
+            companyName: state.companyName || '',
+            contactEmail: state.contactEmail || '',
+            industry: state.industry?.name || 'Unknown',
+            industryId: state.industryId || '',
+            score: finalScore,
+            grade: gradeInfo.grade,
+            quartersPlayed: state.totalQuartersPlayed,
+            seed: state.seed
+        };
+
+        // Always save locally as backup
+        addLeaderboardEntry(entry);
+
+        const reg = getRegistration();
+        if (!reg?.gameToken || reg.gameTokenExpiry < Date.now()) {
+            // No valid token — local save only, no status shown
+            return;
+        }
+
+        const payload = {
+            gameId: state.gameId,
+            playerName: state.playerName,
+            company: state.companyName || reg.company || '',
+            industry: state.industry?.name || '',
+            industryId: state.industryId || '',
+            score: finalScore,
+            grade: gradeInfo.grade,
+            quartersPlayed: state.totalQuartersPlayed,
+            seed: state.seed,
+            cumulativePnL: state.cumulativePnL || 0
+        };
+
+        this.showSubmitStatus('loading', null);
+
+        try {
+            const result = await submitScore(payload);
+            clearPendingScore();
+            this.showSubmitStatus('success', result?.rank);
+        } catch {
+            savePendingScore(payload);
+            this.showSubmitStatus('error', null);
+        }
+    }
+
+    showSubmitStatus(state, rank) {
+        const el = this.el?.querySelector('#submit-status');
+        if (!el) return;
+        if (state === 'loading') {
+            el.innerHTML = `<span class="pixel-text" style="font-size:8px;color:var(--text-muted);">Submitting to leaderboard…</span>`;
+        } else if (state === 'success') {
+            const rankText = rank != null ? ` · You are ranked <strong>#${rank}</strong> globally` : '';
+            el.innerHTML = `<span class="pixel-text" style="font-size:8px;color:var(--gold);">Score submitted!${rankText}</span>`;
+        } else if (state === 'error') {
+            el.innerHTML = `<span class="pixel-text" style="font-size:8px;color:var(--text-muted);">Could not submit — score saved locally and will retry next visit.</span>`;
+        }
     }
 
     async revealYear() {
@@ -286,66 +345,70 @@ export class GameOverScreen {
     }
 
 
-    showLeaderboard() {
-        const board = getLeaderboard();
-        if (board.length === 0) {
-            this.app.showToast('No leaderboard entries yet!', 'info');
-            return;
-        }
-
-        // Simple overlay
+    async showLeaderboard() {
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay';
         overlay.innerHTML = `
             <div class="modal" style="width:95vw;max-width:500px;">
                 <div class="modal-header">
-                    LEADERBOARD
+                    GLOBAL LEADERBOARD
                     <button class="modal-close" id="close-leaderboard">X</button>
                 </div>
-                <div class="modal-body" style="max-height:400px;overflow-y:auto;">
-                    <table class="data-table">
-                        <thead>
-                            <tr><th>#</th><th>NAME</th><th>INDUSTRY</th><th>SCORE</th><th>GRADE</th></tr>
-                        </thead>
-                        <tbody>
-                            ${board.map((entry, i) => `
-                                <tr>
-                                    <td style="color:${i < 3 ? 'var(--gold)' : 'var(--text-muted)'}">${i + 1}</td>
-                                    <td>${entry.playerName}</td>
-                                    <td style="color:var(--text-muted)">${entry.industry}</td>
-                                    <td style="color:var(--cyan)">${entry.score}</td>
-                                    <td style="color:var(--gold)">${entry.grade}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                <div style="padding:8px;text-align:center;border-top:1px solid var(--border);">
-                    <button class="btn" id="btn-export-csv" style="font-size:12px;min-height:24px;padding:4px 12px;">EXPORT CSV</button>
+                <div class="modal-body" id="leaderboard-body" style="max-height:400px;overflow-y:auto;">
+                    <div class="pixel-text" style="font-size:8px;color:var(--text-muted);text-align:center;padding:16px;">
+                        Loading global scores…
+                    </div>
                 </div>
             </div>
         `;
 
         const viewport = document.getElementById('game-viewport');
         viewport.appendChild(overlay);
+        overlay.querySelector('#close-leaderboard').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
-        overlay.querySelector('#close-leaderboard').addEventListener('click', () => {
-            overlay.remove();
-        });
-        overlay.querySelector('#btn-export-csv').addEventListener('click', () => {
-            const csv = exportLeaderboardCSV();
-            if (!csv) return;
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'hedj-game-leaderboard.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-            this.app.showToast('Leaderboard exported!', 'success');
-        });
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) overlay.remove();
-        });
+        try {
+            const { entries } = await fetchLeaderboard(20);
+            this.renderLeaderboardTable(overlay.querySelector('#leaderboard-body'), entries, false);
+        } catch {
+            const local = getLeaderboard();
+            const mapped = local.map((e, i) => ({
+                rank: i + 1,
+                playerName: e.playerName,
+                company: e.companyName || '',
+                industry: e.industry,
+                score: e.score,
+                grade: e.grade,
+                quartersPlayed: e.quartersPlayed
+            }));
+            this.renderLeaderboardTable(overlay.querySelector('#leaderboard-body'), mapped, true);
+        }
+    }
+
+    renderLeaderboardTable(container, entries, isOffline) {
+        if (entries.length === 0) {
+            container.innerHTML = `<div class="pixel-text" style="font-size:8px;color:var(--text-muted);text-align:center;padding:16px;">No scores yet — be the first!</div>`;
+            return;
+        }
+        const offlineNote = isOffline
+            ? `<div class="pixel-text" style="font-size:7px;color:var(--text-muted);text-align:center;margin-bottom:8px;">(showing local scores — offline)</div>`
+            : '';
+        container.innerHTML = `
+            ${offlineNote}
+            <table class="data-table">
+                <thead><tr><th>#</th><th>NAME</th><th>INDUSTRY</th><th>SCORE</th><th>GRADE</th></tr></thead>
+                <tbody>
+                    ${entries.map(e => `
+                        <tr>
+                            <td style="color:${e.rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'}">${e.rank}</td>
+                            <td>${e.playerName}</td>
+                            <td style="color:var(--text-muted)">${e.industry}</td>
+                            <td style="color:var(--cyan)">${e.score}</td>
+                            <td style="color:var(--gold)">${e.grade}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
     }
 }

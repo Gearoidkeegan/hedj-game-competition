@@ -1,7 +1,8 @@
 // Title Screen — animated intro with start/continue/leaderboard options
-// Includes attract mode demo loop for conventions
 
-import { hasSavedGame, getLeaderboard, exportLeaderboardCSV, hasSeenGuide } from '../utils/storage.js';
+import { hasSavedGame, getLeaderboard, hasSeenGuide } from '../utils/storage.js';
+import { fetchLeaderboard } from '../utils/api.js';
+import { CONFIG } from '../config.js';
 import { careerEngine } from '../engine/CareerEngine.js';
 import { soundFX } from '../ui/SoundFX.js';
 
@@ -13,6 +14,7 @@ export class TitleScreen {
         this.attractScene = 0;
         this.idleTimer = null;
         this.attractActive = false;
+        this.cachedGlobalBoard = null; // pre-fetched for attract mode
     }
 
     render() {
@@ -109,10 +111,15 @@ export class TitleScreen {
             this.app.showScreen('howtoplay');
         });
 
+        // Pre-fetch global leaderboard for attract mode display
+        fetchLeaderboard(5).then(data => {
+            this.cachedGlobalBoard = data?.entries || null;
+        }).catch(() => {});
+
         // Animate background
         this.animateBackground();
 
-        // Start idle timer for attract mode (30 seconds of no interaction)
+        // Start idle timer for attract mode
         this.resetIdleTimer();
         this.interactionHandler = () => {
             if (this.attractActive) {
@@ -149,7 +156,7 @@ export class TitleScreen {
 
     resetIdleTimer() {
         if (this.idleTimer) clearTimeout(this.idleTimer);
-        this.idleTimer = setTimeout(() => this.enterAttractMode(), 30000);
+        this.idleTimer = setTimeout(() => this.enterAttractMode(), CONFIG.attractModeIdleMs || 300000);
     }
 
     enterAttractMode() {
@@ -286,8 +293,12 @@ export class TitleScreen {
     }
 
     attractSceneLeaderboard() {
-        const board = getLeaderboard();
-        if (board.length === 0) {
+        // Use globally fetched board if available, fall back to local
+        const rawBoard = this.cachedGlobalBoard || getLeaderboard().map((e, i) => ({
+            rank: i + 1, playerName: e.playerName, score: e.score, grade: e.grade
+        }));
+
+        if (!rawBoard || rawBoard.length === 0) {
             return `
                 <div class="pixel-text" style="font-size:8px;color:var(--gold);margin-bottom:8px;letter-spacing:2px;">LEADERBOARD</div>
                 <div class="pixel-text" style="font-size:9px;color:var(--text-secondary);">No scores yet — be the first!</div>
@@ -295,10 +306,10 @@ export class TitleScreen {
             `;
         }
 
-        const top5 = board.slice(0, 5);
-        const rows = top5.map((e, i) => `
+        const top5 = rawBoard.slice(0, 5);
+        const rows = top5.map((e) => `
             <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(136,170,204,0.15);">
-                <span class="pixel-text" style="font-size:8px;color:${i < 3 ? 'var(--gold)' : 'var(--text-muted)'};">${i + 1}.</span>
+                <span class="pixel-text" style="font-size:8px;color:${e.rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'};">${e.rank}.</span>
                 <span class="pixel-text" style="font-size:8px;color:var(--text-primary);flex:1;margin-left:6px;">${e.playerName}</span>
                 <span class="pixel-text" style="font-size:8px;color:var(--cyan);">${e.score}</span>
                 <span class="pixel-text" style="font-size:8px;color:var(--gold);margin-left:6px;">${e.grade}</span>
@@ -336,39 +347,19 @@ export class TitleScreen {
         `;
     }
 
-    showLeaderboard() {
-        const board = getLeaderboard();
-        if (board.length === 0) {
-            this.app.showToast('Leaderboard coming after first game!', 'info');
-            return;
-        }
-
+    async showLeaderboard() {
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay';
         overlay.innerHTML = `
             <div class="modal" style="width:95vw;max-width:500px;">
                 <div class="modal-header">
-                    LEADERBOARD
+                    GLOBAL LEADERBOARD
                     <button class="modal-close" id="close-lb">X</button>
                 </div>
-                <div class="modal-body" style="max-height:400px;overflow-y:auto;">
-                    <table class="data-table">
-                        <thead><tr><th>#</th><th>NAME</th><th>INDUSTRY</th><th>SCORE</th><th>GRADE</th></tr></thead>
-                        <tbody>
-                            ${board.map((e, i) => `
-                                <tr>
-                                    <td style="color:${i < 3 ? 'var(--gold)' : 'var(--text-muted)'}">${i + 1}</td>
-                                    <td>${e.playerName}</td>
-                                    <td style="color:var(--text-muted)">${e.industry}</td>
-                                    <td style="color:var(--cyan)">${e.score}</td>
-                                    <td style="color:var(--gold)">${e.grade}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                <div style="padding:8px;text-align:center;border-top:1px solid var(--border);">
-                    <button class="btn" id="btn-export-lb" style="font-size:12px;min-height:24px;padding:4px 12px;">EXPORT CSV</button>
+                <div class="modal-body" id="lb-body" style="max-height:400px;overflow-y:auto;">
+                    <div class="pixel-text" style="font-size:8px;color:var(--text-muted);text-align:center;padding:16px;">
+                        Loading global scores…
+                    </div>
                 </div>
             </div>
         `;
@@ -376,19 +367,43 @@ export class TitleScreen {
         const viewport = document.getElementById('game-viewport');
         viewport.appendChild(overlay);
         overlay.querySelector('#close-lb').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#btn-export-lb').addEventListener('click', () => {
-            const csv = exportLeaderboardCSV();
-            if (!csv) return;
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'hedj-game-leaderboard.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-            this.app.showToast('Leaderboard exported!', 'success');
-        });
         overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+        const body = overlay.querySelector('#lb-body');
+        try {
+            const { entries } = await fetchLeaderboard(20);
+            this.cachedGlobalBoard = entries;
+            body.innerHTML = this.buildLeaderboardTable(entries, false);
+        } catch {
+            const local = getLeaderboard();
+            const mapped = local.map((e, i) => ({
+                rank: i + 1, playerName: e.playerName, industry: e.industry,
+                score: e.score, grade: e.grade
+            }));
+            body.innerHTML = this.buildLeaderboardTable(mapped, true);
+        }
+    }
+
+    buildLeaderboardTable(entries, isOffline) {
+        if (entries.length === 0) {
+            return `<div class="pixel-text" style="font-size:8px;color:var(--text-muted);text-align:center;padding:16px;">No scores yet — be the first!</div>`;
+        }
+        const note = isOffline
+            ? `<div class="pixel-text" style="font-size:7px;color:var(--text-muted);text-align:center;margin-bottom:8px;">(showing local scores — offline)</div>`
+            : '';
+        const rows = entries.map(e => `
+            <tr>
+                <td style="color:${e.rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'}">${e.rank}</td>
+                <td>${e.playerName}</td>
+                <td style="color:var(--text-muted)">${e.industry || ''}</td>
+                <td style="color:var(--cyan)">${e.score}</td>
+                <td style="color:var(--gold)">${e.grade}</td>
+            </tr>
+        `).join('');
+        return `${note}<table class="data-table">
+            <thead><tr><th>#</th><th>NAME</th><th>INDUSTRY</th><th>SCORE</th><th>GRADE</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
     }
 
 

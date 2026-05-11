@@ -24,6 +24,8 @@ export class BoardScreen {
         this.el = null;
         this.typewriterTimers = [];
         this.stressFace = null;
+        this.currentMemberIndex = 0;
+        this._allMembers = [];
     }
 
     render() {
@@ -90,68 +92,33 @@ export class BoardScreen {
                     QUARTERLY REVIEW
                 </div>
 
-                <!-- Board members with reactions -->
-                <div class="board-members">
-                    ${regularFeedback.map((fb, i) => `
-                        <div class="board-member">
-                            <div class="board-member-portrait">
-                                ${this.getMemberEmoji(fb.member.personality)}
-                            </div>
-                            <div class="board-member-name">${fb.member.name}</div>
-                            <div class="board-member-role">${fb.member.role}</div>
-                            <div class="board-member-delta" style="font-family:var(--font-pixel);font-size:7px;color:${fb.satisfactionDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};">
-                                ${fb.satisfactionDelta >= 0 ? '+' : ''}${Math.round(fb.satisfactionDelta)}
-                            </div>
-                            <div class="board-speech" id="speech-${i}">
-                                <span class="speech-text"></span><span class="blink">_</span>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
+                <!-- Single member slot — one at a time -->
+                <div id="current-member-slot" class="board-members" style="min-height:160px;"></div>
 
                 ${eventNote ? `
-                    <div class="panel" style="margin-top:12px;border-color:var(--gold-dark);">
+                    <div class="panel" id="event-note-panel" style="margin-top:12px;border-color:var(--gold-dark);display:none;">
                         <div class="pixel-text" style="font-size:7px;color:var(--gold);margin-bottom:4px;">RE: RECENT EVENT</div>
                         ${eventNote}
-                    </div>
-                ` : ''}
-
-                ${ceoFeedback ? `
-                    <div class="ceo-appearance" style="margin-top:16px;">
-                        <div class="panel" style="border-color:var(--gold);background:rgba(255,204,0,0.05);">
-                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                                <span style="font-size:28px;">${CEO_EMOJIS[boardAI.ceoPersona] || '👑'}</span>
-                                <div>
-                                    <div class="pixel-text" style="font-size:9px;color:var(--gold);">${ceoFeedback.member.name}</div>
-                                    <div style="font-family:var(--font-pixel);font-size:7px;color:var(--text-muted);">CHAIRMAN OF THE BOARD</div>
-                                </div>
-                            </div>
-                            <div class="board-speech" id="speech-ceo" style="border-color:var(--gold-dark);background:rgba(0,0,0,0.2);">
-                                <span class="speech-text"></span><span class="blink">_</span>
-                            </div>
-                        </div>
                     </div>
                 ` : ''}
             </div>
 
             <div class="dashboard-footer">
-                <div></div>
-                <button class="btn btn-primary" id="btn-continue">CONTINUE ▶</button>
+                <div class="pixel-text" id="member-counter" style="font-size:7px;color:var(--text-muted);align-self:center;padding-left:8px;"></div>
+                <button class="btn btn-primary" id="btn-board-advance">NEXT →</button>
             </div>
         `;
 
-        // Store feedback data for typewriter
-        this._feedback = { regular: regularFeedback, ceo: ceoFeedback };
+        // Build ordered member list: regular members, then CEO at the end
+        this._allMembers = [...regularFeedback, ...(ceoFeedback ? [ceoFeedback] : [])];
+        this._eventNote = eventNote;
+        this.currentMemberIndex = 0;
 
         return this.el;
     }
 
     mount() {
         soundFX.boardReview();
-
-        this.el.querySelector('#btn-continue').addEventListener('click', () => {
-            gameLoop.completeBoardReview();
-        });
 
         // Stress face in quarter bar
         this.stressFace = new StressFace(40);
@@ -162,28 +129,98 @@ export class BoardScreen {
             this.stressFace.updateWidget();
         }
 
-        // Typewriter effect for board members
-        const { regular, ceo } = this._feedback;
-
-        setTimeout(() => {
-            regular.forEach((fb, i) => {
-                const text = fb.lines.join(' ');
-                this.typewriteText(`speech-${i}`, text, 200 + i * 600);
-            });
-
-            // CEO appears last with extra delay
-            if (ceo) {
-                const ceoDelay = 200 + regular.length * 600 + 400;
-                const ceoText = ceo.lines.join(' ');
-                this.typewriteText('speech-ceo', ceoText, ceoDelay);
+        const advanceBtn = this.el.querySelector('#btn-board-advance');
+        advanceBtn.addEventListener('click', () => {
+            const next = this.currentMemberIndex + 1;
+            if (next < this._allMembers.length) {
+                this.currentMemberIndex = next;
+                this.showMember(next);
+            } else {
+                gameLoop.completeBoardReview();
             }
-        }, 300);
+        });
+
+        // Show first member
+        this.showMember(0);
     }
 
     unmount() {
         this.typewriterTimers.forEach(t => clearTimeout(t));
         this.typewriterTimers = [];
         if (this.stressFace) { this.stressFace.stop(); this.stressFace = null; }
+        this.currentMemberIndex = 0;
+    }
+
+    showMember(index) {
+        // Clear any running typewriters
+        this.typewriterTimers.forEach(t => clearTimeout(t));
+        this.typewriterTimers = [];
+
+        const fb = this._allMembers[index];
+        const isLast = index === this._allMembers.length - 1;
+        const isCEO = fb.member.personality === 'ceo';
+
+        // Update counter
+        const counter = this.el.querySelector('#member-counter');
+        if (counter) {
+            counter.textContent = `${index + 1} / ${this._allMembers.length}`;
+        }
+
+        // Update advance button label
+        const btn = this.el.querySelector('#btn-board-advance');
+        if (btn) {
+            btn.textContent = isLast ? 'CONTINUE ▶' : 'NEXT →';
+        }
+
+        // Show event note panel only on the last item
+        const notePanel = this.el.querySelector('#event-note-panel');
+        if (notePanel) {
+            notePanel.style.display = isLast && this._eventNote ? 'block' : 'none';
+        }
+
+        // Render member HTML into slot
+        const memberSlot = this.el.querySelector('#current-member-slot');
+        if (!memberSlot) return;
+
+        if (isCEO) {
+            memberSlot.innerHTML = `
+                <div class="ceo-appearance">
+                    <div class="panel" style="border-color:var(--gold);background:rgba(255,204,0,0.05);">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="font-size:28px;">${CEO_EMOJIS[boardAI.ceoPersona] || '👑'}</span>
+                            <div>
+                                <div class="pixel-text" style="font-size:9px;color:var(--gold);">${fb.member.name}</div>
+                                <div style="font-family:var(--font-pixel);font-size:7px;color:var(--text-muted);">CHAIRMAN OF THE BOARD</div>
+                            </div>
+                            <div class="board-member-delta" style="font-family:var(--font-pixel);font-size:7px;color:${fb.satisfactionDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};">
+                                ${fb.satisfactionDelta >= 0 ? '+' : ''}${Math.round(fb.satisfactionDelta)}
+                            </div>
+                        </div>
+                        <div class="board-speech" id="current-speech" style="border-color:var(--gold-dark);background:rgba(0,0,0,0.2);">
+                            <span class="speech-text"></span><span class="blink">_</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            memberSlot.innerHTML = `
+                <div class="board-member">
+                    <div class="board-member-portrait">${this.getMemberEmoji(fb.member.personality)}</div>
+                    <div class="board-member-name">${fb.member.name}</div>
+                    <div class="board-member-role">${fb.member.role}</div>
+                    <div class="board-member-delta" style="font-family:var(--font-pixel);font-size:7px;color:${fb.satisfactionDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};">
+                        ${fb.satisfactionDelta >= 0 ? '+' : ''}${Math.round(fb.satisfactionDelta)}
+                    </div>
+                    <div class="board-speech" id="current-speech">
+                        <span class="speech-text"></span><span class="blink">_</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Start typewriter for this member
+        const text = fb.lines.join(' ');
+        this.typewriteText('current-speech', text, 150);
     }
 
     getMemberEmoji(personality) {

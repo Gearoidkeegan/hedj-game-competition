@@ -1,0 +1,67 @@
+name: Deploy Competition Backend (SAM)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: SAM Build + Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_COMP }}
+          aws-region: eu-north-1
+          role-session-name: GitHubActions-SAMDeploy-${{ github.run_id }}
+
+      - name: SAM build
+        working-directory: backend
+        run: sam build --template template.yaml
+
+      - name: SAM deploy
+        working-directory: backend
+        run: |
+          sam deploy \
+            --stack-name hedj-competition-backend \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --region eu-north-1 \
+            --parameter-overrides AdminKey="${{ secrets.COMP_ADMIN_KEY }}"
+
+      - name: Print API URL
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name hedj-competition-backend \
+            --region eu-north-1 \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+            --output text)
+          echo "## Backend Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "**API URL:** ${API_URL}" >> $GITHUB_STEP_SUMMARY
+          echo "Add this as the /api/* origin in CloudFront." >> $GITHUB_STEP_SUMMARY
+          echo "API_URL=${API_URL}" >> $GITHUB_STEP_SUMMARY

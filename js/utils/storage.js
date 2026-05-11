@@ -1,8 +1,10 @@
-// localStorage persistence for game saves and leaderboard
+// localStorage persistence for game saves, leaderboard, competition registration, and pending scores
 
 const SAVE_KEY = 'hedj_game_save';
 const LEADERBOARD_KEY = 'hedj_game_leaderboard';
 const GUIDE_SEEN_KEY = 'hedj_has_seen_guide';
+const REGISTRATION_KEY = 'hedj_comp_registration';
+const PENDING_SCORE_KEY = 'hedj_comp_pending_score';
 const MAX_LEADERBOARD_ENTRIES = 20;
 
 export function hasSeenGuide() {
@@ -104,4 +106,51 @@ function csvEscape(val) {
         return '"' + val.replace(/"/g, '""') + '"';
     }
     return val;
+}
+
+// ─── Competition Registration ─────────────────────────────────────────────
+
+export function getRegistration() {
+    try {
+        const data = localStorage.getItem(REGISTRATION_KEY);
+        return data ? JSON.parse(data) : null;
+    } catch {
+        return null;
+    }
+}
+
+export function saveRegistration(reg) {
+    // reg: { playerName, email, company, gameToken, gameTokenExpiry }
+    try {
+        localStorage.setItem(REGISTRATION_KEY, JSON.stringify(reg));
+    } catch (e) {
+        console.warn('Failed to save registration:', e);
+    }
+}
+
+export function clearRegistration() {
+    localStorage.removeItem(REGISTRATION_KEY);
+}
+
+// ─── Pending Score Queue ──────────────────────────────────────────────────
+
+export function savePendingScore(payload) {
+    try {
+        localStorage.setItem(PENDING_SCORE_KEY, JSON.stringify(payload));
+    } catch (e) {
+        console.warn('Failed to save pending score:', e);
+    }
+}
+
+export function getPendingScore() {
+    try {
+        const data = localStorage.getItem(PENDING_SCORE_KEY);
+        return data ? JSON.parse(data) : null;
+    } catch {
+        return null;
+    }
+}
+
+export function clearPendingScore() {
+    localStorage.removeItem(PENDING_SCORE_KEY);
 }

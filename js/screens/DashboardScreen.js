@@ -16,6 +16,7 @@ import { BloombergTerminal } from '../ui/BloombergTerminal.js';
 import { HedgeLadder } from '../ui/HedgeLadder.js';
 import { StressFace } from '../ui/StressFace.js';
 import { soundFX } from '../ui/SoundFX.js';
+import { trackEvent } from '../utils/api.js';
 
 // Format exposure size using physical units (mT, bbl) when defined, otherwise currency
 function formatExposureNotional(exp, notionalUSD) {
@@ -302,6 +303,11 @@ export class DashboardScreen {
     // -----------------------------------------------------------------------
 
     beginQuarter() {
+        // Track first quarter start as a "play" in analytics (fire-and-forget)
+        if (gameState.get().totalQuartersPlayed === 0) {
+            trackEvent('play');
+        }
+
         this.quarterStarted = true;
         soundFX.quarterStart();
 
@@ -981,6 +987,36 @@ export class DashboardScreen {
         const sat = state.boardSatisfaction;
         el.textContent = `${sat}%`;
         el.style.color = sat >= 50 ? 'var(--satisfaction-high)' : sat >= 25 ? 'var(--satisfaction-mid)' : 'var(--satisfaction-low)';
+        this.updatePolicyComplianceDot();
+    }
+
+    updatePolicyComplianceDot() {
+        const dot = this.el?.querySelector('#policy-compliance-dot');
+        if (!dot) return;
+
+        const state = gameState.get();
+        const policy = state.hedgingPolicy;
+        if (!policy || !state.exposures?.length) return;
+
+        const horizon = policy.hedgeHorizon || 4;
+        let allCompliant = true;
+
+        for (const exp of state.exposures) {
+            const totalExposure = (exp.quarterlyNotional || 0) * horizon;
+            if (totalExposure <= 0) continue;
+            const hedged = (state.hedgePortfolio || [])
+                .filter(h => h.underlying === exp.underlying && h.status === 'active' &&
+                             h.maturityQuarter <= state.totalQuartersPlayed + horizon)
+                .reduce((sum, h) => sum + (h.notional || 0), 0);
+            const ratio = hedged / totalExposure;
+            if (ratio < policy.minHedgeRatio || ratio > policy.maxHedgeRatio) {
+                allCompliant = false;
+                break;
+            }
+        }
+
+        dot.style.color = allCompliant ? 'var(--pnl-positive)' : 'var(--pnl-negative)';
+        dot.title = allCompliant ? 'All exposures within policy range' : 'One or more exposures outside policy range';
     }
 
     updateTradeCountBadge() {
@@ -1776,17 +1812,21 @@ export class DashboardScreen {
                     : policy.budgetRateType;
 
                 strip.innerHTML = `
-                    <span class="policy-strip-name">${policy.name}</span>
-                    <span class="policy-strip-details">
-                        ${formatPercent(policy.minHedgeRatio, 0)}-${formatPercent(policy.maxHedgeRatio, 0)}
-                        · ${horizonLabel}
-                        · ${products}
-                        · ${budgetLabel}
-                    </span>
-                    <span class="policy-strip-tap">TAP FOR DETAIL</span>
+                    <div class="policy-strip-row1">
+                        <span class="policy-strip-name">${policy.name}</span>
+                        <span class="policy-strip-range">${formatPercent(policy.minHedgeRatio, 0)}–${formatPercent(policy.maxHedgeRatio, 0)} HEDGE</span>
+                        <span id="policy-compliance-dot" class="policy-compliance-dot" title="Hedge ratio compliance">●</span>
+                    </div>
+                    <div class="policy-strip-row2">
+                        ${horizonLabel} horizon · ${products} · ${budgetLabel}
+                        <span class="policy-strip-tap">· tap for detail</span>
+                    </div>
                 `;
                 strip.style.cursor = 'pointer';
                 strip.addEventListener('click', () => this.showPolicyDetail());
+
+                // Initial compliance dot update
+                this.updatePolicyComplianceDot();
             }
         }
 

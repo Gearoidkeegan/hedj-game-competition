@@ -1,0 +1,83 @@
+name: Deploy Competition Frontend to S3 + CloudFront
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'data/**'
+      - 'assets/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Frontend to S3 + CloudFront
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_COMP }}
+          aws-region: eu-north-1
+          role-session-name: GitHubActions-DeployComp-${{ github.run_id }}
+
+      - name: Sync game files to S3
+        run: |
+          aws s3 sync . "s3://hedj-comp-assets-eu-north-1/" \
+            --region eu-north-1 \
+            --cache-control "public, max-age=300" \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "backend/*" \
+            --exclude "tools/*" \
+            --exclude "*.md" \
+            --exclude ".gitignore" \
+            --exclude ".claude/*" \
+            --delete
+
+          # Correct MIME types
+          for ext in js css json; do
+            case $ext in
+              js) ct="application/javascript" ;;
+              css) ct="text/css" ;;
+              json) ct="application/json" ;;
+            esac
+            aws s3 cp "s3://hedj-comp-assets-eu-north-1/" \
+              "s3://hedj-comp-assets-eu-north-1/" \
+              --recursive \
+              --exclude "*" \
+              --include "*.${ext}" \
+              --content-type "${ct}" \
+              --metadata-directive REPLACE \
+              --cache-control "public, max-age=300" \
+              --region eu-north-1
+          done
+
+      - name: Invalidate CloudFront
+        run: |
+          if [ -n "${{ secrets.CF_COMP_DISTRIBUTION_ID }}" ]; then
+            aws cloudfront create-invalidation \
+              --distribution-id "${{ secrets.CF_COMP_DISTRIBUTION_ID }}" \
+              --paths "/*" \
+              --region us-east-1
+            echo "CloudFront invalidation created"
+          else
+            echo "CF_COMP_DISTRIBUTION_ID not set — skipping CloudFront invalidation"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Deployed Competition Frontend" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** $(git rev-parse --short HEAD)" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://competition.hedj.eu" >> $GITHUB_STEP_SUMMARY

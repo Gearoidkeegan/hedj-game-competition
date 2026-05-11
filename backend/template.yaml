@@ -1,0 +1,188 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Hedj Competition Backend — persistent leaderboard, registration, analytics
+
+Parameters:
+  AdminKey:
+    Type: String
+    NoEcho: true
+    Description: Secret key for the admin analytics GET endpoint
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    MemorySize: 128
+    Timeout: 10
+    Environment:
+      Variables:
+        PLAYERS_TABLE: !Ref HCompPlayers
+        SCORES_TABLE: !Ref HCompScores
+        ANALYTICS_TABLE: !Ref HCompAnalytics
+        ADMIN_KEY: !Ref AdminKey
+
+Resources:
+
+  # ─── DynamoDB Tables ───────────────────────────────────────────────────────
+
+  HCompPlayers:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'HCompPlayers-${AWS::StackName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  HCompScores:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'HCompScores-${AWS::StackName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: scoreId
+          AttributeType: S
+        - AttributeName: leaderboard
+          AttributeType: S
+        - AttributeName: score
+          AttributeType: N
+      KeySchema:
+        - AttributeName: scoreId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: GlobalLeaderboard
+          KeySchema:
+            - AttributeName: leaderboard
+              KeyType: HASH
+            - AttributeName: score
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  HCompAnalytics:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'HCompAnalytics-${AWS::StackName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: metricName
+          AttributeType: S
+      KeySchema:
+        - AttributeName: metricName
+          KeyType: HASH
+
+  # ─── HTTP API ──────────────────────────────────────────────────────────────
+
+  CompetitionApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - 'https://competition.hedj.eu'
+          - 'http://localhost:8080'
+          - 'http://localhost:3000'
+        AllowHeaders:
+          - Content-Type
+          - x-admin-key
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+
+  # ─── Lambda Functions ─────────────────────────────────────────────────────
+
+  RegisterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/register.handler
+      Description: Register a player for prize eligibility
+      Events:
+        Register:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /register
+            Method: POST
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HCompPlayers
+
+  ScoreFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/score.handler
+      Description: Submit a game score to the persistent leaderboard
+      Events:
+        SubmitScore:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /score
+            Method: POST
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HCompPlayers
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HCompScores
+
+  LeaderboardFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/leaderboard.handler
+      Description: Retrieve the global leaderboard
+      Events:
+        GetLeaderboard:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /leaderboard
+            Method: GET
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref HCompScores
+
+  AnalyticsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/analytics.handler
+      Description: Track site visits and plays; admin read endpoint
+      Events:
+        TrackEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /analytics
+            Method: POST
+        GetAnalytics:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /analytics
+            Method: GET
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HCompAnalytics
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway invoke URL — add as /api/* origin in CloudFront
+    Value: !Sub 'https://${CompetitionApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+  PlayersTable:
+    Value: !Ref HCompPlayers
+  ScoresTable:
+    Value: !Ref HCompScores
+  AnalyticsTable:
+    Value: !Ref HCompAnalytics
