@@ -1,0 +1,305 @@
+{
+    "events": [
+        {
+            "id": "contingent_deal",
+            "name": "Contingent Sales Deal",
+            "type": "two_part",
+            "category": "corporate",
+            "part1": {
+                "title": "Call from the Sales Team",
+                "description": "The sales team just called: there's a highly contingent deal in the pipeline that would significantly increase your {exposure_type} exposure. The deal has a 50/50 chance of closing next quarter.",
+                "choices": [
+                    {
+                        "id": "hedge_forward",
+                        "label": "Hedge with forward/future",
+                        "description": "Lock in the rate now. If the deal falls through, you'll face breakage costs."
+                    },
+                    {
+                        "id": "hedge_option",
+                        "label": "Hedge with option",
+                        "description": "Pay a premium for flexibility. No breakage if the deal falls through."
+                    },
+                    {
+                        "id": "no_hedge",
+                        "label": "Don't hedge yet",
+                        "description": "Wait and see if the deal materialises before committing."
+                    }
+                ]
+            },
+            "part2_delay": 1,
+            "part2_materialise_chance": 0.5,
+            "part2_materialised": {
+                "title": "The Deal Closed!",
+                "description": "The contingent deal has materialised. Your exposure has increased.",
+                "outcomes": {
+                    "hedge_forward_itm": {
+                        "description": "Your forward is in the money. Mixed reactions from the board.",
+                        "board_reactions": {
+                            "praise": "Smart move hedging early — the rate moved in our favour.",
+                            "criticism": "You got lucky. Hedging a contingent deal with a forward was reckless. What if it hadn't closed?"
+                        },
+                        "satisfaction_delta": 1
+                    },
+                    "hedge_forward_otm": {
+                        "description": "Your forward is out of the money. The board is not impressed.",
+                        "board_reactions": {
+                            "criticism": "You hedged a 50/50 deal with a hard commitment and it's underwater. That's poor risk management."
+                        },
+                        "satisfaction_delta": -5
+                    },
+                    "hedge_option_itm": {
+                        "description": "Your option is in the money. The board acknowledges the strategy.",
+                        "board_reactions": {
+                            "praise": "The option worked out. Good use of flexible instruments for contingent exposure."
+                        },
+                        "satisfaction_delta": 3
+                    },
+                    "hedge_option_otm": {
+                        "description": "Your option expired worthless, but the deal closed and you're exposed.",
+                        "board_reactions": {
+                            "criticism": "We paid a premium and got nothing. At least there's no breakage cost."
+                        },
+                        "satisfaction_delta": -2
+                    },
+                    "no_hedge": {
+                        "description": "The deal closed and you're fully exposed to market rates.",
+                        "board_reactions": {
+                            "criticism": "The deal closed and we have no hedge in place. Rates have moved against us."
+                        },
+                        "satisfaction_delta": -4
+                    }
+                }
+            },
+            "part2_not_materialised": {
+                "title": "Deal Fell Through",
+                "description": "The contingent deal did not materialise.",
+                "outcomes": {
+                    "hedge_forward": {
+                        "description": "You hedged a deal that never happened. Must unwind at breakage cost.",
+                        "board_reactions": {
+                            "criticism": "We now have a hedge with no underlying exposure. Unwind costs are significant."
+                        },
+                        "satisfaction_delta": -6
+                    },
+                    "hedge_option": {
+                        "description": "The option simply expires. Premium was the cost of prudence.",
+                        "board_reactions": {
+                            "mild_criticism": "We spent money on options for a deal that never closed.",
+                            "grudging_praise": "At least you used options — no breakage cost. That was smart."
+                        },
+                        "satisfaction_delta": -1
+                    },
+                    "no_hedge": {
+                        "description": "Good call — no hedge needed for a deal that didn't happen.",
+                        "board_reactions": {
+                            "praise": "Prudent decision to wait. No unnecessary costs incurred."
+                        },
+                        "satisfaction_delta": 2
+                    }
+                }
+            },
+            "weight": 1.0,
+            "industries": ["all"]
+        },
+        {
+            "id": "revenue_shortfall",
+            "name": "Revenue Shortfall",
+            "type": "instant",
+            "category": "universal",
+            "title": "Revenue Warning",
+            "description": "Sales have come in 20% below forecast this quarter. Your revenue exposures have been reduced accordingly. Review your hedge book — you may now be over-hedged and should consider unwinding excess positions yourself.",
+            "choices": [
+                {
+                    "id": "acknowledge",
+                    "label": "Continue",
+                    "description": "Acknowledge the revenue shortfall and review your book.",
+                    "effect": { "revenue_shrink_pct": 0.2, "satisfaction_delta": -1 }
+                }
+            ],
+            "weight": 1.0,
+            "industries": ["all"]
+        },
+        {
+            "id": "cost_overrun",
+            "name": "Cost Overrun",
+            "type": "instant",
+            "category": "universal",
+            "title": "Cost Overrun Alert",
+            "description": "Operating costs have exceeded budget by 15%. Your cost-side commodity and FX exposures have grown beyond your existing hedges. You'll need to add coverage yourself to avoid an under-hedged book.",
+            "choices": [
+                {
+                    "id": "acknowledge",
+                    "label": "Continue",
+                    "description": "Acknowledge the cost overrun and rebalance your hedges.",
+                    "effect": { "cost_increase_pct": 0.15, "satisfaction_delta": -1 }
+                }
+            ],
+            "weight": 1.0,
+            "industries": ["all"]
+        },
+        {
+            "id": "margin_call_event",
+            "name": "Major Margin Call",
+            "type": "instant",
+            "category": "universal",
+            "title": "Margin Call — Additional Collateral Required",
+            "description": "Market moves have triggered a significant margin call on your derivative positions. Cash must be posted immediately.",
+            "choices": [
+                {
+                    "id": "post_margin",
+                    "label": "Post the margin",
+                    "description": "Use cash reserves to meet the margin call.",
+                    "effect": { "cash_drain_pct": 0.08, "satisfaction_delta": -3 }
+                },
+                {
+                    "id": "partial_unwind",
+                    "label": "Partially unwind positions",
+                    "description": "Close some positions to reduce margin requirements. Incurs breakage costs.",
+                    "effect": { "unwind_pct": 0.3, "satisfaction_delta": -2 }
+                }
+            ],
+            "weight": 0.6,
+            "industries": ["all"]
+        },
+        {
+            "id": "regulatory_change",
+            "name": "Regulatory Change",
+            "type": "instant",
+            "category": "universal",
+            "title": "New Regulatory Requirements",
+            "description": "The regulator has mandated stricter margin requirements on OTC derivatives. Your posting requirements just doubled.",
+            "choices": [
+                {
+                    "id": "comply",
+                    "label": "Comply immediately",
+                    "description": "Post additional margin. Strains cash but keeps regulators happy.",
+                    "effect": { "cash_drain_pct": 0.05, "satisfaction_delta": 1 }
+                },
+                {
+                    "id": "restructure",
+                    "label": "Restructure positions",
+                    "description": "Move to exchange-traded products to reduce margin. Takes time and costs.",
+                    "effect": { "satisfaction_delta": -1 }
+                }
+            ],
+            "weight": 0.4,
+            "industries": ["all"]
+        },
+        {
+            "id": "pharma_rejection",
+            "name": "Product Not Approved",
+            "type": "instant",
+            "category": "industry_specific",
+            "title": "FDA Rejection — Product Not Approved",
+            "description": "Your blockbuster drug has been rejected by the regulator. Projected USD revenue has evaporated — your revenue exposures have been wiped out. Any forward hedges you booked against this revenue are now naked positions; you'll need to unwind them yourself (and pay the breakage). Options would have simply expired.",
+            "choices": [
+                {
+                    "id": "acknowledge",
+                    "label": "Continue",
+                    "description": "Acknowledge the rejection and review your hedge book.",
+                    "effect": { "revenue_shrink_pct": 1.0, "satisfaction_delta": -3 }
+                }
+            ],
+            "board_note": "Options used for revenue hedging are praised here — no breakage. Forwards are criticised.",
+            "weight": 1.8,
+            "industries": ["pharma"]
+        },
+        {
+            "id": "construction_delay",
+            "name": "Project Delay",
+            "type": "instant",
+            "category": "industry_specific",
+            "title": "Major Project Delayed 6 Months",
+            "description": "Your flagship project has been delayed by 6 months. Near-term materials and equipment exposures have shrunk by half — the work simply isn't happening yet. Your existing hedges still settle on the original schedule, leaving you over-hedged in the short term. Roll or unwind to match the new timeline.",
+            "choices": [
+                {
+                    "id": "acknowledge",
+                    "label": "Continue",
+                    "description": "Acknowledge the delay and rebalance your hedges.",
+                    "effect": { "cost_shrink_pct": 0.5, "satisfaction_delta": -2 }
+                }
+            ],
+            "weight": 2.0,
+            "industries": ["construction"]
+        },
+        {
+            "id": "fuel_spike",
+            "name": "Fuel Price Spike",
+            "type": "instant",
+            "category": "industry_specific",
+            "title": "Fuel Prices Surge 25%",
+            "description": "Geopolitical tensions have caused a 25% spike in fuel prices. Brent has just jumped — your unhedged fuel exposure is now marked at a much higher level. Decide whether to lock in here or ride it out.",
+            "choices": [
+                {
+                    "id": "acknowledge",
+                    "label": "Continue",
+                    "description": "Acknowledge the fuel spike and review your hedge book.",
+                    "effect": { "rate_shock": { "JETNWE": 0.25 }, "satisfaction_delta": -2 }
+                }
+            ],
+            "weight": 1.5,
+            "industries": ["airline"]
+        },
+        {
+            "id": "pe_acquisition",
+            "name": "Private Equity Takeover",
+            "type": "instant",
+            "category": "corporate",
+            "title": "Private Equity Acquisition",
+            "description": "The company has been acquired by a PE firm. Significant debt has been added. The board has been replaced with PE partners who have zero tolerance for losses. Your IR exposure just doubled.",
+            "choices": [
+                {
+                    "id": "accept",
+                    "label": "Adapt to new reality",
+                    "description": "Adjust your strategy for the new debt load and tougher board.",
+                    "effect": { "pe_takeover": true, "ir_exposure_multiply": 2, "satisfaction_reset": 50, "satisfaction_delta": 0 }
+                }
+            ],
+            "weight": 0.3,
+            "min_quarter": 4,
+            "industries": ["all"]
+        },
+        {
+            "id": "bank_downgrade",
+            "name": "Counterparty Downgrade",
+            "type": "instant",
+            "category": "corporate",
+            "title": "Bank Counterparty Downgraded",
+            "description": "One of your banking counterparties has been downgraded by rating agencies. Your concentrated positions with them are now a concern.",
+            "choices": [
+                {
+                    "id": "diversify",
+                    "label": "Move positions to other banks",
+                    "description": "Transfer hedges to stronger counterparties. Incurs transfer costs.",
+                    "effect": { "transfer_cost_pct": 0.01, "satisfaction_delta": 1 }
+                },
+                {
+                    "id": "stay",
+                    "label": "Maintain existing positions",
+                    "description": "Keep positions where they are. Risk of counterparty failure.",
+                    "effect": { "counterparty_risk": true, "satisfaction_delta": -3 }
+                }
+            ],
+            "weight": 0.5,
+            "industries": ["all"]
+        },
+        {
+            "id": "supply_disruption",
+            "name": "Supply Chain Disruption",
+            "type": "instant",
+            "category": "industry_specific",
+            "title": "Supply Chain Disruption",
+            "description": "A major supply route has been disrupted. Your commodity prices have spiked 15%. Existing hedges have rallied in your favour, but any new coverage will be more expensive — review your book and decide whether to add more.",
+            "choices": [
+                {
+                    "id": "acknowledge",
+                    "label": "Continue",
+                    "description": "Acknowledge the disruption and review your hedges.",
+                    "effect": { "commodity_spike": 0.15, "satisfaction_delta": -1 }
+                }
+            ],
+            "weight": 1.3,
+            "industries": ["tech", "construction", "agrifoods"]
+        }
+    ]
+}

@@ -1,0 +1,103 @@
+name: Deploy Game to S3 + CloudFront
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'data/**'
+      - 'assets/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to S3 + CloudFront
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-north-1
+          role-session-name: GitHubActions-DeployGame-${{ github.run_id }}
+
+      - name: Sync game files to S3
+        run: |
+          # Sync all game files to pages/game/ prefix
+          aws s3 sync . "s3://hedj-static-assets-eu-north-1/pages/game/" \
+            --region eu-north-1 \
+            --cache-control "public, max-age=300" \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "tools/*" \
+            --exclude "*.md" \
+            --exclude ".gitignore" \
+            --delete
+
+          # Set correct content types for specific file extensions
+          aws s3 cp "s3://hedj-static-assets-eu-north-1/pages/game/" \
+            "s3://hedj-static-assets-eu-north-1/pages/game/" \
+            --recursive \
+            --exclude "*" \
+            --include "*.js" \
+            --content-type "application/javascript" \
+            --metadata-directive REPLACE \
+            --cache-control "public, max-age=300" \
+            --region eu-north-1
+
+          aws s3 cp "s3://hedj-static-assets-eu-north-1/pages/game/" \
+            "s3://hedj-static-assets-eu-north-1/pages/game/" \
+            --recursive \
+            --exclude "*" \
+            --include "*.css" \
+            --content-type "text/css" \
+            --metadata-directive REPLACE \
+            --cache-control "public, max-age=300" \
+            --region eu-north-1
+
+          aws s3 cp "s3://hedj-static-assets-eu-north-1/pages/game/" \
+            "s3://hedj-static-assets-eu-north-1/pages/game/" \
+            --recursive \
+            --exclude "*" \
+            --include "*.json" \
+            --content-type "application/json" \
+            --metadata-directive REPLACE \
+            --cache-control "public, max-age=300" \
+            --region eu-north-1
+
+      - name: Invalidate CloudFront
+        run: |
+          if [ -n "${{ secrets.CF_APP_DISTRIBUTION_ID }}" ]; then
+            aws cloudfront create-invalidation \
+              --distribution-id "${{ secrets.CF_APP_DISTRIBUTION_ID }}" \
+              --paths "/pages/game/*" \
+              --region us-east-1
+            echo "CloudFront invalidation created for /pages/game/*"
+          else
+            echo "CF_APP_DISTRIBUTION_ID not set — skipping CloudFront invalidation"
+          fi
+
+      - name: Summary
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          FILE_COUNT=$(find . -not -path './.git/*' -not -path './.github/*' -not -path './tools/*' -not -name '*.md' -type f | wc -l)
+          echo "## Deployed Treasury Manager Game" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${COMMIT_SHA}" >> $GITHUB_STEP_SUMMARY
+          echo "**Files:** ${FILE_COUNT}" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://app.hedj.eu/pages/game/index.html" >> $GITHUB_STEP_SUMMARY

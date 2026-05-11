@@ -1,0 +1,371 @@
+/* ============================================
+   Reusable components
+   ============================================ */
+
+/* ---- Hedge Ladder ---- */
+.hedge-ladder {
+    font-family: var(--font-readable);
+}
+
+.hedge-ladder-row {
+    border: 1px solid transparent;
+    border-radius: 2px;
+}
+
+.hedge-ladder-row:hover:not(.past) {
+    background: rgba(68, 204, 221, 0.05);
+}
+
+.hedge-ladder-row.selected {
+    background: rgba(68, 204, 221, 0.1);
+    border-color: var(--cyan);
+}
+
+/* Inline range sliders for each tenor row */
+.ladder-row-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 16px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-inner);
+    border-radius: 2px;
+    outline: none;
+}
+
+.ladder-row-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 16px;
+    background: var(--cyan);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.ladder-row-slider::-moz-range-thumb {
+    width: 10px;
+    height: 16px;
+    background: var(--cyan);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.ladder-row-slider::-webkit-slider-runnable-track {
+    height: 6px;
+    background: linear-gradient(to right, var(--pnl-positive) 0%, var(--gold) 50%, var(--pnl-negative) 100%);
+    border-radius: 2px;
+}
+
+.ladder-row-slider::-moz-range-track {
+    height: 6px;
+    background: linear-gradient(to right, var(--pnl-positive) 0%, var(--gold) 50%, var(--pnl-negative) 100%);
+    border-radius: 2px;
+}
+
+/* ---- Modal / Dialog overlay ---- */
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal {
+    background: var(--bg-panel);
+    border: 3px solid var(--border-outer);
+    border-top-color: var(--border-highlight);
+    border-left-color: var(--border-highlight);
+    border-bottom-color: var(--border-shadow);
+    border-right-color: var(--border-shadow);
+    min-width: 300px;
+    max-width: 500px;
+    animation: slideUp 0.2s ease;
+}
+
+.modal-header {
+    background: linear-gradient(180deg, var(--rct-brown) 0%, var(--rct-brown-dark) 100%);
+    padding: 6px 10px;
+    font-family: var(--font-pixel);
+    font-size: 9px;
+    color: var(--text-bright);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-close {
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 2px 6px;
+}
+
+.modal-close:hover {
+    color: var(--pnl-negative);
+}
+
+.modal-body {
+    padding: 12px;
+    font-family: var(--font-readable);
+    font-size: 18px;
+    color: var(--text-primary);
+}
+
+.modal-footer {
+    padding: 8px 12px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid var(--border-inner);
+}
+
+/* ---- Tooltip ---- */
+.tooltip {
+    position: absolute;
+    background: var(--bg-dark);
+    border: 2px solid var(--gold);
+    padding: 6px 10px;
+    font-family: var(--font-readable);
+    font-size: 16px;
+    color: var(--text-primary);
+    z-index: 600;
+    pointer-events: none;
+    max-width: 250px;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+}
+
+/* ---- Notification / Toast ---- */
+.toast-container {
+    position: absolute;
+    top: 40px;
+    right: 8px;
+    z-index: 400;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.toast {
+    background: var(--bg-panel);
+    border: 2px solid var(--border-outer);
+    padding: 8px 12px;
+    font-family: var(--font-readable);
+    font-size: 16px;
+    color: var(--text-primary);
+    animation: slideUp 0.3s ease, fadeIn 0.3s ease;
+    max-width: 280px;
+}
+
+.toast.success { border-left: 4px solid var(--pnl-positive); }
+.toast.warning { border-left: 4px solid var(--warning); }
+.toast.error { border-left: 4px solid var(--pnl-negative); }
+.toast.info { border-left: 4px solid var(--cyan); }
+
+/* ---- Mini sparkline chart ---- */
+.mini-chart {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 24px;
+    vertical-align: middle;
+}
+
+.mini-chart-bar {
+    width: 4px;
+    background: var(--cyan);
+    min-height: 2px;
+}
+
+.mini-chart-bar.positive { background: var(--pnl-positive); }
+.mini-chart-bar.negative { background: var(--pnl-negative); }
+
+/* ---- Loading spinner ---- */
+.spinner {
+    display: inline-block;
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    color: var(--gold);
+}
+
+.spinner::after {
+    content: '|';
+    animation: spin-chars 0.5s steps(4) infinite;
+}
+
+@keyframes spin-chars {
+    0% { content: '|'; }
+    25% { content: '/'; }
+    50% { content: '-'; }
+    75% { content: '\\'; }
+}
+
+/* ---- Divider ---- */
+.divider {
+    border: none;
+    border-top: 1px solid var(--border-inner);
+    margin: 8px 0;
+}
+
+/* ---- Badge / Tag ---- */
+.badge {
+    display: inline-block;
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    padding: 2px 6px;
+    border: 1px solid;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-fx {
+    background: rgba(42, 74, 106, 0.5);
+    border-color: #4477aa;
+    color: #66aaff;
+}
+
+.badge-commodity {
+    background: rgba(74, 58, 42, 0.5);
+    border-color: #aa8844;
+    color: #ddaa66;
+}
+
+.badge-ir {
+    background: rgba(42, 74, 58, 0.5);
+    border-color: #44aa77;
+    color: #66ddaa;
+}
+
+/* ---- Satisfaction face indicator ---- */
+.satisfaction-face {
+    font-size: 24px;
+    text-align: center;
+}
+
+/* ---- Stress Face (Doom-style HUD) ---- */
+.stress-face-widget {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.stress-face-canvas {
+    image-rendering: pixelated;
+    border: 2px solid var(--border-outer);
+    background: var(--bg-dark);
+}
+
+/* Isometric scene uses pre-rendered PNG backdrops — render smoothly,
+   not pixelated, so the Hedj brand illustrations look clean. */
+#iso-canvas {
+    image-rendering: auto;
+    image-rendering: -webkit-optimize-contrast;
+}
+
+.stress-face-label {
+    font-size: 6px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+}
+
+.stress-face-level {
+    font-size: 8px;
+    color: var(--gold);
+}
+
+/* ---- Tab system ---- */
+.tab-bar {
+    display: flex;
+    border-bottom: 2px solid var(--border-outer);
+}
+
+.tab {
+    font-family: var(--font-pixel);
+    font-size: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border: 2px solid transparent;
+    border-bottom: none;
+    background: var(--bg-input);
+    margin-right: 2px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+}
+
+.tab:hover {
+    color: var(--text-secondary);
+}
+
+.tab.active {
+    background: var(--bg-panel);
+    color: var(--gold);
+    border-color: var(--border-outer);
+    border-top-color: var(--border-highlight);
+    border-left-color: var(--border-highlight);
+    border-right-color: var(--border-shadow);
+    position: relative;
+    top: 2px;
+}
+
+.tab-content {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+}
+
+.tab-content.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ---- Progress pips (quarter indicators) ---- */
+.quarter-pips {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.quarter-pip {
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--border-inner);
+    background: var(--bg-input);
+}
+
+.quarter-pip.completed {
+    background: var(--pnl-positive);
+    border-color: #229944;
+}
+
+.quarter-pip.current {
+    background: var(--gold);
+    border-color: var(--gold-dark);
+    animation: pulseGlow 1s ease infinite;
+}
+
+.quarter-pip.future {
+    background: var(--bg-input);
+}
+
+/* Year divider between pips */
+.quarter-pip-divider {
+    width: 2px;
+    height: 16px;
+    background: var(--border-outer);
+    margin: 0 2px;
+}

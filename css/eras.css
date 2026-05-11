@@ -1,0 +1,467 @@
+/* ============================================
+   Era-specific communication styles
+   Fax (90s) → Outlook (00s) → BlackBerry (late 00s) → Slack (10s) → Teams (20s)
+   ============================================ */
+
+/* ---- Shared era popup base ---- */
+.era-popup {
+    max-width: 560px;
+    width: 100%;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+/* ============================================
+   FAX (1994-1999) — dot-matrix, paper texture
+   ============================================ */
+.era-fax {
+    background: #f5f0e0;
+    border: 2px solid #999;
+    font-family: 'Courier New', monospace;
+    color: #222;
+}
+
+.fax-banner {
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    padding: 8px;
+    border-bottom: 2px dashed #999;
+    color: #333;
+}
+
+.fax-meta {
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.8;
+    color: #444;
+}
+
+.fax-line {
+    border-top: 1px solid #999;
+    margin: 0 12px;
+}
+
+.fax-body {
+    padding: 12px 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #222;
+}
+
+.fax-category {
+    font-weight: bold;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.fax-footer {
+    text-align: center;
+    font-size: 11px;
+    padding: 8px;
+    border-top: 2px dashed #999;
+    color: #777;
+}
+
+/* ============================================
+   OUTLOOK 2000 (2000-2005) — blue/grey window
+   ============================================ */
+.era-outlook {
+    background: #f0f0f0;
+    border: 2px solid #666;
+    font-family: 'Tahoma', 'Segoe UI', sans-serif;
+    color: #222;
+}
+
+.outlook-titlebar {
+    background: linear-gradient(180deg, #0a246a 0%, #3a6ea5 100%);
+    color: white;
+    padding: 3px 6px;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.outlook-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.outlook-window-btns {
+    display: flex;
+    gap: 2px;
+}
+
+.outlook-window-btns span {
+    display: inline-block;
+    width: 16px;
+    height: 14px;
+    background: #c0c0c0;
+    border: 1px outset #ddd;
+    text-align: center;
+    font-size: 9px;
+    line-height: 14px;
+    color: #222;
+}
+
+.outlook-toolbar {
+    background: #e8e8e0;
+    border-bottom: 1px solid #aaa;
+    padding: 2px 6px;
+    font-size: 11px;
+    display: flex;
+    gap: 4px;
+}
+
+.outlook-tool {
+    padding: 1px 6px;
+    color: #333;
+    cursor: default;
+}
+
+.outlook-tool:hover {
+    background: #d0d0d0;
+}
+
+.outlook-tool-sep {
+    color: #999;
+}
+
+.outlook-meta {
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.8;
+    border-bottom: 1px solid #ccc;
+    color: #333;
+    background: #fff;
+}
+
+.outlook-meta strong {
+    color: #222;
+    min-width: 50px;
+    display: inline-block;
+}
+
+.outlook-body {
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    background: #fff;
+    color: #222;
+    min-height: 60px;
+}
+
+/* ============================================
+   BLACKBERRY (2006-2011) — small screen, BB chrome
+   ============================================ */
+.era-blackberry {
+    background: #1a1a24;
+    border: 3px solid #444;
+    border-radius: 8px;
+    font-family: 'Lucida Console', 'Courier New', monospace;
+    color: #e0e0e0;
+    max-width: 380px;
+}
+
+.bb-statusbar {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 8px;
+    font-size: 9px;
+    color: #888;
+    border-bottom: 1px solid #333;
+}
+
+.bb-battery {
+    letter-spacing: -1px;
+}
+
+.bb-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #333;
+}
+
+.bb-icon {
+    font-size: 14px;
+    color: #ff4444;
+}
+
+.bb-from {
+    font-size: 11px;
+    color: #ccc;
+    flex: 1;
+}
+
+.bb-priority {
+    background: #cc0000;
+    color: white;
+    font-size: 9px;
+    font-weight: bold;
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+}
+
+.bb-subject {
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #fff;
+    border-bottom: 1px solid #333;
+}
+
+.bb-body {
+    padding: 8px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #ddd;
+    min-height: 48px;
+}
+
+.bb-footer {
+    padding: 4px 8px;
+    font-size: 8px;
+    color: #555;
+    text-align: right;
+    border-top: 1px solid #333;
+    font-style: italic;
+}
+
+/* ============================================
+   SLACK (2012-2017) — flat design, channels
+   ============================================ */
+.era-slack {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Lato', 'Helvetica Neue', sans-serif;
+    color: #333;
+}
+
+.slack-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.slack-channel {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.slack-badge {
+    background: #e01e5a;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 10px;
+}
+
+.slack-message {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+}
+
+.slack-avatar {
+    width: 32px;
+    height: 32px;
+    background: #4a154b;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.slack-content {
+    flex: 1;
+}
+
+.slack-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+
+.slack-sender {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.slack-time {
+    font-size: 10px;
+    color: #999;
+}
+
+.slack-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1264a3;
+    margin-bottom: 4px;
+}
+
+.slack-body {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* ============================================
+   TEAMS (2018-2024) — chat bubbles, reactions
+   ============================================ */
+.era-teams {
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-family: 'Segoe UI', sans-serif;
+    color: #252423;
+}
+
+.teams-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #464775;
+    color: white;
+    border-radius: 4px 4px 0 0;
+}
+
+.teams-channel-icon {
+    font-size: 14px;
+}
+
+.teams-channel-name {
+    font-size: 13px;
+    font-weight: 600;
+    flex: 1;
+}
+
+.teams-badge {
+    background: #c4314b;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 1px 5px;
+    border-radius: 10px;
+    min-width: 16px;
+    text-align: center;
+}
+
+.teams-chat {
+    padding: 12px;
+}
+
+.teams-message {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.teams-avatar {
+    width: 28px;
+    height: 28px;
+    background: #6264a7;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.teams-bubble {
+    background: #e8ebfa;
+    border-radius: 4px 12px 12px 12px;
+    padding: 8px 12px;
+    flex: 1;
+}
+
+.teams-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+
+.teams-sender {
+    font-size: 12px;
+    font-weight: 600;
+    color: #252423;
+}
+
+.teams-time {
+    font-size: 10px;
+    color: #999;
+}
+
+.teams-subject {
+    font-size: 13px;
+    font-weight: 600;
+    color: #252423;
+    margin-bottom: 4px;
+}
+
+.teams-body {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+}
+
+.teams-reactions {
+    display: flex;
+    gap: 6px;
+    margin-left: 36px;
+    margin-bottom: 8px;
+}
+
+.teams-reaction {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: #555;
+}
+
+.teams-typing {
+    font-size: 11px;
+    color: #999;
+    margin-left: 36px;
+    font-style: italic;
+}
+
+.teams-typing-dots {
+    animation: teamsDots 1.2s steps(3) infinite;
+    display: inline-block;
+    width: 18px;
+    text-align: left;
+    overflow: hidden;
+}
+
+@keyframes teamsDots {
+    0% { content: '.'; }
+    33% { content: '..'; }
+    66% { content: '...'; }
+}

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Treasury Manager Simulator | Hedj</title>
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/retro.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/screens.css">
+    <link rel="stylesheet" href="css/eras.css">
+    <link rel="stylesheet" href="css/responsive.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>💰</text></svg>">
+
+    <!-- Prevent zoom on double-tap (convention tablets) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+    <div id="game-viewport">
+        <!-- Screens are rendered here by JS -->
+        <div id="screen-container"></div>
+
+        <!-- Toast notification container -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <!-- App entry point -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

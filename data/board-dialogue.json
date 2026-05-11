@@ -1,0 +1,475 @@
+{
+    "ceoPersonas": {
+        "jameson": {
+            "name": "J. Jonah Jameson Type",
+            "description": "Always angry, demands results, shouts a lot",
+            "signature": "I DON'T WANT EXCUSES, I WANT RESULTS!"
+        },
+        "musk": {
+            "name": "Elon Musk Type",
+            "description": "Erratic, visionary, tweets too much, makes wild pivots",
+            "signature": "This is either genius or we're going to Mars. Either way, I'm tweeting about it."
+        },
+        "oleary": {
+            "name": "Michael O'Leary Type",
+            "description": "Cost-obsessed, blunt, hates paying for anything",
+            "signature": "If it costs money, I hate it. If it saves money, I love it. Simple."
+        },
+        "dimon": {
+            "name": "Jamie Dimon Type",
+            "description": "Sophisticated, understands derivatives, catches sloppy work",
+            "signature": "I've been in this business 40 years. Don't try to bluff me."
+        },
+        "buffett": {
+            "name": "Warren Buffett Type",
+            "description": "Patient, values long-term thinking, hates speculation",
+            "signature": "Risk comes from not knowing what you're doing."
+        },
+        "jobs": {
+            "name": "Steve Jobs Type",
+            "description": "Design obsessive, believes in simplicity, reality distortion field, won't let his own kids use the products",
+            "signature": "People don't know what they want until you show it to them."
+        },
+        "dorsey": {
+            "name": "Jack Dorsey Type",
+            "description": "Zen hippie CEO, obsessed with wellness, meditation, fasting, ice baths, and Bitcoin",
+            "signature": "I've been thinking about this during my morning meditation and 47-minute ice bath."
+        },
+        "ackman": {
+            "name": "Bill Ackman Type",
+            "description": "Extremely verbose, writes essay-length opinions on everything, high conviction activist investor, always has a thesis",
+            "signature": "Let me walk you through my thinking on this, because I believe the market is fundamentally mispricing our risk..."
+        }
+    },
+
+    "aggressive": {
+        "good_pnl": [
+            "Not bad. Don't let it go to your head.",
+            "Finally, some numbers I can show the shareholders.",
+            "You're no Warren Buffett, but you did OK.",
+            "Acceptable. Barely.",
+            "The competitors would kill for these numbers. Keep it up.",
+            "Even a broken clock is right twice a day. Well done... I think.",
+            "I'll admit it — I didn't think you had it in you.",
+            "My golf handicap is still better than your performance, but this'll do.",
+            "The board is... not unhappy. That's high praise from us.",
+            "Don't spend it all in one place. Actually, don't spend any of it."
+        ],
+        "bad_pnl": [
+            "Who do you think you are, Elon Musk? You still answer to this board!",
+            "These numbers are a disaster. What exactly are we paying you for?",
+            "My nephew could do a better job, and he's twelve.",
+            "I've seen better risk management from a casino.",
+            "Are you sure you know what you're doing?",
+            "The shareholders are going to eat us alive. Thanks for that.",
+            "I'm starting to wonder if we should have hired the other candidate.",
+            "This is not what I signed up for when I joined this board.",
+            "You're making us look like amateurs out there.",
+            "I've had it up to HERE with these losses. What's your plan?",
+            "Do you even read the market reports, or do you just wing it?",
+            "My blood pressure can't take another quarter like this."
+        ],
+        "neutral_pnl": [
+            "Mediocre. The board expects more.",
+            "Not a disaster, but nothing to write home about either.",
+            "Treading water isn't a strategy.",
+            "The market gave you opportunities and you just... sat there?",
+            "Average. And in this business, average gets you fired.",
+            "You're not Michael O'Leary — you can't do whatever you want."
+        ],
+        "overtrading": [
+            "Stop churning the book! You're not a day trader!",
+            "Every trade costs money. Are you trying to bankrupt us in fees?",
+            "This isn't a video game — oh wait, it is. But still, stop trading so much!",
+            "The trading desk called. They love you. You're their best customer.",
+            "More trades than a secondhand car dealer. Calm down."
+        ],
+        "option_premium": [
+            "Why are we paying for insurance? Are we made of money?",
+            "Options?! The premium alone could fund a small country.",
+            "I don't like paying for things we might never use.",
+            "That premium better be worth it. I have my doubts."
+        ],
+        "option_saved": [
+            "Fine, the options saved us. I'll give you that ONE time.",
+            "Lucky you used options. Don't expect me to admit that in the minutes.",
+            "The board acknowledges that options were... not the worst idea."
+        ],
+        "margin_call": [
+            "MARGIN CALL?! This is exactly what I was afraid of!",
+            "Do you have any idea what a margin call does to our cash position?",
+            "The CFO nearly had a heart attack. Fix this.",
+            "Margin calls are for hedge funds, not respectable companies!"
+        ],
+        "policy_violation": [
+            "The policy exists for a REASON. Follow it!",
+            "You're outside policy. I'm noting this in the minutes.",
+            "Compliance called. They're not happy. Neither am I.",
+            "The hedging policy isn't a suggestion — it's a directive."
+        ],
+        "trade_direction_error": [
+            "You traded the WRONG WAY?! What kind of treasurer are you?!",
+            "A trading error. Wonderful. Just wonderful.",
+            "Even the interns know the difference between buy and sell.",
+            "I'm speechless. Actually no, I have MANY words for this."
+        ],
+        "good_diversification": [
+            "Good spread across counterparties. At least you got that right.",
+            "Diversification. Finally, some evidence of competence."
+        ],
+        "poor_diversification": [
+            "All your eggs in one basket? What if that bank goes under?",
+            "Spread the risk! Have you learned nothing from 2008?"
+        ],
+        "tms_positive": [
+            "Finally investing in proper systems. About time.",
+            "If it helps us see the numbers clearer, I'll allow it."
+        ],
+        "tms_overspend": [
+            "We're a treasury, not a tech startup! Stop buying systems!",
+            "You're spending more on TMS than on actual hedging. Priorities!",
+            "How many modules do you NEED? This is getting ridiculous."
+        ],
+        "high_variance": [
+            "Our forecasts are all over the place. How can we hedge what we can't predict?",
+            "The business keeps missing its numbers. Sort it out or I will."
+        ],
+        "low_variance": [
+            "At least the forecasting is tight. One less thing to worry about.",
+            "Good visibility on the numbers. Now use it."
+        ]
+    },
+
+    "cautious": {
+        "good_pnl": [
+            "The numbers are positive, but I need to verify the methodology.",
+            "Encouraging, but let's not count our chickens.",
+            "I'll feel better when I've reconciled every single trade.",
+            "Good quarter, but what about next quarter's exposure?",
+            "The variance to budget is within tolerance. Satisfactory.",
+            "I've double-checked the figures. They appear to be correct. Well done.",
+            "Positive P&L is nice, but is it sustainable? That's my concern.",
+            "The auditors will be pleased. That's what matters to me."
+        ],
+        "bad_pnl": [
+            "This is deeply concerning. We need to review the entire strategy.",
+            "I warned the board this could happen. It's in the minutes.",
+            "The deviation from budget is unacceptable. What's the recovery plan?",
+            "I've prepared a detailed breakdown of where things went wrong.",
+            "We need tighter controls. I'm recommending a policy review.",
+            "Every basis point of loss keeps me awake at night.",
+            "The risk committee will need a full report on this.",
+            "I don't like surprises. Especially expensive ones."
+        ],
+        "neutral_pnl": [
+            "Hmm. Not terrible, but there's room for improvement in the methodology.",
+            "The numbers are flat. I'd prefer a tighter hedge ratio.",
+            "Adequate, but I'd like to see more rigour next quarter.",
+            "Within tolerance, but only just. Let's tighten up."
+        ],
+        "overtrading": [
+            "Excessive transactions increase operational risk. Please reconsider.",
+            "Each trade is a potential point of failure. Less is more.",
+            "I've calculated the cumulative bid-offer cost. It's... significant.",
+            "The back office is drowning in confirmations. Slow down."
+        ],
+        "option_premium": [
+            "Options provide flexibility. I understand the logic, even if the cost stings.",
+            "The premium is defensible given our risk profile. I'll support it.",
+            "I'd rather pay a premium than face breakage costs on a forward."
+        ],
+        "option_saved": [
+            "This validates the use of options for contingent exposures.",
+            "The premium paid for itself. I'll note this for the policy review.",
+            "Options were the right call here. The data supports it."
+        ],
+        "margin_call": [
+            "This is precisely why I advocate for conservative hedge ratios.",
+            "The cash flow impact of margin calls was flagged in my last report.",
+            "We need to stress-test our positions more frequently."
+        ],
+        "policy_violation": [
+            "We are outside the approved hedging bands. This must be corrected immediately.",
+            "The policy was designed to prevent exactly this situation.",
+            "I'll be raising this at the audit committee."
+        ],
+        "trade_direction_error": [
+            "A trade in the wrong direction is a serious operational failure.",
+            "This should have been caught by our controls. I'm very concerned.",
+            "We need a four-eyes check on every trade going forward."
+        ],
+        "tms_positive": [
+            "Good investment. Better data leads to better decisions.",
+            "The TMS will help us reconcile positions in real-time. I approve.",
+            "This should reduce our operational risk. Sensible spend."
+        ],
+        "tms_overspend": [
+            "The marginal benefit of each additional module is decreasing. The data shows it.",
+            "I've run the numbers. We've passed the point of diminishing returns on TMS.",
+            "The audit committee will question this level of systems spend."
+        ],
+        "high_variance": [
+            "Forecast accuracy is below acceptable thresholds. This undermines the entire hedging strategy.",
+            "With variance this high, our hedge ratios are essentially guesswork.",
+            "I've prepared a report on the forecast deviation. It's not encouraging."
+        ],
+        "low_variance": [
+            "Forecast accuracy is within tolerance. The TMS investment is paying off.",
+            "Good. Tight forecasts mean our hedge ratios are meaningful."
+        ]
+    },
+
+    "operational": {
+        "good_pnl": [
+            "Good. Does this mean we can fund that new project?",
+            "Nice work. The supply chain team will be happy.",
+            "Positive P&L means happy suppliers. I like happy suppliers.",
+            "The operating budget looks healthier. Thanks for that.",
+            "My team can breathe easier this quarter.",
+            "Good numbers. Now, about that capital expenditure request..."
+        ],
+        "bad_pnl": [
+            "This is going to hit our operating budget hard.",
+            "My team's been asking for resources. This doesn't help.",
+            "Can we at least protect the cash flow? I've got suppliers to pay.",
+            "The procurement team is going to panic when they see these FX rates.",
+            "Losses on the hedge book ripple through the whole business.",
+            "I don't understand all the derivatives, but I understand losing money."
+        ],
+        "neutral_pnl": [
+            "No news is good news for operations. Just keep things stable.",
+            "Flat is fine. I just need predictability.",
+            "As long as the cash keeps flowing, I'm happy enough.",
+            "My concern is always the day-to-day. Is our cash position OK?"
+        ],
+        "overtrading": [
+            "Does all this trading actually help the business, or is it just noise?",
+            "I don't care how many trades you do as long as my costs are hedged.",
+            "Every time you trade, my team gets a new confirmation to process."
+        ],
+        "option_premium": [
+            "Is this premium coming out of my budget?",
+            "I don't love the cost, but if it protects our supply chain, fine.",
+            "Just tell me: are my costs hedged or not?"
+        ],
+        "margin_call": [
+            "A margin call? That's cash we could be using to pay suppliers!",
+            "If this affects our working capital, we've got a real problem.",
+            "Operations can't function without cash. Sort this out."
+        ],
+        "policy_violation": [
+            "I don't follow the policy details, but the CFO looks worried.",
+            "Just stay within the rules. I've got enough headaches already."
+        ],
+        "trade_direction_error": [
+            "Wait, you hedged the wrong way? How does that even happen?",
+            "My team could have told you which way to hedge. Just ask us."
+        ],
+        "tms_positive": [
+            "If the TMS means I get better numbers from treasury, I'm all for it.",
+            "Finally, I might be able to plan my procurement without guessing."
+        ],
+        "tms_overspend": [
+            "That TMS budget could have bought us new equipment. Just saying.",
+            "How much are we spending on treasury systems vs. actual operations?"
+        ],
+        "high_variance": [
+            "My team keeps changing their forecasts. It makes planning impossible.",
+            "If the business can't predict its own volumes, what chance has treasury?"
+        ],
+        "low_variance": [
+            "The forecasts are actually matching reality now. That helps everyone.",
+            "Good. I can plan my supply chain with confidence."
+        ]
+    },
+
+    "ceo_special": {
+        "jameson": {
+            "big_loss": [
+                "I DON'T WANT EXCUSES! I WANT SOMEONE TO FIX THIS!",
+                "YOU'RE FIRED! Wait, no, I need someone to blame next quarter.",
+                "GET ME PICTURES OF— I mean GET ME BETTER NUMBERS!",
+                "This is a DISASTER! A CATASTROPHE! A— someone get me coffee."
+            ],
+            "big_win": [
+                "Hmph. Not terrible. Don't expect me to say that again.",
+                "Fine work. Now DO IT AGAIN or you're out!",
+                "I'll allow a small celebration. VERY small. Back to work!"
+            ],
+            "general": [
+                "WHY IS EVERYONE STANDING AROUND? THERE ARE EXPOSURES TO HEDGE!",
+                "I run a tight ship! A TIGHT SHIP! Why is the P&L loose?!",
+                "You've got until end of quarter to impress me. Clock's ticking!"
+            ],
+            "tms_comment": [
+                "WHY ARE WE BUYING COMPUTERS?! ARE WE AN IT COMPANY NOW?!",
+                "If this system doesn't IMMEDIATELY show me better numbers, you're done!",
+                "I DON'T CARE ABOUT MODULES! I CARE ABOUT RESULTS!"
+            ]
+        },
+        "musk": {
+            "big_loss": [
+                "This is fine. Actually, I'm going to tweet about this.",
+                "We need to pivot. Have you considered hedging with cryptocurrency?",
+                "Losses are just future gains that haven't materialised yet.",
+                "I'll sleep at the office until we fix this. I'm joking. Maybe."
+            ],
+            "big_win": [
+                "To the moon! 🚀 Wait, wrong company.",
+                "I knew our treasury strategy was genius. I thought of it myself.",
+                "This proves my thesis. Which I'll explain on a podcast later."
+            ],
+            "general": [
+                "What if we vertically integrated our hedging? Just thinking out loud.",
+                "I've been up since 3am reviewing your hedge book. We need to talk.",
+                "I just renamed the treasury department. It's now called 'X-Treasury'."
+            ],
+            "tms_comment": [
+                "Why are we buying off-the-shelf? We should build our own TMS. From scratch. In a weekend.",
+                "I've seen the TMS code. It's terrible. I could write better treasury software in my sleep.",
+                "What if the TMS was also a social network? Just thinking out loud."
+            ]
+        },
+        "oleary": {
+            "big_loss": [
+                "Every cent of that loss is coming out of someone's bonus!",
+                "You know what this loss could have bought? Three planes.",
+                "If this were my airline, I'd charge the losses to the passengers.",
+                "Losing money is the one thing I will NEVER tolerate."
+            ],
+            "big_win": [
+                "Good. Now spend absolutely none of it.",
+                "That's more like it. But don't think I'm paying for a celebration.",
+                "Profit is just cost savings you haven't found yet. Keep cutting."
+            ],
+            "general": [
+                "Why are we paying for options when we could just... not?",
+                "I've cut costs everywhere else. Treasury is next.",
+                "Have you considered hedging for free? Think about it."
+            ],
+            "tms_comment": [
+                "How much?! For SOFTWARE?! I got a plane for less!",
+                "Can we charge the TMS vendor for the privilege of being our supplier?",
+                "Every module costs money. Money that could be in MY pocket."
+            ]
+        },
+        "dimon": {
+            "big_loss": [
+                "Walk me through every position. I'll find where this went wrong.",
+                "I've managed through every crisis since '87. This is fixable.",
+                "The mark-to-market doesn't concern me. The risk management does.",
+                "We've been through worse. But I expect a plan by Monday."
+            ],
+            "big_win": [
+                "Solid execution. The Street would approve.",
+                "Good discipline. That's what separates us from the amateurs.",
+                "Risk-adjusted, this is strong performance. Keep it up."
+            ],
+            "general": [
+                "Show me the VaR report. The real one, not the sanitised version.",
+                "I've seen treasurers come and go. The good ones stay disciplined.",
+                "Don't confuse a good outcome with a good decision."
+            ],
+            "tms_comment": [
+                "Good. A banker who invests in infrastructure. I respect that.",
+                "The TMS won't save you from bad judgment, but it'll help with execution.",
+                "Every major bank runs on systems. It's about time our treasury did too."
+            ]
+        },
+        "buffett": {
+            "big_loss": [
+                "Rule number one: never lose money. Rule number two: see rule one.",
+                "Short-term losses I can tolerate. Poor process I cannot.",
+                "The market is a voting machine short-term, weighing machine long-term.",
+                "This too shall pass. But let's not make it a habit."
+            ],
+            "big_win": [
+                "Be fearful when others are greedy. Don't get carried away.",
+                "Patient, disciplined hedging. That's all I ever ask for.",
+                "Good quarter. Now forget about it and focus on the next one."
+            ],
+            "general": [
+                "Price is what you pay. Value is what you get. Remember that.",
+                "Risk comes from not knowing what you're doing. Do you know?",
+                "I'd rather have a treasury that's approximately right than precisely wrong."
+            ],
+            "tms_comment": [
+                "I've never needed a computer to tell me what I already know. But you do you.",
+                "If it helps you think more clearly, I suppose it's a reasonable investment.",
+                "Systems don't make decisions. People do. Don't forget that."
+            ]
+        },
+        "jobs": {
+            "big_loss": [
+                "This is unacceptable. Not because of the loss, but because it's inelegant. A beautiful hedge book doesn't lose money.",
+                "You know what the problem is? You're thinking about it wrong. The exposure isn't the product. The HEDGE is the product. And your product is ugly.",
+                "I told my kids they're not allowed to use our treasury system. Looking at these numbers, I was right.",
+                "Simplify. You've got too many positions, too many counterparties, too much complexity. Strip it back to its essence."
+            ],
+            "big_win": [
+                "See? Simplicity. One clear strategy, beautifully executed. That's what separates us from the noise.",
+                "This is what happens when you focus on making something insanely great instead of just adequate.",
+                "The people who are crazy enough to think they can change the P&L... are the ones who do."
+            ],
+            "general": [
+                "I've been thinking about our hedging strategy and I believe we need to reimagine it from the ground up. Start with the customer — the business — and work backwards.",
+                "Design isn't just how it looks. Design is how it works. And right now, this treasury desk isn't working the way I envisioned it.",
+                "I wouldn't let my own children use this hedge book. Think about what that means.",
+                "You're holding it wrong. The hedge book, I mean. Metaphorically."
+            ],
+            "tms_comment": [
+                "The TMS interface is hideous. But... the functionality is acceptable. Ship it, then we'll redesign it.",
+                "Why does treasury software always look like it was designed by accountants? Because it was. We need to think different.",
+                "My kids aren't allowed to use any TMS. Not because of the data. Because of the fonts."
+            ]
+        },
+        "dorsey": {
+            "big_loss": [
+                "I want everyone to take a deep breath with me. In... out... Now, about these losses. They're part of the journey.",
+                "During my 5am ice bath this morning, I reflected on impermanence. Gains are impermanent. Losses are impermanent. But our treasury policy endures.",
+                "Have we considered that the loss is actually a lesson the market is trying to teach us? I journaled about this at 4:30am.",
+                "I'm not worried. I spent 40 minutes in a sauna before this meeting and I've achieved total clarity. We need to accept the loss and align our chakras — I mean, our hedge ratios."
+            ],
+            "big_win": [
+                "Beautiful. This is what happens when we approach hedging with intention and mindfulness. Namaste.",
+                "I was fasting for 36 hours when I had the insight that our strategy was aligned with the market's energy. I was right.",
+                "Gratitude. That's what I'm feeling. Also, has anyone considered converting our reserves to Bitcoin?"
+            ],
+            "general": [
+                "I've been doing a 10-day silent meditation retreat — well, 3 days, I had to check my phone — and I have some thoughts on our FX exposure.",
+                "What if we approached hedging the way we approach wellness? Holistically. Mindfully. With intermittent fasting.",
+                "I walked barefoot to this board meeting. It helps me stay grounded. Speaking of grounding — how's our basis risk?",
+                "Before we review the numbers, I'd like us all to take a moment of silence. ... OK, that's enough. The P&L is what it is."
+            ],
+            "tms_comment": [
+                "The TMS should be open source. And decentralised. And somehow involve Bitcoin.",
+                "I don't use the TMS myself. I track my positions in a handwritten leather journal. But I support the team having one.",
+                "What if instead of buying TMS modules, we built our own on the blockchain? During a group ice bath. As a team-building exercise."
+            ]
+        },
+        "ackman": {
+            "big_loss": [
+                "Look, I want to be very clear about something. I've spent the last 72 hours analysing every single position in our hedge book, and I've written a 47-page memo that I'd like to share with the board. The key thesis — and I'll summarise here, though I encourage everyone to read the full document — is that this loss, while optically significant, actually represents a fundamental mispricing of our risk that the market will eventually correct. Let me walk you through the first 12 slides.",
+                "I've been thinking about this all week, and I've come to a very high-conviction view. The loss isn't the problem. The problem is that our hedging framework fails to account for approximately 14 structural factors that I've identified and documented in a letter I plan to publish on social media this afternoon. With the board's permission, of course.",
+                "Let me be direct. Actually, let me provide some context first. In 2004, I made a similar bet against a company — well, not similar exactly, but adjacent — and the initial mark-to-market was deeply negative. I was down for 18 months. Everyone said I was wrong. I wrote a 340-page presentation. And eventually, the market came around. My point is: patience.",
+                "This quarter's loss is, frankly, a vindication of everything I've been saying about our exposure framework for the past three board meetings. I have the minutes. I have the transcripts. I have a detailed timeline. If anyone would like to review my 28-page analysis..."
+            ],
+            "big_win": [
+                "I want to acknowledge the strong result this quarter, but more importantly, I want to explain WHY it's strong, because I don't think the numbers alone tell the full story. If you'll bear with me for about twenty minutes, I have a presentation that walks through the structural thesis behind our hedging approach, the macro backdrop, the positioning of our counterparties, and — this is the key part — why I believe we're only at the beginning of what could be a multi-quarter outperformance cycle. Slide one, please.",
+                "Excellent quarter. Now, I've prepared some thoughts — brief thoughts, maybe 15 pages — on how we can compound this advantage. The core argument, which I'll develop in detail, rests on three pillars. Actually, four. Let me start from the beginning.",
+                "This is what high-conviction hedging looks like. I said this at the last board meeting. And the one before that. I believe I also mentioned it in my letter to stakeholders, my social media post, and the conference panel I spoke at last Tuesday."
+            ],
+            "general": [
+                "I'd like to share some updated thinking on our hedging strategy. I've written a detailed memo — it's only about 35 pages, quite concise by my standards — that lays out a comprehensive framework for how we should be thinking about our exposure over the next 8 quarters. The executive summary alone is 6 pages, but I think it's important to read the full thing. I can wait while you pull it up.",
+                "A few observations. First — and I want to be precise here because precision matters — our hedge ratio is currently at a level that, while technically within policy, represents what I would characterise as a suboptimal equilibrium. I've modelled 14 alternative scenarios. Let me share my screen.",
+                "Before we move to the next agenda item, I have one more thing. Actually, several more things. I've been posting about our sector's FX dynamics online and the engagement has been extraordinary. The key insight — which I'll develop over the next few minutes, so please bear with me — is that the market is mispricing volatility in a way that creates a generational hedging opportunity.",
+                "I want to make a brief point. Well, not brief exactly. Comprehensive. I've prepared a letter — 22 pages, double-spaced — outlining my views on our treasury strategy. The thesis is simple, though the supporting evidence is necessarily detailed. I'll walk you through the highlights. Starting with macroeconomic conditions in 1971."
+            ],
+            "tms_comment": [
+                "I'm broadly supportive of the TMS investment. Let me explain why in detail. I've written a memo — short one, only 18 pages — that analyses the ROI of treasury management systems across 340 comparable companies. The data is conclusive, though I should note several important caveats that I'll enumerate beginning with caveat number one...",
+                "The TMS purchase raises an interesting strategic question that I've been thinking about extensively. I have a 12-slide deck. The core thesis is that technology investment in treasury functions, when properly calibrated — and I'll define 'properly calibrated' in a moment — generates alpha. Let me elaborate.",
+                "I support this. But I want to document my reasoning. I've drafted a position paper that I'd like to share with the board, the audit committee, and, with your permission, my social media followers."
+            ]
+        }
+    }
+}

@@ -1,0 +1,159 @@
+{
+    "yearFacts": {
+        "1994": {
+            "headline": "The Bond Massacre",
+            "fact": "Global bond markets suffered their worst year in decades. Orange County, California went bankrupt after its treasurer lost $1.7 billion on leveraged interest rate bets. A cautionary tale in duration risk.",
+            "market_note": "US 30-year Treasury yield rose from 6.2% to 8.0%"
+        },
+        "1995": {
+            "headline": "Barings Bank Collapses",
+            "fact": "Nick Leeson brought down Barings Bank — Britain's oldest merchant bank — with $1.3 billion in unauthorised derivatives losses. He hid the losses in a secret 'error account'. The bank was sold for £1.",
+            "market_note": "USD/JPY fell from 100 to 80 — the strongest yen in history"
+        },
+        "1996": {
+            "headline": "The Copper King Falls",
+            "fact": "Sumitomo Corporation lost $2.6 billion after rogue trader Yasuo Hamanaka manipulated global copper markets for over a decade. Copper prices collapsed when the scheme unravelled.",
+            "market_note": "Copper fell 25% after Hamanaka's exposure"
+        },
+        "1997": {
+            "headline": "Asian Financial Crisis",
+            "fact": "The Thai baht collapsed, triggering a wave of currency crises across Southeast Asia. Corporate treasurers with unhedged USD debt were wiped out. The IMF mounted its largest-ever bailout programme.",
+            "market_note": "Thai baht fell 50%, Korean won fell 45%, Indonesian rupiah fell 80%"
+        },
+        "1998": {
+            "headline": "LTCM Nearly Destroys Wall Street",
+            "fact": "Long-Term Capital Management, run by Nobel Prize winners, nearly collapsed the global financial system. The Fed organised a $3.6 billion bailout by 14 banks. Russia defaulted on its debt.",
+            "market_note": "Russian ruble devalued 70%, flight to quality crushed spreads"
+        },
+        "1999": {
+            "headline": "Y2K Panic and the Euro Launch",
+            "fact": "The world prepared for the 'Millennium Bug' while the euro launched at $1.17. Treasurers scrambled to hedge new EUR exposures as 11 national currencies disappeared overnight.",
+            "market_note": "EUR/USD launched at 1.1743 on 4 January 1999"
+        },
+        "2000": {
+            "headline": "The Dot-Com Bubble Bursts",
+            "fact": "The NASDAQ peaked at 5,048 in March before losing 78% over the next two years. Enron was still considered a blue-chip company. Oil hit $37 per barrel.",
+            "market_note": "EUR/USD fell to 0.82 — its all-time low"
+        },
+        "2001": {
+            "headline": "Enron Collapses, 9/11 Reshapes the World",
+            "fact": "Enron's bankruptcy revealed massive accounting fraud and off-balance-sheet derivatives. The September 11 attacks shut US markets for four days. The Fed slashed rates from 6.5% to 1.75%.",
+            "market_note": "Gold began its long rally from $270/oz"
+        },
+        "2002": {
+            "headline": "Corporate Scandals Everywhere",
+            "fact": "WorldCom filed the largest bankruptcy in US history ($107 billion). Sarbanes-Oxley Act passed, transforming corporate governance. Treasurers suddenly had much more compliance paperwork.",
+            "market_note": "S&P 500 fell 23%, its third consecutive annual decline"
+        },
+        "2003": {
+            "headline": "Iraq War and the Dollar Decline",
+            "fact": "The US invaded Iraq, oil prices began their long climb, and the dollar weakened sharply. European exporters scrambled to hedge their suddenly less competitive products.",
+            "market_note": "EUR/USD surged from 1.05 to 1.26"
+        },
+        "2004": {
+            "headline": "Greenspan's Rate Hike Campaign Begins",
+            "fact": "The Fed began raising rates from their post-9/11 emergency level of 1%. Corporate treasurers who had locked in low fixed rates via swaps were suddenly sitting on profits.",
+            "market_note": "Fed Funds rate rose from 1.00% to 2.25% in six moves"
+        },
+        "2005": {
+            "headline": "Hurricane Katrina Devastates Energy Markets",
+            "fact": "Hurricane Katrina shut down Gulf of Mexico oil production and destroyed refining capacity. Energy prices spiked and airlines without fuel hedges posted massive losses. Southwest Airlines' hedging programme became legendary.",
+            "market_note": "Oil spiked from $55 to $70; natural gas doubled"
+        },
+        "2006": {
+            "headline": "Amaranth's $6 Billion Natural Gas Bet",
+            "fact": "Hedge fund Amaranth Advisors lost $6 billion in a single week on natural gas futures. The fund's energy trader had bet heavily on a winter price spike that never came.",
+            "market_note": "Natural gas fell 60% from its 2005 highs"
+        },
+        "2007": {
+            "headline": "The First Cracks Appear",
+            "fact": "Bear Stearns' subprime hedge funds collapsed in June. Northern Rock suffered the first UK bank run in 150 years. The credit crisis had begun, though few realised how bad it would get.",
+            "market_note": "GBP/USD hit $2.11 — its highest level in 26 years"
+        },
+        "2008": {
+            "headline": "The Global Financial Crisis",
+            "fact": "Lehman Brothers collapsed, triggering the worst financial crisis since the 1930s. Counterparty risk became real — treasurers who had concentrated derivatives positions with failing banks faced chaos. AIG was bailed out for $182 billion.",
+            "market_note": "Oil crashed from $147 to $32; GBP fell from $2.00 to $1.35"
+        },
+        "2009": {
+            "headline": "Quantitative Easing Begins",
+            "fact": "Central banks pumped trillions into markets. Interest rates hit the zero lower bound. Corporate treasurers faced a new world: negative real rates, abundant liquidity, and a steep yield curve.",
+            "market_note": "S&P 500 bottomed at 666 in March before rallying 65%"
+        },
+        "2010": {
+            "headline": "European Sovereign Debt Crisis",
+            "fact": "Greece's debt crisis exploded, threatening the eurozone's survival. Ireland and Portugal followed. EUR/USD fell sharply. Corporate treasurers debated whether the euro would even exist in five years.",
+            "market_note": "EUR/USD fell from 1.45 to 1.19; Greek 10-year yields hit 12%"
+        },
+        "2011": {
+            "headline": "Swiss Franc Chaos and Fukushima",
+            "fact": "Japan's earthquake and nuclear disaster, the Arab Spring, and the US debt ceiling crisis created volatility everywhere. The SNB pegged EUR/CHF at 1.20 after the franc surged to parity.",
+            "market_note": "Gold hit its all-time high of $1,920/oz; USD/CHF hit 0.70"
+        },
+        "2012": {
+            "headline": "'Whatever It Takes'",
+            "fact": "ECB President Mario Draghi saved the euro with three words: 'whatever it takes.' LIBOR manipulation scandal (Tom Hayes) exposed systemic benchmark rigging. Interest rate hedges were repriced globally.",
+            "market_note": "German 2-year yields turned negative for the first time"
+        },
+        "2013": {
+            "headline": "The Taper Tantrum",
+            "fact": "The Fed hinted at reducing QE, causing bonds and emerging market currencies to crash. Treasurers with EM exposure suffered sharp FX losses. The word 'taper' entered the financial lexicon.",
+            "market_note": "US 10-year yield jumped from 1.6% to 3.0% in months"
+        },
+        "2014": {
+            "headline": "Oil Price Collapse and Russia Sanctions",
+            "fact": "Oil crashed from $115 to $55 as OPEC refused to cut production. Western sanctions hit Russia after Crimea's annexation. The ruble collapsed. Energy companies' hedging programmes were stress-tested.",
+            "market_note": "USD/RUB went from 33 to 68; Brent crude halved"
+        },
+        "2015": {
+            "headline": "SNB Shock — The 'Francogeddon'",
+            "fact": "The Swiss National Bank abandoned its EUR/CHF 1.20 floor without warning. EUR/CHF crashed 30% in minutes. Brokers went bankrupt. Treasurers with CHF exposure learned the hard way about central bank risk.",
+            "market_note": "EUR/CHF dropped from 1.20 to 0.85 in seconds"
+        },
+        "2016": {
+            "headline": "Brexit and Trump Shock Markets",
+            "fact": "The UK voted to leave the EU, sending GBP crashing 15%. Trump's election caused wild swings. Corporate hedging programmes were overwhelmed by political risk that no model had priced in.",
+            "market_note": "GBP/USD fell from 1.50 to 1.23; USD/MXN spiked 20%"
+        },
+        "2017": {
+            "headline": "The Year of Low Volatility",
+            "fact": "Markets were eerily calm. VIX hit all-time lows. Treasurers could hedge cheaply but many questioned whether the calm was real. Bitcoin surged from $1,000 to $20,000.",
+            "market_note": "VIX averaged just 11 — its lowest annual average ever"
+        },
+        "2018": {
+            "headline": "Volmageddon and Trade Wars",
+            "fact": "The VIX exploded in February, destroying inverse volatility products. US-China trade war escalated. LIBOR transition to SOFR/SONIA began. Treasurers started planning for the biggest benchmark change in history.",
+            "market_note": "US-China tariffs disrupted supply chains; EM currencies tumbled"
+        },
+        "2019": {
+            "headline": "Negative Interest Rates Peak",
+            "fact": "$17 trillion of global debt traded at negative yields. Corporate treasurers were paying banks to hold their cash. The inverted US yield curve signalled recession. Nobody knew what was coming in 2020.",
+            "market_note": "German 10-year Bund hit -0.71%; entire Swiss yield curve was negative"
+        },
+        "2020": {
+            "headline": "COVID-19 Pandemic",
+            "fact": "Global pandemic shut down economies worldwide. Oil briefly traded at negative $37 per barrel. Central banks cut rates to zero and launched unlimited QE. Corporate treasurers faced unprecedented cash flow uncertainty.",
+            "market_note": "WTI crude hit -$37.63; GBP/USD fell to 1.15; VIX hit 82"
+        },
+        "2021": {
+            "headline": "Inflation Returns",
+            "fact": "Supply chain chaos and massive fiscal stimulus pushed inflation above 5% globally. Container shipping rates surged 10x. Commodity prices soared. Treasurers who had locked in pre-COVID costs were heroes.",
+            "market_note": "Natural gas tripled; wheat up 30%; shipping costs up 1,000%"
+        },
+        "2022": {
+            "headline": "Rate Shock and the Energy Crisis",
+            "fact": "Russia invaded Ukraine, triggering an energy crisis. The Fed raised rates at the fastest pace since 1980. GBP crashed during the 'mini-budget' crisis. LDI pension funds nearly collapsed. EUR hit parity with USD.",
+            "market_note": "EUR/USD fell below 1.00; UK 30-year gilt yields swung 150bps in days"
+        },
+        "2023": {
+            "headline": "Banking Crisis and AI Mania",
+            "fact": "Silicon Valley Bank collapsed in 48 hours — the second-largest US bank failure ever. Credit Suisse was forced into UBS's arms. Meanwhile, AI hype drove tech stocks higher. LIBOR finally died.",
+            "market_note": "2-year Treasury yield swung 100bps in 3 days during SVB crisis"
+        },
+        "2024": {
+            "headline": "Rate Cuts Begin, Geopolitics Intensify",
+            "fact": "Major central banks began cutting rates after two years of hikes. Middle East tensions spiked oil volatility. Treasurers navigated the transition from hiking to easing cycles — timing hedges around pivot points.",
+            "market_note": "ECB, BoE, and Fed all began cutting rates; gold hit new all-time highs above $2,700"
+        }
+    }
+}

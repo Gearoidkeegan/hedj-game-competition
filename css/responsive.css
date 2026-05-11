@@ -1,0 +1,777 @@
+/* ============================================
+   Responsive / Mobile / Tablet
+   ============================================ */
+
+/* Hide mobile-only elements on desktop */
+.mobile-only-tab {
+    display: none !important;
+}
+
+/* Scale the game viewport to fit smaller screens */
+@media (max-width: 980px) {
+    #game-viewport {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh; /* dynamic viewport height — excludes mobile browser chrome */
+        border: none;
+        border-radius: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        transform: none;
+    }
+}
+
+/* Tablet — convention iPads (768-1024px) */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .industry-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+
+    .modal {
+        min-width: 360px !important;
+        max-width: 90vw;
+    }
+
+    /* Slightly larger touch targets */
+    .btn {
+        min-height: 44px;
+    }
+
+    .event-choice-btn {
+        min-height: 52px;
+        padding: 10px 14px;
+    }
+
+    /* Career progress pips fit tablet width */
+    .career-progress {
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Score breakdown */
+    .score-breakdown {
+        max-width: 480px;
+    }
+}
+
+/* ============================================
+   Mobile / small tablet (<=768px)
+   Complete mobile-first dashboard redesign
+   ============================================ */
+@media (max-width: 768px) {
+    :root {
+        --game-width: 100vw;
+        --game-height: 100vh;
+        --game-height: 100dvh;
+    }
+
+    /* --- Quarter Bar: Two-row mobile layout --- */
+    .quarter-bar {
+        display: flex !important;
+        flex-wrap: wrap;
+        padding: 4px 8px !important;
+        font-size: 8px;
+        gap: 2px 6px;
+    }
+
+    .qbar-row1 {
+        display: flex !important;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+    }
+
+    .qbar-row1 .quarter-pips {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .qbar-row1 .quarter-pips .quarter-pip {
+        width: 8px;
+        height: 8px;
+    }
+
+    .qbar-row1 .quarter-pips .quarter-pip-divider {
+        height: 10px;
+    }
+
+    .qbar-row2 {
+        display: flex !important;
+        width: 100%;
+        align-items: center;
+        justify-content: space-around;
+        gap: 4px;
+    }
+
+    .qbar-stat {
+        display: inline-flex;
+        gap: 3px;
+        align-items: center;
+    }
+
+    /* Compact stress face on mobile */
+    #stress-face-slot .stress-face-canvas {
+        width: 28px !important;
+        height: 28px !important;
+    }
+
+    #stress-face-slot .stress-face-label {
+        display: none;
+    }
+
+    #stress-face-slot .stress-face-level {
+        font-size: 7px;
+    }
+
+    /* --- Dashboard: Compact isometric scene on mobile --- */
+    .isometric-viewport {
+        height: 120px !important;
+        margin: 2px !important;
+    }
+
+    .isometric-viewport #iso-canvas {
+        width: 100%;
+        height: 100%;
+    }
+
+    /* --- HEDGING tab: only visible on mobile --- */
+    .mobile-only-tab {
+        display: flex !important;
+    }
+
+    /* --- Dashboard: Full-viewport mobile tab system --- */
+    .dashboard-main {
+        flex-direction: column !important;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .dashboard-left {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    /* On mobile, the right panel (hedging desk) is hidden by default.
+       It becomes visible only when "HEDGING" mobile tab is active. */
+    .dashboard-right {
+        display: none !important;
+        width: 100% !important;
+        max-height: none !important;
+    }
+
+    .dashboard-right.mobile-active {
+        display: flex !important;
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Show mobile exposure selector inside hedging panel */
+    .mobile-exposure-selector {
+        display: block !important;
+        padding: 4px 6px;
+        border-bottom: 1px solid var(--border-inner);
+    }
+
+    .mobile-exposure-dropdown {
+        font-size: 11px;
+        min-height: 44px;
+    }
+
+    /* When hedging tab is active, hide left panel entirely on mobile */
+    .dashboard-left.mobile-hedging-active {
+        flex: 0 0 auto !important;
+    }
+
+    .dashboard-left.mobile-hedging-active .tab-content {
+        display: none !important;
+    }
+
+    .dashboard-left.mobile-hedging-active .isometric-viewport {
+        display: none !important;
+    }
+
+    /* --- Mobile Tab Bar: Scrollable, full-width --- */
+    .tab-bar {
+        display: flex;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-shrink: 0;
+    }
+
+    .tab-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tab {
+        font-size: 7px !important;
+        padding: 8px 10px !important;
+        min-height: 36px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    /* --- Tab content: full height --- */
+    .tab-content.active {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* --- Exposure rows: more compact on mobile --- */
+    .exposure-row {
+        padding: 8px 10px;
+        gap: 3px;
+    }
+
+    .exposure-row-top {
+        gap: 6px;
+    }
+
+    .exposure-underlying {
+        font-size: 8px;
+        min-width: 55px;
+    }
+
+    .exposure-detail {
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .exposure-row-bottom {
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    /* --- Hedge panel on mobile: full height, scrollable --- */
+    .hedge-panel {
+        height: 100%;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .hedge-panel > div[style*="overflow-y"] {
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+    }
+
+    /* --- Bloomberg terminal: compact on mobile --- */
+    #bloomberg-right canvas {
+        height: 100px !important;
+    }
+
+    /* --- Hedge ladder: larger touch targets --- */
+    .hedge-ladder-row:not(.past) {
+        padding: 6px 4px !important;
+    }
+
+    .ladder-row-slider {
+        height: 28px !important;
+    }
+
+    .ladder-row-slider::-webkit-slider-thumb {
+        width: 18px !important;
+        height: 28px !important;
+    }
+
+    .ladder-row-slider::-moz-range-thumb {
+        width: 18px !important;
+        height: 28px !important;
+    }
+
+    /* --- Bank execute buttons: compact row --- */
+    #trade-execution > div[style*="display:flex"] {
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+
+    .bank-execute-btn {
+        min-width: auto !important;
+        flex: 1 1 auto !important;
+        min-height: 44px !important;
+        font-size: 9px !important;
+        padding: 6px 8px !important;
+    }
+
+    /* --- Product selector: full width buttons --- */
+    .hedge-product-selector {
+        flex-direction: column !important;
+    }
+
+    .hedge-product-btn {
+        min-height: 40px !important;
+        flex: none !important;
+        width: 100%;
+        text-align: center;
+    }
+
+    /* --- Direction test buttons: larger --- */
+    #direction-test .btn {
+        min-height: 48px !important;
+        font-size: 12px !important;
+    }
+
+    /* --- Selected exposure info: more readable --- */
+    #selected-exposure-info .readable-text {
+        font-size: 14px !important;
+    }
+
+    /* --- Footer: pinned to bottom on mobile --- */
+    .dashboard-screen {
+        padding-bottom: 52px; /* reserve space for fixed footer */
+    }
+
+    .dashboard-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 4px 8px;
+        background: var(--bg-panel);
+        border-top: 2px solid var(--border-outer);
+        z-index: 100;
+        display: flex;
+        gap: 8px;
+    }
+
+    .dashboard-footer .btn {
+        min-width: 100px;
+        font-size: 10px;
+        min-height: 44px;
+        flex: 1;
+    }
+
+    /* Policy label in footer — hide on mobile (shown in policy strip instead) */
+    .dashboard-footer > div:first-child {
+        display: none;
+    }
+
+    /* --- Board Requests panel: larger touch targets --- */
+    #board-requests-view .btn {
+        min-height: 44px !important;
+    }
+
+    /* --- Data tables: smaller text on mobile --- */
+    .data-table {
+        font-size: 12px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 4px 6px;
+    }
+
+    /* --- Other screen adjustments --- */
+    .btn {
+        min-height: 48px;
+        font-size: 11px;
+    }
+
+    .industry-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        max-height: none;
+        overflow-y: visible;
+        padding: 2px;
+    }
+
+    .industry-card {
+        padding: 8px 6px;
+        min-height: 36px;
+    }
+
+    .industry-card .industry-name {
+        font-size: 7px;
+        margin-bottom: 2px;
+    }
+
+    .industry-card .industry-company {
+        font-size: 13px;
+        margin-bottom: 0;
+    }
+
+    .industry-card .industry-exposures {
+        display: none;
+    }
+
+    .setup-screen h2 {
+        font-size: 10px !important;
+        margin-bottom: 8px;
+    }
+
+    .setup-screen {
+        padding: 8px 10px;
+    }
+
+    .industry-detail-panel {
+        margin-top: 6px;
+        padding: 6px 8px;
+        min-height: auto;
+    }
+
+    .setup-fields {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .setup-field {
+        flex: 1 1 45%;
+        min-width: 0;
+    }
+
+    .setup-fields input {
+        min-height: 36px !important;
+        font-size: 14px !important;
+    }
+
+    .board-members {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .board-member {
+        max-width: 100%;
+    }
+
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .extend-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .extend-buttons .btn {
+        width: 100%;
+    }
+
+    .gameover-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .gameover-buttons .btn {
+        width: 100%;
+    }
+
+    /* Reduce font sizes for mobile */
+    h1 { font-size: 14px; }
+    h2 { font-size: 11px; }
+
+    .title-logo h1 {
+        font-size: 16px;
+    }
+
+    /* Event screen — stack choices vertically */
+    .event-choices {
+        flex-direction: column !important;
+    }
+
+    .event-choice-btn {
+        width: 100%;
+        min-height: 52px;
+    }
+
+    /* Era popups — fit mobile width */
+    .era-fax,
+    .era-outlook,
+    .era-blackberry,
+    .era-slack,
+    .era-teams {
+        max-width: 95vw !important;
+        font-size: 14px;
+    }
+
+    /* Level complete screen */
+    .career-progress {
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: center;
+    }
+
+    .career-pip {
+        min-width: 50px;
+        font-size: 8px;
+    }
+
+    /* Modals — full width on mobile */
+    .modal {
+        min-width: auto !important;
+        width: 95vw;
+        max-width: 95vw;
+    }
+
+    .modal-body {
+        max-height: 70vh !important;
+        overflow-y: auto;
+    }
+
+    /* Score breakdown rows */
+    .score-row {
+        gap: 4px;
+    }
+
+    .score-label {
+        font-size: 7px !important;
+        min-width: 80px;
+    }
+
+    /* Share text — smaller */
+    #share-text {
+        font-size: 12px !important;
+    }
+
+    /* Attract mode */
+    .attract-overlay {
+        padding: 16px;
+    }
+
+    .attract-content {
+        max-width: 90vw;
+    }
+
+    /* Character select */
+    .character-select {
+        gap: 8px;
+    }
+
+    .char-btn {
+        min-width: 80px;
+        min-height: 48px;
+    }
+
+    /* Setup screen — fit single viewport on mobile */
+    .setup-screen {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+        padding-bottom: 8px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .setup-screen .panel {
+        max-width: 100%;
+        margin-bottom: 4px;
+    }
+
+    .setup-bottom {
+        position: relative;
+        padding-bottom: 8px;
+        margin-top: 6px;
+    }
+
+    .setup-actions {
+        padding: 4px 0;
+    }
+
+    .setup-actions .btn {
+        min-height: 40px;
+        font-size: 11px;
+    }
+
+    .char-btn {
+        min-width: 70px !important;
+        min-height: 36px !important;
+    }
+
+    .industry-detail-panel .readable-text {
+        font-size: 13px;
+    }
+
+    /* --- Summary screen: tighter on mobile --- */
+    .summary-screen {
+        padding: 8px;
+    }
+
+    .summary-screen .panel {
+        margin: 4px auto !important;
+    }
+
+    .summary-stat {
+        font-size: 14px;
+        padding: 3px 0;
+    }
+
+    .summary-stat-label {
+        font-size: 13px;
+    }
+
+    /* --- Full-screen exposure detail modal --- */
+    .exposure-detail-modal {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--bg-dark);
+        z-index: 500;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .exposure-detail-modal .modal-header {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .exposure-detail-modal .modal-body {
+        flex: 1;
+        max-height: none !important;
+        padding: 12px;
+    }
+}
+
+/* Very small phones */
+@media (max-width: 400px) {
+    .title-logo h1 {
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .title-menu {
+        min-width: 240px;
+        gap: 8px;
+    }
+
+    .title-menu .btn {
+        padding: 8px 16px;
+    }
+
+    .panel {
+        padding: 6px !important;
+    }
+
+    .readable-text {
+        font-size: 14px !important;
+    }
+
+    /* Even more compact tabs */
+    .tab {
+        font-size: 6px !important;
+        padding: 6px 7px !important;
+    }
+
+    /* Exposure row: truncate description more aggressively */
+    .exposure-detail {
+        font-size: 12px !important;
+        max-width: 100px;
+    }
+
+    /* Quarter bar: tighter */
+    .quarter-bar {
+        padding: 3px 6px !important;
+    }
+
+    .quarter-bar .quarter-pips .quarter-pip {
+        width: 6px;
+        height: 6px;
+    }
+}
+
+/* Large screens / convention displays */
+@media (min-width: 1200px) {
+    #game-viewport {
+        width: 1024px;
+        height: 680px;
+    }
+}
+
+/* Very large screens - scale up */
+@media (min-width: 1600px) {
+    #game-viewport {
+        transform: translate(-50%, -50%) scale(1.2);
+    }
+}
+
+/* Touch device optimisations */
+@media (pointer: coarse) {
+    .btn {
+        min-height: 44px;
+    }
+
+    .event-choice-btn {
+        min-height: 52px;
+        padding: 10px 14px;
+    }
+
+    /* Larger slider handles for touch */
+    .ladder-row-slider {
+        height: 24px;
+    }
+
+    .ladder-row-slider::-webkit-slider-thumb {
+        width: 16px;
+        height: 24px;
+    }
+
+    .ladder-row-slider::-moz-range-thumb {
+        width: 16px;
+        height: 24px;
+    }
+
+    /* Prevent text selection on game elements */
+    .screen {
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    /* Allow selection on share text */
+    #share-text {
+        -webkit-user-select: all;
+        user-select: all;
+    }
+
+    /* Disable hover effects on touch */
+    .btn:hover {
+        transform: none;
+    }
+}
+
+/* Landscape phone — restrict height */
+@media (max-height: 500px) and (orientation: landscape) {
+    .title-logo {
+        margin-bottom: 8px;
+    }
+
+    .title-logo h1 {
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    .title-menu {
+        flex-direction: row;
+        gap: 8px;
+    }
+
+    .title-mode-info {
+        display: none;
+    }
+
+    .summary-screen {
+        padding-top: 4px;
+    }
+
+    .gameover-grade {
+        font-size: 32px;
+    }
+
+    /* Compact isometric scene in landscape phone */
+    .isometric-viewport {
+        height: 80px !important;
+    }
+}

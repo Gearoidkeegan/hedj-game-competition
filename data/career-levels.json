@@ -1,0 +1,179 @@
+{
+    "careerLevels": [
+        {
+            "level": 1,
+            "name": "Startup",
+            "title": "First Treasury Role",
+            "description": "A small startup with its first international exposure. One wrong move and the company folds.",
+            "icon": "🏠",
+            "quarters": 8,
+            "scoreToAdvance": 55,
+            "parameters": {
+                "maxExposures": 2,
+                "startingBanks": 1,
+                "creditLimitMultiplier": 0.05,
+                "cashMultiplier": 0.15,
+                "revenueMultiplier": 0.05,
+                "boardDifficulty": "nervous",
+                "satisfactionStart": 55,
+                "satisfactionLossMultiplier": 1.3,
+                "satisfactionGainMultiplier": 0.8,
+                "eventFrequency": 0.3,
+                "maxHedgeQuarters": 4,
+                "policyId": "none"
+            },
+            "boardPersonalities": {
+                "override": [
+                    { "role": "Founder / CEO", "name": "Alex Chen", "personality": "aggressive" },
+                    { "role": "Co-Founder / CFO", "name": "Sarah Mitchell", "personality": "cautious" }
+                ]
+            },
+            "flavourText": {
+                "intro": "Welcome to your first treasury role. The founders are counting on you — literally. One bad quarter and the runway runs out.",
+                "advance": "The startup survived! The founders are impressed enough to recommend you for a bigger role.",
+                "fail": "The startup ran out of cash. Your LinkedIn now says 'Open to Work'."
+            }
+        },
+        {
+            "level": 2,
+            "name": "Scale-Up",
+            "title": "Growing Pains",
+            "description": "More international exposure as the company expands. You're juggling multiple risks now.",
+            "icon": "📈",
+            "quarters": 8,
+            "scoreToAdvance": 58,
+            "parameters": {
+                "maxExposures": 4,
+                "startingBanks": 1,
+                "creditLimitMultiplier": 0.08,
+                "cashMultiplier": 0.25,
+                "revenueMultiplier": 0.15,
+                "boardDifficulty": "growing",
+                "satisfactionStart": 58,
+                "satisfactionLossMultiplier": 1.2,
+                "satisfactionGainMultiplier": 0.9,
+                "eventFrequency": 0.35,
+                "maxHedgeQuarters": 6,
+                "policyId": "basic"
+            },
+            "boardPersonalities": {
+                "override": [
+                    { "role": "CEO", "name": "David Park", "personality": "aggressive" },
+                    { "role": "CFO", "name": "Emma Rodriguez", "personality": "cautious" },
+                    { "role": "COO", "name": "James Wright", "personality": "operational" }
+                ]
+            },
+            "flavourText": {
+                "intro": "The company is growing fast. New markets, new currencies, new headaches. Time to prove you can handle complexity.",
+                "advance": "Scale-up complete. You've earned a reputation as someone who can manage growth. A mature business wants you.",
+                "fail": "Too many balls in the air. The board has 'decided to go in a different direction'."
+            }
+        },
+        {
+            "level": 3,
+            "name": "Mature Business",
+            "title": "Comfortable but Sharp",
+            "description": "Established company with wide margins. More exposures to manage, but less existential pressure.",
+            "icon": "🏢",
+            "quarters": 10,
+            "scoreToAdvance": 60,
+            "parameters": {
+                "maxExposures": 6,
+                "startingBanks": 2,
+                "creditLimitMultiplier": 0.12,
+                "cashMultiplier": 0.45,
+                "revenueMultiplier": 0.5,
+                "boardDifficulty": "experienced",
+                "satisfactionStart": 60,
+                "satisfactionLossMultiplier": 1.0,
+                "satisfactionGainMultiplier": 1.0,
+                "eventFrequency": 0.4,
+                "maxHedgeQuarters": 8,
+                "policyId": "moderate"
+            },
+            "boardPersonalities": {
+                "useIndustryDefault": true
+            },
+            "flavourText": {
+                "intro": "A well-established business with proper governance. The board is experienced but expects professionalism. Don't get complacent.",
+                "advance": "Excellent work at a mature business. But your next challenge will be very different...",
+                "fail": "Steady hand, they said. The board expected better from someone at this level."
+            }
+        },
+        {
+            "level": 4,
+            "name": "PE Takeover",
+            "title": "Under New Management",
+            "description": "Private equity has acquired the company. Debt has doubled. The new board has zero tolerance for losses.",
+            "icon": "🦈",
+            "quarters": 10,
+            "scoreToAdvance": 62,
+            "parameters": {
+                "maxExposures": 6,
+                "startingBanks": 2,
+                "creditLimitMultiplier": 0.10,
+                "cashMultiplier": 0.25,
+                "revenueMultiplier": 0.5,
+                "boardDifficulty": "brutal",
+                "satisfactionStart": 50,
+                "satisfactionLossMultiplier": 1.8,
+                "satisfactionGainMultiplier": 0.5,
+                "eventFrequency": 0.5,
+                "maxHedgeQuarters": 8,
+                "irExposureMultiplier": 2.0,
+                "additionalDebt": true,
+                "policyId": "pe_mandate"
+            },
+            "boardPersonalities": {
+                "override": [
+                    { "role": "PE Partner (Chair)", "name": "Marcus Blackstone", "personality": "aggressive" },
+                    { "role": "PE Partner (Finance)", "name": "Victoria Sterling", "personality": "aggressive" },
+                    { "role": "Retained CFO", "name": "Robert Hartley", "personality": "cautious" }
+                ]
+            },
+            "flavourText": {
+                "intro": "New owners, new rules. The PE partners have loaded the company with debt and your IR exposure has doubled. They want returns, not excuses. Board satisfaction starts at 50 — you're already on thin ice.",
+                "advance": "You survived the PE years. Most don't. A listed company wants someone battle-tested.",
+                "fail": "The PE partners don't do second chances. Your desk has been cleared."
+            }
+        },
+        {
+            "level": 5,
+            "name": "Listed Company",
+            "title": "The Big League",
+            "description": "Global listed company. Many exposures, analyst scrutiny, and the highest stakes. Treasury Manager of the Year awaits.",
+            "icon": "🌍",
+            "quarters": 12,
+            "scoreToAdvance": null,
+            "parameters": {
+                "maxExposures": 8,
+                "startingBanks": 4,
+                "creditLimitMultiplier": 0.15,
+                "cashMultiplier": 0.5,
+                "revenueMultiplier": 1.0,
+                "boardDifficulty": "public",
+                "satisfactionStart": 60,
+                "satisfactionLossMultiplier": 1.3,
+                "satisfactionGainMultiplier": 0.7,
+                "eventFrequency": 0.45,
+                "maxHedgeQuarters": 8,
+                "policyId": "rigorous"
+            },
+            "boardPersonalities": {
+                "useIndustryDefault": true
+            },
+            "flavourText": {
+                "intro": "The pinnacle. A global listed company with exposures across every asset class. Analysts are watching. The board is demanding. Score A+ and you'll be crowned Treasury Manager of the Year.",
+                "advance": null,
+                "fail": "The analysts downgraded the stock. The board needed a scapegoat. Guess who."
+            },
+            "specialOutcomes": {
+                "aPlusGrade": {
+                    "title": "Treasury Manager of the Year",
+                    "description": "Your exceptional performance has been recognised by the industry. You've been awarded Treasury Manager of the Year at the annual awards ceremony.",
+                    "icon": "🏆"
+                }
+            }
+        }
+    ]
+}
