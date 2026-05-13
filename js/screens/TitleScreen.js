@@ -1,6 +1,6 @@
 // Title Screen — animated intro with start/continue/leaderboard options
 
-import { hasSavedGame, getLeaderboard, hasSeenGuide } from '../utils/storage.js';
+import { hasSavedGame, getLeaderboard, hasSeenGuide, getRegistration, clearRegistration } from '../utils/storage.js';
 import { fetchLeaderboard, fetchPlayCount } from '../utils/api.js';
 import { CONFIG } from '../config.js';
 import { careerEngine } from '../engine/CareerEngine.js';
@@ -55,6 +55,8 @@ export class TitleScreen {
                     PRESS ANY KEY OR TAP TO PLAY
                 </div>
             </div>
+
+            <div id="player-switcher" style="display:none;font-size:7px;color:var(--text-muted);margin-top:10px;" class="pixel-text"></div>
 
             <div class="title-footer">
                 <button class="btn" id="btn-sound" style="font-size:16px;padding:4px 10px;min-height:24px;">🔊</button>
@@ -117,6 +119,21 @@ export class TitleScreen {
         fetchLeaderboard(5).then(data => {
             this.cachedGlobalBoard = data?.entries || null;
         }).catch(() => {});
+
+        // Show registered player name with option to switch
+        const reg = getRegistration();
+        if (reg && reg.playerName && reg.gameTokenExpiry > Date.now()) {
+            const switcher = this.el.querySelector('#player-switcher');
+            if (switcher) {
+                switcher.innerHTML = `Playing as ${reg.playerName} &bull; <a href="#" id="btn-switch-player" style="color:var(--cyan);text-decoration:underline;">Not you?</a>`;
+                switcher.style.display = 'block';
+                switcher.querySelector('#btn-switch-player').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    clearRegistration();
+                    this.app.showScreen('registration');
+                });
+            }
+        }
 
         // Fetch and display public play count
         fetchPlayCount().then(count => {

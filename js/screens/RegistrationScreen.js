@@ -55,8 +55,17 @@ export class RegistrationScreen {
                                 <span class="readable-text" style="font-size:12px;">
                                     I agree that Hedj may store my contact details to administer this competition
                                     and contact me if I win. Data will be deleted within 90 days of the competition
-                                    closing. See our <a href="https://www.hedj.eu/privacy" target="_blank" rel="noopener"
-                                    style="color:var(--cyan);">privacy policy</a>.
+                                    closing. See our <a href="/privacy.html" target="_blank" rel="noopener"
+                                    style="color:var(--cyan);">privacy notice</a>.
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="reg-consent" style="margin-top:8px;">
+                            <label class="reg-consent-label">
+                                <input id="reg-marketing" type="checkbox" />
+                                <span class="readable-text" style="font-size:12px;">
+                                    I'm happy for Hedj to contact me after the competition about treasury risk management services. (Optional)
                                 </span>
                             </label>
                         </div>
@@ -99,6 +108,7 @@ export class RegistrationScreen {
             this.el.querySelector('#reg-email').value = '';
             this.el.querySelector('#reg-company').value = '';
             this.el.querySelector('#reg-consent').checked = false;
+            this.el.querySelector('#reg-marketing').checked = false;
             this.el.querySelector('#reg-name').focus();
         });
 
@@ -115,6 +125,7 @@ export class RegistrationScreen {
         const email = this.el.querySelector('#reg-email').value.trim();
         const company = this.el.querySelector('#reg-company').value.trim();
         const consent = this.el.querySelector('#reg-consent').checked;
+        const marketingConsent = this.el.querySelector('#reg-marketing').checked;
 
         const error = this.validate(name, email, company, consent);
         if (error) {
@@ -128,11 +139,12 @@ export class RegistrationScreen {
         this.showError(null);
 
         try {
-            const result = await register(name, email, company);
+            const result = await register(name, email, company, marketingConsent);
             saveRegistration({
                 playerName: name,
                 email,
                 company,
+                marketingConsent,
                 gameToken: result.gameToken,
                 gameTokenExpiry: result.expiresAt
             });

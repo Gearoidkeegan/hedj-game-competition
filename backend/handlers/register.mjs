@@ -26,7 +26,7 @@ export async function handler(event) {
         return response(400, { error: 'Invalid JSON' });
     }
 
-    const { playerName, email, company, consentGiven } = body;
+    const { playerName, email, company, consentGiven, marketingConsent } = body;
 
     if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
         return response(400, { error: 'Player name is required' });
@@ -54,6 +54,7 @@ export async function handler(event) {
             company: company.trim(),
             registeredAt,
             consentGiven: true,
+            marketingConsent: marketingConsent === true,
             gameToken,
             gameTokenExpiry
         }

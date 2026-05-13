@@ -23,17 +23,17 @@ export async function handler(event) {
 
     const result = await ddb.send(new ScanCommand({ TableName: PLAYERS_TABLE }));
     const players = (result.Items || [])
-        .map(({ playerName, email, company, registeredAt }) =>
-            ({ playerName, email, company, registeredAt }))
+        .map(({ playerName, email, company, registeredAt, marketingConsent }) =>
+            ({ playerName, email, company, registeredAt, marketingConsent: marketingConsent === true }))
         .sort((a, b) => (a.registeredAt || '').localeCompare(b.registeredAt || ''));
 
     const format = event.queryStringParameters?.format;
     if (format === 'csv') {
         const csvEscape = v => `"${(v || '').replace(/"/g, '""')}"`;
         const rows = [
-            'Name,Email,Company,Registered At',
+            'Name,Email,Company,Registered At,Marketing Consent',
             ...players.map(p =>
-                [p.playerName, p.email, p.company, p.registeredAt].map(csvEscape).join(','))
+                [p.playerName, p.email, p.company, p.registeredAt, p.marketingConsent ? 'Yes' : 'No'].map(csvEscape).join(','))
         ].join('\r\n');
         return {
             statusCode: 200,

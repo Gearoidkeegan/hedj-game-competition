@@ -258,6 +258,7 @@
                         <th>EMAIL</th>
                         <th>COMPANY</th>
                         <th>REGISTERED AT</th>
+                        <th>MARKETING</th>
                     </tr>
                 </thead>
                 <tbody id="players-tbody"></tbody>
@@ -365,6 +366,9 @@
                 <td>${esc(p.email)}</td>
                 <td>${esc(p.company)}</td>
                 <td class="muted">${formatDate(p.registeredAt)}</td>
+                <td style="color:${p.marketingConsent ? 'var(--pnl-positive)' : 'var(--text-muted)'}">
+                    ${p.marketingConsent ? 'YES' : 'no'}
+                </td>
             </tr>
         `).join('');
     }
@@ -386,9 +390,9 @@
         if (!playersData.length) return;
         const csvEscape = v => `"${(v || '').replace(/"/g, '""')}"`;
         const rows = [
-            'Name,Email,Company,Registered At',
+            'Name,Email,Company,Registered At,Marketing Consent',
             ...playersData.map(p =>
-                [p.playerName, p.email, p.company, p.registeredAt].map(csvEscape).join(','))
+                [p.playerName, p.email, p.company, p.registeredAt, p.marketingConsent ? 'Yes' : 'No'].map(csvEscape).join(','))
         ].join('\r\n');
         const blob = new Blob([rows], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);

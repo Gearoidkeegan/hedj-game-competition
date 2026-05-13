@@ -35,10 +35,10 @@ async function apiFetch(path, options = {}) {
     }
 }
 
-export async function register(playerName, email, company) {
+export async function register(playerName, email, company, marketingConsent = false) {
     const data = await apiFetch('/register', {
         method: 'POST',
-        body: JSON.stringify({ playerName, email, company, consentGiven: true })
+        body: JSON.stringify({ playerName, email, company, consentGiven: true, marketingConsent })
     });
     return data; // { gameToken, expiresAt }
 }
