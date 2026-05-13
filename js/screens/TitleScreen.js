@@ -1,7 +1,7 @@
 // Title Screen — animated intro with start/continue/leaderboard options
 
 import { hasSavedGame, getLeaderboard, hasSeenGuide } from '../utils/storage.js';
-import { fetchLeaderboard } from '../utils/api.js';
+import { fetchLeaderboard, fetchPlayCount } from '../utils/api.js';
 import { CONFIG } from '../config.js';
 import { careerEngine } from '../engine/CareerEngine.js';
 import { soundFX } from '../ui/SoundFX.js';
@@ -38,6 +38,8 @@ export class TitleScreen {
                 <button class="btn" id="btn-leaderboard">LEADERBOARD</button>
                 <button class="btn" id="btn-how-to-play">HOW TO PLAY</button>
             </div>
+
+            <div class="pixel-text" id="play-counter" style="font-size:7px;color:var(--cyan);margin-top:6px;letter-spacing:1px;opacity:0.8;min-height:10px;"></div>
 
             <div class="title-mode-info" id="mode-info">
                 <div class="pixel-text" style="font-size:7px;color:var(--text-muted);margin-top:8px;">
@@ -114,6 +116,12 @@ export class TitleScreen {
         // Pre-fetch global leaderboard for attract mode display
         fetchLeaderboard(5).then(data => {
             this.cachedGlobalBoard = data?.entries || null;
+        }).catch(() => {});
+
+        // Fetch and display public play count
+        fetchPlayCount().then(count => {
+            const el = this.el.querySelector('#play-counter');
+            if (el && count > 0) el.textContent = `${count.toLocaleString()} GAMES PLAYED`;
         }).catch(() => {});
 
         // Animate background

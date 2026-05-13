@@ -1,5 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, UpdateCommand, ScanCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
@@ -50,8 +50,14 @@ async function handlePost(event) {
 
 async function handleGet(event) {
     const adminKey = event.headers?.['x-admin-key'];
-    if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
-        return response(401, { error: 'Unauthorized' });
+    const isAdmin = ADMIN_KEY && adminKey === ADMIN_KEY;
+
+    if (!isAdmin) {
+        const result = await ddb.send(new GetCommand({
+            TableName: ANALYTICS_TABLE,
+            Key: { metricName: 'play' }
+        }));
+        return response(200, { play: result.Item?.count || 0 });
     }
 
     const result = await ddb.send(new ScanCommand({ TableName: ANALYTICS_TABLE }));

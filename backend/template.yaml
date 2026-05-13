@@ -176,6 +176,23 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref HCompAnalytics
 
+  AdminFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/admin.handler
+      Description: Admin endpoint — list registered players
+      Events:
+        GetPlayers:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /admin/players
+            Method: GET
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref HCompPlayers
+
 Outputs:
   ApiUrl:
     Description: API Gateway invoke URL — add as /api/* origin in CloudFront

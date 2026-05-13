@@ -57,6 +57,11 @@ export async function fetchLeaderboard(limit = 20) {
     return apiFetch(`/leaderboard?limit=${limit}`);
 }
 
+export async function fetchPlayCount() {
+    const data = await apiFetch('/analytics');
+    return data?.play || 0;
+}
+
 export function trackEvent(eventName) {
     // Fire-and-forget — errors are swallowed intentionally
     apiFetch('/analytics', {

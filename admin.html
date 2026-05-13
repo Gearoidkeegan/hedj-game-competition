@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Treasury Manager Competition</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-dark: #1a1a2e;
+            --bg-panel: #2d2d44;
+            --bg-panel-light: #3d3d5c;
+            --bg-input: #1e1e35;
+            --border-outer: #5a5a7a;
+            --border-highlight: #8888aa;
+            --gold: #ffcc00;
+            --cyan: #44ccdd;
+            --warning: #ff8844;
+            --pnl-positive: #33cc66;
+            --pnl-negative: #ff4444;
+            --text-primary: #e8e8f0;
+            --text-secondary: #aaaacc;
+            --text-muted: #666688;
+            --font-pixel: 'Press Start 2P', monospace;
+            --font-mono: 'VT323', monospace;
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 18px;
+            min-height: 100vh;
+            padding: 24px 16px;
+        }
+
+        h1 {
+            font-family: var(--font-pixel);
+            font-size: 12px;
+            color: var(--gold);
+            text-align: center;
+            margin-bottom: 4px;
+            letter-spacing: 2px;
+        }
+
+        .tagline {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 28px;
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            border: 2px solid var(--border-outer);
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-width: 960px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .panel-title {
+            font-family: var(--font-pixel);
+            font-size: 8px;
+            color: var(--cyan);
+            letter-spacing: 1px;
+            margin-bottom: 14px;
+            border-bottom: 1px solid var(--border-outer);
+            padding-bottom: 8px;
+        }
+
+        .key-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input[type="password"] {
+            background: var(--bg-input);
+            border: 2px solid var(--border-outer);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 18px;
+            padding: 8px 12px;
+            flex: 1;
+            min-width: 200px;
+            outline: none;
+        }
+
+        input[type="password"]:focus {
+            border-color: var(--cyan);
+        }
+
+        button {
+            background: var(--bg-panel-light);
+            border: 2px solid var(--border-outer);
+            color: var(--gold);
+            font-family: var(--font-pixel);
+            font-size: 8px;
+            padding: 10px 16px;
+            cursor: pointer;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        button:hover { border-color: var(--gold); }
+        button:active { background: var(--bg-dark); }
+
+        button.btn-cyan {
+            color: var(--cyan);
+            border-color: var(--cyan);
+        }
+
+        button.btn-cyan:hover { background: #1a3a40; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .stat-box {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-outer);
+            padding: 14px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-family: var(--font-pixel);
+            font-size: 6px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-family: var(--font-pixel);
+            font-size: 14px;
+            color: var(--gold);
+        }
+
+        .stat-value.cyan { color: var(--cyan); }
+        .stat-value.green { color: var(--pnl-positive); }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 16px;
+        }
+
+        thead th {
+            font-family: var(--font-pixel);
+            font-size: 7px;
+            color: var(--cyan);
+            letter-spacing: 1px;
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 2px solid var(--border-outer);
+        }
+
+        tbody tr { border-bottom: 1px solid var(--border-outer); }
+        tbody tr:hover { background: var(--bg-panel-light); }
+
+        tbody td {
+            padding: 7px 10px;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+
+        tbody td.muted { color: var(--text-muted); font-size: 14px; }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .count-badge {
+            font-family: var(--font-pixel);
+            font-size: 7px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .msg {
+            font-family: var(--font-pixel);
+            font-size: 7px;
+            padding: 10px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        .msg.error { color: var(--pnl-negative); }
+        .msg.loading { color: var(--text-muted); }
+        .msg.empty { color: var(--text-muted); }
+
+        #auth-section { display: block; }
+        #data-section { display: none; }
+    </style>
+</head>
+<body>
+
+<h1>TREASURY MANAGER</h1>
+<div class="tagline">COMPETITION ADMIN</div>
+
+<div id="auth-section" class="panel">
+    <div class="panel-title">ADMIN ACCESS</div>
+    <div class="key-input-row">
+        <input type="password" id="admin-key-input" placeholder="Enter admin key..." autocomplete="off">
+        <button onclick="login()">UNLOCK</button>
+    </div>
+    <div id="auth-msg" class="msg error" style="margin-top:10px;display:none;"></div>
+</div>
+
+<div id="data-section">
+
+    <div class="panel">
+        <div class="panel-title">OVERVIEW</div>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">VISITS</div>
+                <div class="stat-value cyan" id="stat-visits">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">PLAYS</div>
+                <div class="stat-value cyan" id="stat-plays">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">REGISTRATIONS</div>
+                <div class="stat-value green" id="stat-regs">—</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">REGISTERED PLAYERS</div>
+        <div class="toolbar">
+            <button class="btn-cyan" onclick="downloadCSV()">DOWNLOAD CSV</button>
+            <button onclick="refresh()">REFRESH</button>
+            <span class="count-badge" id="player-count"></span>
+        </div>
+        <div id="players-msg" class="msg loading">LOADING...</div>
+        <div id="players-table-wrap" style="overflow-x:auto;display:none;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>NAME</th>
+                        <th>EMAIL</th>
+                        <th>COMPANY</th>
+                        <th>REGISTERED AT</th>
+                    </tr>
+                </thead>
+                <tbody id="players-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const API = '/api';
+    let adminKey = '';
+    let playersData = [];
+
+    function getStoredKey() {
+        try { return sessionStorage.getItem('hedj_admin_key') || ''; } catch { return ''; }
+    }
+
+    function storeKey(k) {
+        try { sessionStorage.setItem('hedj_admin_key', k); } catch {}
+    }
+
+    async function login() {
+        const input = document.getElementById('admin-key-input');
+        const key = input.value.trim();
+        if (!key) return;
+        adminKey = key;
+        storeKey(key);
+        await loadAll();
+    }
+
+    document.getElementById('admin-key-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') login();
+    });
+
+    async function apiFetch(path, headers = {}) {
+        const res = await fetch(API + path, {
+            headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey, ...headers }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    }
+
+    async function loadAll() {
+        const authMsg = document.getElementById('auth-msg');
+        authMsg.style.display = 'none';
+        try {
+            const [analyticsData, playersResult] = await Promise.all([
+                apiFetch('/analytics'),
+                apiFetch('/admin/players')
+            ]);
+
+            // Unlock UI
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('data-section').style.display = 'block';
+
+            // Stats
+            const counts = analyticsData.counts || {};
+            document.getElementById('stat-visits').textContent =
+                (counts.visit || 0).toLocaleString();
+            document.getElementById('stat-plays').textContent =
+                (counts.play || 0).toLocaleString();
+
+            // Players
+            playersData = playersResult.players || [];
+            document.getElementById('stat-regs').textContent =
+                playersData.length.toLocaleString();
+            renderPlayers(playersData);
+
+        } catch (err) {
+            if (err.message.includes('401') || err.message.includes('403')) {
+                authMsg.textContent = 'INVALID ADMIN KEY';
+            } else {
+                authMsg.textContent = 'ERROR: ' + err.message;
+            }
+            authMsg.style.display = 'block';
+            adminKey = '';
+            storeKey('');
+        }
+    }
+
+    function renderPlayers(players) {
+        const tbody = document.getElementById('players-tbody');
+        const msg = document.getElementById('players-msg');
+        const wrap = document.getElementById('players-table-wrap');
+        const badge = document.getElementById('player-count');
+
+        badge.textContent = players.length + ' PLAYERS';
+
+        if (players.length === 0) {
+            msg.textContent = 'NO REGISTRATIONS YET';
+            msg.className = 'msg empty';
+            msg.style.display = 'block';
+            wrap.style.display = 'none';
+            return;
+        }
+
+        msg.style.display = 'none';
+        wrap.style.display = 'block';
+
+        tbody.innerHTML = players.map((p, i) => `
+            <tr>
+                <td class="muted">${i + 1}</td>
+                <td>${esc(p.playerName)}</td>
+                <td>${esc(p.email)}</td>
+                <td>${esc(p.company)}</td>
+                <td class="muted">${formatDate(p.registeredAt)}</td>
+            </tr>
+        `).join('');
+    }
+
+    function esc(s) {
+        return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '—';
+        try {
+            return new Date(iso).toLocaleString('en-IE', {
+                dateStyle: 'short', timeStyle: 'short'
+            });
+        } catch { return iso; }
+    }
+
+    function downloadCSV() {
+        if (!playersData.length) return;
+        const csvEscape = v => `"${(v || '').replace(/"/g, '""')}"`;
+        const rows = [
+            'Name,Email,Company,Registered At',
+            ...playersData.map(p =>
+                [p.playerName, p.email, p.company, p.registeredAt].map(csvEscape).join(','))
+        ].join('\r\n');
+        const blob = new Blob([rows], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `players-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function refresh() {
+        if (!adminKey) return;
+        document.getElementById('stat-visits').textContent = '—';
+        document.getElementById('stat-plays').textContent = '—';
+        document.getElementById('stat-regs').textContent = '—';
+        document.getElementById('players-msg').textContent = 'LOADING...';
+        document.getElementById('players-msg').className = 'msg loading';
+        document.getElementById('players-msg').style.display = 'block';
+        document.getElementById('players-table-wrap').style.display = 'none';
+        loadAll();
+    }
+
+    // Auto-unlock if key is stored in session
+    const storedKey = getStoredKey();
+    if (storedKey) {
+        adminKey = storedKey;
+        document.getElementById('admin-key-input').value = storedKey;
+        loadAll();
+    }
+</script>
+</body>
+</html>
