@@ -10,6 +10,33 @@ class BoardAIController {
     constructor() {
         this.dialogueData = null;
         this.ceoPersona = null;    // Current game's CEO persona id
+        this.usedLines = new Map(); // poolKey -> Set of used indices (no-repeat across a playthrough)
+    }
+
+    /**
+     * Pick a line from a pool without repeating within the current game.
+     * Tracks used indices per pool key so CEO/Chairman/board comments don't
+     * repeat over an 8-quarter playthrough. Once a pool is exhausted it resets
+     * so picking can continue.
+     */
+    pickNoRepeat(arr, key, rng) {
+        if (!arr || arr.length === 0) return null;
+        let used = this.usedLines.get(key);
+        if (!used) { used = new Set(); this.usedLines.set(key, used); }
+
+        let available = [];
+        for (let i = 0; i < arr.length; i++) {
+            if (!used.has(i)) available.push(i);
+        }
+        // All lines used — reset this pool so it can cycle again
+        if (available.length === 0) {
+            used.clear();
+            for (let i = 0; i < arr.length; i++) available.push(i);
+        }
+
+        const idx = available[Math.floor(rng.next() * available.length)];
+        used.add(idx);
+        return arr[idx];
     }
 
     /**
@@ -31,6 +58,7 @@ class BoardAIController {
     assignCEOPersona(rng) {
         const personas = ['jameson', 'musk', 'oleary', 'dimon', 'buffett', 'jobs', 'dorsey', 'ackman'];
         this.ceoPersona = rng.pick(personas);
+        this.usedLines = new Map(); // Fresh no-repeat tracking for each new game
         return this.ceoPersona;
     }
 
@@ -92,17 +120,18 @@ class BoardAIController {
 
         const lines = [];
         const rng = gameState.getRng();
+        const k = (cat) => `${personality}.${cat}`;
 
         // Primary reaction: P&L outcome
         const pnlCategory = this.getPnLCategory(result);
         const pnlPool = pool[`${pnlCategory}_pnl`] || [];
         if (pnlPool.length > 0) {
-            lines.push(rng.pick(pnlPool));
+            lines.push(this.pickNoRepeat(pnlPool, k(`${pnlCategory}_pnl`), rng));
         }
 
         // Secondary reactions based on player behaviour
         if (state.tradesThisQuarter > 3 && pool.overtrading) {
-            lines.push(rng.pick(pool.overtrading));
+            lines.push(this.pickNoRepeat(pool.overtrading, k('overtrading'), rng));
         }
 
         if (state.tradeDirectionErrors > 0 && pool.trade_direction_error && state.tradesThisQuarter > 0) {
@@ -110,12 +139,12 @@ class BoardAIController {
                 ? (state.quarterlyResults[state.quarterlyResults.length - 2]?.tradeDirectionErrors || 0)
                 : 0;
             if (state.tradeDirectionErrors > prevErrors) {
-                lines.push(rng.pick(pool.trade_direction_error));
+                lines.push(this.pickNoRepeat(pool.trade_direction_error, k('trade_direction_error'), rng));
             }
         }
 
         if (result.marginCallAmount > 0 && pool.margin_call) {
-            lines.push(rng.pick(pool.margin_call));
+            lines.push(this.pickNoRepeat(pool.margin_call, k('margin_call'), rng));
         }
 
         // Check for option usage — board reacts to premium cost
@@ -123,14 +152,14 @@ class BoardAIController {
             h.status === 'active' && (h.productType === 'option' || h.productType === 'cap') && h.premiumPaid > 0
         );
         if (hasOptions && pool.option_premium && rng.chance(0.4)) {
-            lines.push(rng.pick(pool.option_premium));
+            lines.push(this.pickNoRepeat(pool.option_premium, k('option_premium'), rng));
         }
 
         // Policy violations
         if (state.policyViolations > 0 && pool.policy_violation) {
             const justViolated = !this.wasInComplianceLastQuarter(state);
             if (justViolated) {
-                lines.push(rng.pick(pool.policy_violation));
+                lines.push(this.pickNoRepeat(pool.policy_violation, k('policy_violation'), rng));
             }
         }
 
@@ -151,18 +180,18 @@ class BoardAIController {
                 "Over-hedging creates risk, it doesn't reduce it. Fix this.",
                 "The policy says hedge our exposure, not take new positions."
             ];
-            lines.push(rng.pick(overhedgeLines));
+            lines.push(this.pickNoRepeat(overhedgeLines, k('overhedging'), rng));
         }
 
         // v2: TMS spending feedback (30% chance per member to comment)
         if (rng.chance(0.3)) {
-            const tmsLine = this.getTMSFeedbackLine(pool, state, rng);
+            const tmsLine = this.getTMSFeedbackLine(pool, state, rng, personality);
             if (tmsLine) lines.push(tmsLine);
         }
 
         // v2: Forecast variance feedback (25% chance, only if variance is notable)
         if (rng.chance(0.25)) {
-            const varianceLine = this.getVarianceFeedbackLine(pool, state, rng);
+            const varianceLine = this.getVarianceFeedbackLine(pool, state, rng, personality);
             if (varianceLine) lines.push(varianceLine);
         }
 
@@ -173,7 +202,7 @@ class BoardAIController {
     /**
      * Get TMS-related feedback line for a board member.
      */
-    getTMSFeedbackLine(pool, state, rng) {
+    getTMSFeedbackLine(pool, state, rng, personality = 'x') {
         const moduleCount = state.tmsModuleCount || 0;
         if (moduleCount === 0) return null;
 
@@ -187,9 +216,9 @@ class BoardAIController {
                             (state.cashBalance > 0 && totalCost > state.cashBalance * 0.20);
 
         if (overSpending && pool.tms_overspend) {
-            return rng.pick(pool.tms_overspend);
+            return this.pickNoRepeat(pool.tms_overspend, `${personality}.tms_overspend`, rng);
         } else if (moduleCount <= 2 && pool.tms_positive) {
-            return rng.pick(pool.tms_positive);
+            return this.pickNoRepeat(pool.tms_positive, `${personality}.tms_positive`, rng);
         }
 
         return null;
@@ -198,7 +227,7 @@ class BoardAIController {
     /**
      * Get forecast variance feedback line for a board member.
      */
-    getVarianceFeedbackLine(pool, state, rng) {
+    getVarianceFeedbackLine(pool, state, rng, personality = 'x') {
         const variance = forecastEngine.getEffectiveVariance(
             state.currentYearOffset,
             state.tmsModuleCount || 0
@@ -206,12 +235,12 @@ class BoardAIController {
 
         // High variance (>25%) — board is concerned
         if (variance > 0.25 && pool.high_variance) {
-            return rng.pick(pool.high_variance);
+            return this.pickNoRepeat(pool.high_variance, `${personality}.high_variance`, rng);
         }
 
         // Low variance (<15%) — board is pleased
         if (variance < 0.15 && pool.low_variance) {
-            return rng.pick(pool.low_variance);
+            return this.pickNoRepeat(pool.low_variance, `${personality}.low_variance`, rng);
         }
 
         return null;
@@ -285,19 +314,25 @@ class BoardAIController {
         const revenue = state.industry?.annualRevenue || 1e9;
         const bigThreshold = revenue * 0.01; // 1% of revenue
 
+        // No-repeat keys are namespaced per persona so the Chairman never repeats
+        // a line over an 8-quarter playthrough.
+        const ck = (cat) => `ceo.${this.ceoPersona}.${cat}`;
+
         // CEO always appears on the very first board review to introduce themselves
         if (state.totalQuartersPlayed === 0) {
-            return [rng.pick(ceoPool.general)];
+            return [this.pickNoRepeat(ceoPool.general, ck('general'), rng)];
         }
 
         // CEO appears on big swings
         if (Math.abs(result.netPnL) > bigThreshold) {
             const category = result.netPnL > 0 ? 'big_win' : 'big_loss';
-            const lines = [rng.pick(ceoPool[category] || ceoPool.general)];
+            const pool = ceoPool[category] || ceoPool.general;
+            const poolKey = ceoPool[category] ? ck(category) : ck('general');
+            const lines = [this.pickNoRepeat(pool, poolKey, rng)];
 
             // v2: CEO also comments on TMS if recently purchased
             if ((state.tmsModuleCount || 0) > 0 && ceoPool.tms_comment && rng.chance(0.4)) {
-                lines.push(rng.pick(ceoPool.tms_comment));
+                lines.push(this.pickNoRepeat(ceoPool.tms_comment, ck('tms_comment'), rng));
             }
 
             return lines;
@@ -305,11 +340,11 @@ class BoardAIController {
 
         // Periodic appearance (~every 2-3 quarters)
         if (state.totalQuartersPlayed % 3 === 0 || rng.chance(0.35)) {
-            const lines = [rng.pick(ceoPool.general)];
+            const lines = [this.pickNoRepeat(ceoPool.general, ck('general'), rng)];
 
             // Chance to comment on TMS
             if ((state.tmsModuleCount || 0) > 0 && ceoPool.tms_comment && rng.chance(0.3)) {
-                lines.push(rng.pick(ceoPool.tms_comment));
+                lines.push(this.pickNoRepeat(ceoPool.tms_comment, ck('tms_comment'), rng));
             }
 
             return lines;
