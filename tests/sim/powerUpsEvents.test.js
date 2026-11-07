@@ -150,3 +150,33 @@ test('a full run with events resolves each once and never repeats one', () => {
     }
     assert.equal(new Set(ids).size, ids.length);
 });
+
+test('simulateQuarter requires an eventChoice while an event is pending', () => {
+    const run = { ...newRun(), pendingEvent: supplier.id };
+    assert.throws(() => simulateQuarter(run, decide(run), marketEngine, content), /eventChoice required while an event is pending/);
+});
+
+function playWithEvents(seed) {
+    let run = createRun({ industry: airline, seed, startedAt: 1, market: marketEngine });
+    while (!isRunOver(run)) {
+        const hedges = Object.fromEntries(run.exposures.map(e => [e.id, run.mandate.min]));
+        const ev = run.pendingEvent ? content.events.find(e => e.id === run.pendingEvent) : null;
+        run = simulateQuarter(run, decide(run, { hedges, eventChoice: ev ? ev.choices[0].id : null }), marketEngine, content).run;
+    }
+    return run;
+}
+
+test('engine runs with events are deterministic per seed and differ across seeds', () => {
+    const eventIds = r => r.history.map(s => s.event && s.event.id);
+    const seeds = [];
+    for (let s = 1; s <= 40 && seeds.length < 2; s++) {
+        const r = playWithEvents(s);
+        if (r.history.length === 8 && eventIds(r).some(Boolean)) seeds.push(s);
+    }
+    assert.equal(seeds.length, 2, 'found two complete seeds with at least one resolved event');
+    const [a, b] = seeds;
+    const first = playWithEvents(a);
+    assert.deepEqual(playWithEvents(a).history, first.history);
+    assert.deepEqual(eventIds(playWithEvents(a)), eventIds(first));
+    assert.notDeepEqual(playWithEvents(b).history, first.history);
+});

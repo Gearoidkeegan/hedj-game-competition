@@ -107,7 +107,7 @@ canBuyPowerUp(run, id, unlockedIds) -> boolean
 applyPowerUp(run, id) -> run
 rollEvent(run, events, rng) -> string|null   // selects only (weighted, ids not yet seen this run); SimEngine applies
                                              // rng.chance(BALANCE.eventChance) first and never rolls once the run is over
-applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult }   // unknown choiceId throws
+applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult, quarterVarianceMult }   // unknown choiceId throws
 
 // SimpleEvent (JSON)
 { id, pool: 'business'|'conference', weight, title, text,

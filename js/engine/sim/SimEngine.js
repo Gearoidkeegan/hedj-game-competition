@@ -10,7 +10,6 @@ import { exposureCashImpact, hedgeCashImpact, optionPremium } from './exposureMa
 
 const MAX_QUARTERS = 8;
 
-
 export function activeExposures(run) {
     return run.exposures.filter(e => e.unlockQuarter <= run.quarter);
 }
@@ -103,6 +102,7 @@ export function simulateQuarter(run, decisions, market, content) {
     let quarterVarianceMult = 1;
     if (next.pendingEvent) {
         const event = (content.events || []).find(e => e.id === next.pendingEvent);
+        if (!decisions.eventChoice) throw new Error('eventChoice required while an event is pending');
         ({ run: next, quarterNotionalMult, quarterVarianceMult } = applyEventChoice(next, event, decisions.eventChoice));
     }
 
