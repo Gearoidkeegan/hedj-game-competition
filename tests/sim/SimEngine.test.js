@@ -69,7 +69,11 @@ test('all-zero hedges: playerDelta === benchmarkDelta', () => {
     assert.notEqual(summary.playerDelta, 0);
 });
 
-test('100% forward on every active exposure: only the over- or under-hedge remains', () => {
+// The benchmark is unhedged, so the 100%-forward identity is checked on the player side (ruling R14):
+//   marketResult = Σ exposureImpact(realised − forecast)      (only the over- or under-hedge remains)
+//   |playerDelta − baseOcf| = |that residual|
+//   playerDelta − benchmarkDelta = Σ hedgeImpact
+test('100% forward: marketResult = Σ exposure impact on (realised − forecast); player − benchmark = Σ hedgeImpact', () => {
     const run = newRun();
     const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 1)), marketEngine, content);
     const byId = Object.fromEntries(run.exposures.map(e => [e.id, e]));
@@ -197,6 +201,25 @@ test('complete after 8', () => {
     assert.deepEqual(run.history.map(h => h.q), [1, 2, 3, 4, 5, 6, 7, 8]);
     assert.ok(run.history.every(h => h.breach === 'none'));
     assert.throws(() => simulateQuarter(run, decide(hedgesAt(run, 0.5)), marketEngine, content));
+});
+
+test('IR realised notional equals forecast at q>=6 regardless of seed', () => {
+    for (const seed of [1, 7, 12345, 999999, 0xDEADBEEF]) {
+        let run = createRun({ industry: airline, seed, startedAt: 1, market: marketEngine });
+        while (run.quarter < 8) {
+            const before = run.quarter;
+            const r = simulateQuarter(run, decide(hedgesAt(run, run.mandate.min)), marketEngine, content);
+            run = r.run;
+            if (before >= 6) {
+                const debt = r.summary.lines.find(l => l.exposureId === 'floating-debt');
+                assert.ok(debt, `seed ${seed}: floating-debt active from quarter index 6`);
+                assert.equal(debt.realisedNotional, debt.forecastNotional);
+                const fuel = r.summary.lines.find(l => l.exposureId === 'fuel');
+                assert.notEqual(fuel.realisedNotional, fuel.forecastNotional);
+            }
+        }
+        assert.equal(run.status, 'complete');
+    }
 });
 
 test('GBP exposure unlocks at Q4', () => {

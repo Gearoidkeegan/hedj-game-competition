@@ -128,7 +128,9 @@ export function simulateQuarter(run, decisions, market, content) {
     const lines = [];
     for (const exp of activeExposures(next)) {
         const forecast = exp.quarterlyNotional * (quarterNotionalMult[exp.id] ?? 1);
-        const realised = forecast * (1 + (rng.next() * 2 - 1) * variance);
+        // Volume forecasts (fx, commodity) miss by up to ±variance; debt principal (ir) is contractual.
+        // ir draws no random number.
+        const realised = exp.type === 'ir' ? forecast : forecast * (1 + (rng.next() * 2 - 1) * variance);
         const h = hedges[exp.id] ?? 0;
         const hedged = h * forecast;
         const startRate = next.rates[exp.underlying];

@@ -42,6 +42,10 @@ Shapes and signatures only. Every stream reads this first. Source of truth: the 
   event: { id, choice } | null, powerUp: string|null }
 ```
 
+`lines[].movePct`: percent change of the rate for `fx` and `commodity`; for `ir` it is the change in percentage points
+(`end − start`, the rates are already in percent). A zero or missing start rate (or missing end rate) is no move:
+`movePct`, `exposureImpact` and `hedgeImpact` are all 0.
+
 `QuarterResult` (return of `simulateQuarter`): `{ run: RunState, summary: QuarterSummary }`.
 
 ## SimEngine (A3)
@@ -65,6 +69,10 @@ isRunOver(run) -> boolean                     // status !== 'playing'
 ```
 
 ## simulateQuarter rules fixed by the contract (A3)
+
+Forecast variance (step 4): `fx` and `commodity` exposures (volume-driven) have
+`realised = forecast × (1 + (rng.next()×2−1) × variance)`. `ir` exposures (debt principal, contractual) have
+`realised = forecast` exactly and draw no random number.
 
 Board mood (step 7), clamped to 0..100:
 
@@ -92,7 +100,8 @@ Status (step 8), checked in this order:
 ```js
 canBuyPowerUp(run, id, unlockedIds) -> boolean
 applyPowerUp(run, id) -> run
-rollEvent(run, events, rng) -> string|null
+rollEvent(run, events, rng) -> string|null   // selects only (weighted, ids not yet seen this run); SimEngine applies
+                                             // rng.chance(BALANCE.eventChance) first and never rolls once the run is over
 applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult }   // unknown choiceId throws
 
 // SimpleEvent (JSON)
