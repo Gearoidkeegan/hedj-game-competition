@@ -55,3 +55,15 @@ test('EventEndIso description no longer claims scores are rejected', () => {
     const desc = yaml.split('EventEndIso:')[1].split('TokenTtlHours:')[0];
     assert.ok(!/no longer accepted/.test(desc));
 });
+
+test('admin function: read-only on players and best, three throttled routes', () => {
+    const block = yaml.split('AdminFunction:')[1].split('ProgressFunction:')[0];
+    for (const path of ['/admin/players', '/admin/metrics', '/admin/prize']) assert.ok(block.includes(`Path: ${path}`), path);
+    assert.equal((block.match(/DynamoDBReadPolicy/g) || []).length, 2);
+    assert.ok(block.includes('!Ref HCompPlayers') && block.includes('!Ref HCompBest'));
+    assert.ok(!block.includes('CrudPolicy') && !block.includes('HCompScores'));
+    for (const route of ['GET /admin/players', 'GET /admin/metrics', 'GET /admin/prize']) {
+        const rs = yaml.split(`'${route}':`)[1].split('\n').slice(0, 3).join('\n');
+        assert.match(rs, /ThrottlingBurstLimit: 5\s+ThrottlingRateLimit: 2/, route);
+    }
+});

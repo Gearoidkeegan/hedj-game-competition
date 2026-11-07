@@ -138,6 +138,12 @@ Resources:
         'GET /admin/players':
           ThrottlingBurstLimit: 5
           ThrottlingRateLimit: 2
+        'GET /admin/metrics':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
+        'GET /admin/prize':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
         'GET /analytics':
           ThrottlingBurstLimit: 5
           ThrottlingRateLimit: 2
@@ -241,7 +247,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: handlers/admin.handler
-      Description: Admin endpoint — list registered players
+      Description: Admin endpoints — list players, engagement metrics, prize export
       Events:
         GetPlayers:
           Type: HttpApi
@@ -249,9 +255,23 @@ Resources:
             ApiId: !Ref CompetitionApi
             Path: /admin/players
             Method: GET
+        GetMetrics:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /admin/metrics
+            Method: GET
+        GetPrize:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /admin/prize
+            Method: GET
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref HCompPlayers
+        - DynamoDBReadPolicy:
+            TableName: !Ref HCompBest
 
   ProgressFunction:
     Type: AWS::Serverless::Function

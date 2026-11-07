@@ -7,6 +7,11 @@ on:
       - main
     paths:
       - 'index.html'
+      - 'admin.html'
+      - 'privacy.html'
+      - 'stand.html'
+      - 'manifest.json'
+      - 'sw.js'
       - 'css/**'
       - 'js/**'
       - 'data/**'
