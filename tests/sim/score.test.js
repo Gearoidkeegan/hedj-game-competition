@@ -74,7 +74,7 @@ test('lucky breach scores less than in-mandate, more than losing breach', () => 
 });
 
 test('a losing breach costs more than an in-mandate quarter earns', () => {
-    // playerDelta far from baseOcf with benchmark at baseOcf-ish: stability 0, below red line
+    // playerDelta far from baseOcf with benchmark at baseOcf-ish: stability 0 (|-100 - baseOcf| = 70 exceeds the spread of 30), below red line
     const loss = quarterPoints(summary({ breach: 'loss', cashAfter: 100 }), START);
     assert.ok(loss < 0);
     assert.equal(loss, BALANCE.points.breachLoss);
@@ -124,4 +124,17 @@ test('title picks the highest entry with score <= total; empty when none given',
     assert.equal(finalScore(input(history(100000, 1000), { boardMood: 100 }), titles).title, 'CFO');
     assert.equal(finalScore(input([], { status: 'bankrupt' }), titles).title, 'Intern');
     assert.equal(finalScore(input([], { status: 'bankrupt' }), [{ min: 10, title: 'X', line: '' }]).title, '');
+});
+
+test('missing or non-finite boardMood defaults to startMood and is clamped, so the total is never NaN', () => {
+    const h = history(1000, 1000);
+    const base = finalScore(input(h, { boardMood: BALANCE.startMood }));
+    for (const bad of [undefined, null, NaN, Infinity, 'x']) {
+        const r = finalScore(input(h, { boardMood: bad }));
+        assert.ok(Number.isFinite(r.total), String(bad));
+        assert.equal(r.total, base.total);
+        assert.equal(r.breakdown.moodMultiplier, base.breakdown.moodMultiplier);
+    }
+    assert.ok(Math.abs(finalScore(input(h, { boardMood: 500 })).breakdown.moodMultiplier - 1.2) < 1e-9);
+    assert.ok(Math.abs(finalScore(input(h, { boardMood: -50 })).breakdown.moodMultiplier - 0.8) < 1e-9);
 });

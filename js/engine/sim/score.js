@@ -32,7 +32,8 @@ export function finalScore({ history, status, startingCash, boardMood }, gameOve
     const outperformance = Math.round(P.outperformPerPct * 100 * (lastCash - lastBenchmark) / startingCash);
 
     const survival = status === 'complete' ? P.survival : 0;
-    const moodMultiplier = 0.8 + 0.4 * boardMood / 100;
+    const mood = clamp(Number.isFinite(boardMood) ? boardMood : BALANCE.startMood, 0, 100);
+    const moodMultiplier = 0.8 + 0.4 * mood / 100;
     const total = clamp(Math.round((quarters + outperformance + survival) * moodMultiplier), 0, SCORE_MAX);
 
     let title = '';
