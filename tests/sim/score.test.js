@@ -111,9 +111,9 @@ test('empty history has zero outperformance', () => {
 
 test('title picks the highest entry with score <= total; empty when none given', () => {
     const titles = [
-        { score: 0, title: 'Intern', line: 'a' },
-        { score: 1000, title: 'Manager', line: 'b' },
-        { score: 5000, title: 'CFO', line: 'c' }
+        { min: 0, title: 'Intern', line: 'a' },
+        { min: 1000, title: 'Manager', line: 'b' },
+        { min: 5000, title: 'CFO', line: 'c' }
     ];
     const h = history(1000, 1000);
     const total = finalScore(input(h)).total;
@@ -123,5 +123,5 @@ test('title picks the highest entry with score <= total; empty when none given',
     assert.equal(finalScore(input(h), []).title, '');
     assert.equal(finalScore(input(history(100000, 1000), { boardMood: 100 }), titles).title, 'CFO');
     assert.equal(finalScore(input([], { status: 'bankrupt' }), titles).title, 'Intern');
-    assert.equal(finalScore(input([], { status: 'bankrupt' }), [{ score: 10, title: 'X', line: '' }]).title, '');
+    assert.equal(finalScore(input([], { status: 'bankrupt' }), [{ min: 10, title: 'X', line: '' }]).title, '');
 });

@@ -21,7 +21,7 @@ export function quarterPoints(summary, startingCash) {
     return pts + Math.round(P.stability * steadiness);
 }
 
-// gameOverTitles: [{ score, title, line }] ascending by score; the highest entry with score <= total wins.
+// gameOverTitles: [{ min, title, line }] ascending by min; the highest entry with min <= total wins.
 export function finalScore({ history, status, startingCash, boardMood }, gameOverTitles = []) {
     const P = BALANCE.points;
     const quarters = history.reduce((sum, s) => sum + quarterPoints(s, startingCash), 0);
@@ -36,6 +36,6 @@ export function finalScore({ history, status, startingCash, boardMood }, gameOve
     const total = clamp(Math.round((quarters + outperformance + survival) * moodMultiplier), 0, SCORE_MAX);
 
     let title = '';
-    for (const t of gameOverTitles) if (t.score <= total) title = t.title;
+    for (const t of gameOverTitles) if (t.min <= total) title = t.title;
     return { total, breakdown: { quarters, outperformance, survival, moodMultiplier }, title };
 }
