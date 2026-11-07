@@ -1,49 +1,49 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { randomUUID } from 'node:crypto';
+import { json, requireAdmin, errorResponse } from '../lib/http.mjs';
 
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
+export function createHandler(deps) {
+    const { ddb, env } = deps;
 
-const PLAYERS_TABLE = process.env.PLAYERS_TABLE;
-const ADMIN_KEY = process.env.ADMIN_KEY;
+    return async function handler(event) {
+        try {
+            requireAdmin(event, env);
+        } catch (err) {
+            return errorResponse(err);
+        }
 
-function jsonResponse(statusCode, body) {
-    return {
-        statusCode,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        const result = await ddb.send(new ScanCommand({ TableName: env.PLAYERS_TABLE }));
+        const players = (result.Items || [])
+            .map(({ playerName, email, company, registeredAt, marketingConsent }) =>
+                ({ playerName, email, company, registeredAt, marketingConsent: marketingConsent === true }))
+            .sort((a, b) => (a.registeredAt || '').localeCompare(b.registeredAt || ''));
+
+        const format = event.queryStringParameters?.format;
+        if (format === 'csv') {
+            const csvEscape = v => `"${(v || '').replace(/"/g, '""')}"`;
+            const rows = [
+                'Name,Email,Company,Registered At,Marketing Consent',
+                ...players.map(p =>
+                    [p.playerName, p.email, p.company, p.registeredAt, p.marketingConsent ? 'Yes' : 'No'].map(csvEscape).join(','))
+            ].join('\r\n');
+            return {
+                statusCode: 200,
+                headers: {
+                    'Content-Type': 'text/csv',
+                    'Content-Disposition': 'attachment; filename=players.csv'
+                },
+                body: rows
+            };
+        }
+
+        return json(200, { players, total: players.length });
     };
 }
 
-export async function handler(event) {
-    const adminKey = event.headers?.['x-admin-key'];
-    if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
-        return jsonResponse(401, { error: 'Unauthorized' });
-    }
-
-    const result = await ddb.send(new ScanCommand({ TableName: PLAYERS_TABLE }));
-    const players = (result.Items || [])
-        .map(({ playerName, email, company, registeredAt, marketingConsent }) =>
-            ({ playerName, email, company, registeredAt, marketingConsent: marketingConsent === true }))
-        .sort((a, b) => (a.registeredAt || '').localeCompare(b.registeredAt || ''));
-
-    const format = event.queryStringParameters?.format;
-    if (format === 'csv') {
-        const csvEscape = v => `"${(v || '').replace(/"/g, '""')}"`;
-        const rows = [
-            'Name,Email,Company,Registered At,Marketing Consent',
-            ...players.map(p =>
-                [p.playerName, p.email, p.company, p.registeredAt, p.marketingConsent ? 'Yes' : 'No'].map(csvEscape).join(','))
-        ].join('\r\n');
-        return {
-            statusCode: 200,
-            headers: {
-                'Content-Type': 'text/csv',
-                'Content-Disposition': 'attachment; filename=players.csv'
-            },
-            body: rows
-        };
-    }
-
-    return jsonResponse(200, { players, total: players.length });
-}
+export const handler = createHandler({
+    ddb: DynamoDBDocumentClient.from(new DynamoDBClient({})),
+    env: process.env,
+    now: () => Date.now(),
+    uuid: () => randomUUID()
+});

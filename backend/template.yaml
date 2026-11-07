@@ -7,6 +7,18 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Secret key for the admin analytics GET endpoint
+  EventId:
+    Type: String
+    Default: test
+    Description: Identifier of the live event; selects the leaderboard partition
+  EventEndIso:
+    Type: String
+    Default: ''
+    Description: ISO-8601 timestamp after which scores are no longer accepted (empty = no end)
+  TokenTtlHours:
+    Type: Number
+    Default: 120
+    Description: Lifetime of a game token in hours
 
 Globals:
   Function:
@@ -18,6 +30,10 @@ Globals:
         PLAYERS_TABLE: !Ref HCompPlayers
         SCORES_TABLE: !Ref HCompScores
         ANALYTICS_TABLE: !Ref HCompAnalytics
+        BEST_TABLE: !Ref HCompBest
+        EVENT_ID: !Ref EventId
+        EVENT_END_ISO: !Ref EventEndIso
+        TOKEN_TTL_HOURS: !Ref TokenTtlHours
         ADMIN_KEY: !Ref AdminKey
 
 Resources:
@@ -67,6 +83,33 @@ Resources:
         AttributeName: ttl
         Enabled: true
 
+  HCompBest:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'HCompBest-${AWS::StackName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: board
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: score
+          AttributeType: N
+      KeySchema:
+        - AttributeName: board
+          KeyType: HASH
+        - AttributeName: email
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: ByScore
+          KeySchema:
+            - AttributeName: board
+              KeyType: HASH
+            - AttributeName: score
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
   HCompAnalytics:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -85,11 +128,20 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: prod
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 50
+        ThrottlingRateLimit: 20
+      RouteSettings:
+        'GET /admin/players':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
+        'GET /analytics':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
       CorsConfiguration:
         AllowOrigins:
           - 'https://competition.hedj.eu'
           - 'http://localhost:8080'
-          - 'http://localhost:3000'
         AllowHeaders:
           - Content-Type
           - x-admin-key
@@ -135,6 +187,8 @@ Resources:
             TableName: !Ref HCompPlayers
         - DynamoDBCrudPolicy:
             TableName: !Ref HCompScores
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HCompBest
 
   LeaderboardFunction:
     Type: AWS::Serverless::Function
@@ -151,7 +205,7 @@ Resources:
             Method: GET
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref HCompScores
+            TableName: !Ref HCompBest
 
   AnalyticsFunction:
     Type: AWS::Serverless::Function
@@ -201,5 +255,7 @@ Outputs:
     Value: !Ref HCompPlayers
   ScoresTable:
     Value: !Ref HCompScores
+  BestTable:
+    Value: !Ref HCompBest
   AnalyticsTable:
     Value: !Ref HCompAnalytics
