@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadMarketData, loadIndustries } from '../helpers/loadData.js';
-import { marketEngine } from '../../js/engine/MarketEngine.js';
+import { marketEngine, fillShortGaps } from '../../js/engine/MarketEngine.js';
 import { SeededRandom } from '../../js/utils/random.js';
 import { eligibleStartYears, pickStartYear, hasExactRate } from '../../js/engine/sim/startYears.js';
 
@@ -14,7 +14,7 @@ const agrifoods = byId('agrifoods');
 test('eligible years for airline exclude 2006 (no JETNWE)', () => {
     const years = eligibleStartYears(marketEngine, airline.exposures);
     assert.ok(!years.includes(2006));
-    assert.ok(years.includes(2013));
+    assert.ok(years.includes(2010));
 });
 
 test('agrifoods requires DAIRY from Q6', () => {
@@ -41,10 +41,28 @@ test('pickStartYear is deterministic per seed', () => {
 
 test('forcedYear outside eligibility throws; inside is returned', () => {
     assert.throws(() => pickStartYear(marketEngine, airline.exposures, new SeededRandom(1), { forcedYear: 1995 }));
-    assert.deepEqual(pickStartYear(marketEngine, airline.exposures, new SeededRandom(1), { forcedYear: 2013 }), { year: 2013, quarter: 1 });
+    assert.deepEqual(pickStartYear(marketEngine, airline.exposures, new SeededRandom(1), { forcedYear: 2010 }), { year: 2010, quarter: 1 });
 });
 
 test('hasExactRate ignores the nearest-date fallback', () => {
     assert.equal(hasExactRate(marketEngine, 'BRENT', 2007, 1), false);
     assert.equal(hasExactRate(marketEngine, 'BRENT', 2008, 1), true);
+});
+
+test('fillShortGaps fills a 2-month gap linearly', () => {
+    const out = fillShortGaps({ '2020-01-01': 3, '2020-04-01': 6 });
+    assert.equal(out['2020-02-01'], 4);
+    assert.equal(out['2020-03-01'], 5);
+});
+
+test('fillShortGaps leaves a 3-month gap', () => {
+    const out = fillShortGaps({ '2020-01-01': 3, '2020-05-01': 7 });
+    assert.deepEqual(Object.keys(out), ['2020-01-01', '2020-05-01']);
+});
+
+test('fillShortGaps does not mutate input', () => {
+    const input = { '2020-01-01': 3, '2020-03-01': 5 };
+    const out = fillShortGaps(input);
+    assert.deepEqual(Object.keys(input), ['2020-01-01', '2020-03-01']);
+    assert.equal(out['2020-02-01'], 4);
 });

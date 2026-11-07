@@ -21,6 +21,42 @@ export function computeBudgetRate(exp, spot) {
     return spot * (1 + (unfavourableUp ? BUDGET_SPREAD : -BUDGET_SPREAD));
 }
 
+function monthIndex(key) {
+    return parseInt(key.slice(0, 4), 10) * 12 + (parseInt(key.slice(5, 7), 10) - 1);
+}
+function monthKey(idx) {
+    const y = Math.floor(idx / 12);
+    return `${y}-${String((idx % 12) + 1).padStart(2, '0')}-01`;
+}
+
+/**
+ * Fill runs of 1..maxGap consecutive missing months (keys YYYY-MM-01) that have real
+ * data on both sides, by linear interpolation. Longer runs and the edges stay unfilled.
+ * Pure: returns a new object.
+ */
+export function fillShortGaps(series, maxGap = 2) {
+    const out = { ...series };
+    const keys = Object.keys(series).sort();
+    for (let i = 1; i < keys.length; i++) {
+        const a = monthIndex(keys[i - 1]);
+        const b = monthIndex(keys[i]);
+        const gap = b - a - 1;
+        if (gap < 1 || gap > maxGap) continue;
+        const va = series[keys[i - 1]];
+        const vb = series[keys[i]];
+        for (let m = 1; m <= gap; m++) {
+            out[monthKey(a + m)] = va + (vb - va) * (m / (gap + 1));
+        }
+    }
+    return out;
+}
+
+function fillAll(group) {
+    const out = {};
+    for (const [name, series] of Object.entries(group)) out[name] = fillShortGaps(series);
+    return out;
+}
+
 class MarketEngineController {
     constructor() {
         this.fxData = null;
@@ -58,9 +94,9 @@ class MarketEngineController {
      * Derives the JETNWE proxy and marks the engine as loaded.
      */
     loadFromObjects({ fx, rates, commodities }) {
-        this.fxData = this.stripMeta(fx);
-        this.ratesData = this.stripMeta(rates);
-        this.commoditiesData = this.stripMeta(commodities);
+        this.fxData = fillAll(this.stripMeta(fx));
+        this.ratesData = fillAll(this.stripMeta(rates));
+        this.commoditiesData = fillAll(this.stripMeta(commodities));
 
         // Derived proxy: Jet CIF NWE ≈ Brent × 1.8 × 7.4 ($/bbl → $/tonne with crack spread)
         if (this.commoditiesData.BRENT && !this.commoditiesData.JETNWE) {
