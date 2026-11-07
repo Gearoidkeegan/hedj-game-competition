@@ -206,7 +206,7 @@ test('status precedence: a 2nd losing breach fires even with a happy board', () 
 function playFull(seed) {
     let run = createRun({ industry: airline, seed, startedAt: 1, market: marketEngine });
     while (!isRunOver(run)) {
-        run = simulateQuarter(run, decide(hedgesAt(run, 0.5)), marketEngine, content).run;
+        run = simulateQuarter(run, decide(hedgesAt(run, run.mandate.min)), marketEngine, content).run;
     }
     return run;
 }
@@ -214,7 +214,7 @@ function playFull(seed) {
 test('full runs are deterministic per seed and differ across seeds', () => {
     const a = playFull(4242);
     assert.deepEqual(playFull(4242), a);
-    assert.equal(a.history.length > 0, true);
+    assert.equal(a.history.length, 8);
     assert.notDeepEqual(playFull(4243).history, a.history);
 });
 

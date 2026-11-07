@@ -4,21 +4,12 @@ import { SeededRandom } from '../../utils/random.js';
 import { forecastEngine } from '../ForecastEngine.js';
 import { BALANCE } from './balance.js';
 import { pickStartYear } from './startYears.js';
+import { applyPowerUp, canBuyPowerUp, POWER_UPS } from './powerUps.js';
+import { applyEventChoice, rollEvent } from './events.js';
 import { exposureCashImpact, hedgeCashImpact, optionPremium } from './exposureMath.js';
 
 const MAX_QUARTERS = 8;
 
-// --- A4 stubs: replaced by powerUps.js / events.js ---
-function applyPowerUp(run, _id) {
-    return run;
-}
-function applyEventChoice(run, _event, _choiceId) {
-    return { run, quarterNotionalMult: {} };
-}
-function rollEvent(_run, _events, _rng) {
-    return null;
-}
-// --- end A4 stubs ---
 
 export function activeExposures(run) {
     return run.exposures.filter(e => e.unlockQuarter <= run.quarter);
@@ -102,11 +93,17 @@ export function simulateQuarter(run, decisions, market, content) {
 
     // 2. Power-up purchase and event choice (A4), on a private copy
     let next = structuredClone(run);
-    if (decisions.buyPowerUp) next = applyPowerUp(next, decisions.buyPowerUp);
+    if (decisions.buyPowerUp) {
+        if (!canBuyPowerUp(next, decisions.buyPowerUp, Object.keys(POWER_UPS))) {
+            throw new Error(`Cannot buy power-up ${decisions.buyPowerUp}`);
+        }
+        next = applyPowerUp(next, decisions.buyPowerUp);
+    }
     let quarterNotionalMult = {};
+    let quarterVarianceMult = 1;
     if (next.pendingEvent) {
         const event = (content.events || []).find(e => e.id === next.pendingEvent);
-        ({ run: next, quarterNotionalMult } = applyEventChoice(next, event, decisions.eventChoice));
+        ({ run: next, quarterNotionalMult, quarterVarianceMult } = applyEventChoice(next, event, decisions.eventChoice));
     }
 
     // 3. End rates at the next calendar quarter
@@ -118,7 +115,7 @@ export function simulateQuarter(run, decisions, market, content) {
     }
 
     // 4. Exposures
-    const variance = forecastEngine.getEffectiveVariance(Math.floor(run.quarter / 4), 0) * next.varianceMultiplier;
+    const variance = forecastEngine.getEffectiveVariance(Math.floor(run.quarter / 4), 0) * next.varianceMultiplier * quarterVarianceMult;
     const useOption = !!decisions.useOptions && next.powerUps.owned.includes('options');
     const product = useOption ? 'option' : 'forward';
     let playerMarket = 0;
