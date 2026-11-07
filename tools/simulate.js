@@ -12,6 +12,7 @@
 //   mandate   the midpoint of the board's band, snapped to the dial (0, 0.25, 0.5, 0.75, 1)
 //   full      all 1
 //   random    one random dial value per quarter, applied to every exposure
+// `severe` is the share of runs fired at once by a severe losing breach (R35); it is part of `fired`.
 // flat50, mandate and full buy the forecasting power-up in Q1; unhedged and random buy nothing.
 // Event choices: a seeded random pick among the event's choices (its own RNG stream per run), so
 // both choices of every card get played.
@@ -88,7 +89,9 @@ export function playRun(strategy, industry, seed) {
         { history: run.history, status: run.status, startingCash: run.startingCash, boardMood: run.boardMood },
         titles
     );
-    return { status: run.status, quarters: run.quarter, score: total, title };
+    // Fired at once by a severe losing breach (R35): the severe check comes before the other firing rules.
+    const severeFired = run.status === 'fired' && run.history[run.history.length - 1].severe;
+    return { status: run.status, quarters: run.quarter, score: total, title, severeFired };
 }
 
 // n runs of one strategy; run i plays industry i mod 7 with seed seedBase + i.
@@ -98,6 +101,7 @@ export function runStrategy(strategyName, n, seedBase = 1) {
     const titles = [];
     let bankrupt = 0;
     let fired = 0;
+    let severeFired = 0;
     let quarters = 0;
     let maxQuarters = 0;
     for (let i = 0; i < n; i++) {
@@ -106,10 +110,11 @@ export function runStrategy(strategyName, n, seedBase = 1) {
         titles.push(r.title);
         if (r.status === 'bankrupt') bankrupt++;
         if (r.status === 'fired') fired++;
+        if (r.severeFired) severeFired++;
         quarters += r.quarters;
         maxQuarters = Math.max(maxQuarters, r.quarters);
     }
-    return { scores, bankruptRate: bankrupt / n, firedRate: fired / n, meanQuarters: quarters / n, maxQuarters, titles };
+    return { scores, bankruptRate: bankrupt / n, firedRate: fired / n, severeFiredRate: severeFired / n, meanQuarters: quarters / n, maxQuarters, titles };
 }
 
 export const mean = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -129,7 +134,7 @@ export function runAll(n, seedBase = 1) {
     return Object.fromEntries(STRATEGIES.map(s => [s, runStrategy(s, n, seedBase)]));
 }
 
-// The A7 balance criteria as restated by ruling R34, evaluated on runAll() output.
+// The A7 balance criteria as restated by ruling R34 (R37: unhedged bankruptcy floor 0.015), evaluated on runAll() output.
 export function criteria(res) {
     const medMandate = quantile(res.mandate.scores, 0.5);
     const maxQ = Math.max(...STRATEGIES.map(s => res[s].maxQuarters));
@@ -142,7 +147,7 @@ export function criteria(res) {
             shareAbove(res.random.scores, medMandate) >= 0.02, shareAbove(res.random.scores, medMandate).toFixed(3)],
         ['p25(mandate) > median(unhedged)', quantile(res.mandate.scores, 0.25) > quantile(res.unhedged.scores, 0.5),
             `${quantile(res.mandate.scores, 0.25).toFixed(0)} vs ${quantile(res.unhedged.scores, 0.5).toFixed(0)}`],
-        ['bankruptRate(unhedged) in [0.03, 0.30]', between(res.unhedged.bankruptRate, 0.03, 0.30), res.unhedged.bankruptRate.toFixed(3)],
+        ['bankruptRate(unhedged) in [0.015, 0.30]', between(res.unhedged.bankruptRate, 0.015, 0.30), res.unhedged.bankruptRate.toFixed(3)],
         ['bankruptRate(mandate) < 0.05', res.mandate.bankruptRate < 0.05, res.mandate.bankruptRate.toFixed(3)],
         ['firedRate(mandate) < 0.05', res.mandate.firedRate < 0.05, res.mandate.firedRate.toFixed(3)],
         ['firedRate(unhedged) >= 0.15', res.unhedged.firedRate >= 0.15, res.unhedged.firedRate.toFixed(3)],
@@ -159,13 +164,13 @@ function pad(v, w) {
 }
 
 export function formatTable(res) {
-    const head = ['strategy', 'mean', 'p10', 'p25', 'median', 'p75', 'p90', 'max', 'bankrupt', 'fired', 'meanQ'];
-    const widths = [9, 6, 6, 6, 6, 6, 6, 6, 8, 6, 5];
+    const head = ['strategy', 'mean', 'p10', 'p25', 'median', 'p75', 'p90', 'max', 'bankrupt', 'fired', 'severe', 'meanQ'];
+    const widths = [9, 6, 6, 6, 6, 6, 6, 6, 8, 6, 6, 5];
     const lines = [head.map((h, i) => pad(h, widths[i])).join(' ')];
     for (const s of STRATEGIES) {
         const r = res[s];
         const row = [s, mean(r.scores).toFixed(0), ...[0.1, 0.25, 0.5, 0.75, 0.9].map(q => quantile(r.scores, q).toFixed(0)),
-            Math.max(...r.scores), r.bankruptRate.toFixed(3), r.firedRate.toFixed(3), r.meanQuarters.toFixed(2)];
+            Math.max(...r.scores), r.bankruptRate.toFixed(3), r.firedRate.toFixed(3), r.severeFiredRate.toFixed(3), r.meanQuarters.toFixed(2)];
         lines.push(row.map((v, i) => pad(v, widths[i])).join(' '));
     }
     return lines.join('\n');

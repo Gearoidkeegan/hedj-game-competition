@@ -74,6 +74,19 @@ export function createRun({ industry, seed, startedAt, market, crisisId = null, 
     };
 }
 
+// Off mandate: 'lucky' if the market result made money, 'loss' if it lost. A loss of at least
+// BALANCE.severeBreachLossPct of starting cash is severe (fires at once).
+// R38: a non-finite marketResult counts as 0; a non-finite or non-positive startingCash is never severe
+// (running out of cash is bankruptcy's job).
+export function classifyBreach({ inMandate, marketResult, startingCash }) {
+    if (inMandate) return { breach: 'none', severe: false };
+    const result = Number.isFinite(marketResult) ? marketResult : 0;
+    if (result >= 0) return { breach: 'lucky', severe: false };
+    const severe = Number.isFinite(startingCash) && startingCash > 0
+        && result <= -BALANCE.severeBreachLossPct * startingCash;
+    return { breach: 'loss', severe };
+}
+
 function usableRate(r) {
     return typeof r === 'number' && Number.isFinite(r);
 }
@@ -163,7 +176,7 @@ export function simulateQuarter(run, decisions, market, content) {
 
     // 6. Mandate and breach
     const marketResult = playerMarket - premiums;
-    const breach = inMandate ? 'none' : (marketResult >= 0 ? 'lucky' : 'loss');
+    const { breach, severe } = classifyBreach({ inMandate, marketResult, startingCash: next.startingCash });
     const playerDelta = next.cash - run.cash;
     const benchmarkDelta = next.benchmarkCash - run.benchmarkCash;
 
@@ -184,6 +197,7 @@ export function simulateQuarter(run, decisions, market, content) {
         benchmarkDelta,
         marketResult,
         breach,
+        severe,
         cashAfter: next.cash,
         benchmarkCashAfter: next.benchmarkCash,
         redLine: next.redLine,
@@ -197,6 +211,7 @@ export function simulateQuarter(run, decisions, market, content) {
     // 8. Status
     const losses = next.history.filter(s => s.breach === 'loss').length;
     if (next.cash <= 0) next.status = 'bankrupt';
+    else if (severe) next.status = 'fired';
     else if (losses >= BALANCE.breachLossesToFire) next.status = 'fired';
     else if (next.boardMood <= BALANCE.fireThreshold) next.status = 'fired';
     else if (next.quarter >= next.maxQuarters) next.status = 'complete';

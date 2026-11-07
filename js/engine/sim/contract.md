@@ -37,6 +37,7 @@ Shapes and signatures only. Every stream reads this first. Source of truth: the 
 { q: number, inMandate: boolean, playerDelta: number, benchmarkDelta: number,
   marketResult: number,   // Σ(exposureImpact + hedgeImpact) − option premiums this quarter (excludes baseOcf, events, power-ups)
   breach: 'none'|'lucky'|'loss',   // 'none' if inMandate; else 'lucky' if marketResult ≥ 0, 'loss' if marketResult < 0
+  severe: boolean,   // A8/R35: breach === 'loss' and marketResult ≤ −BALANCE.severeBreachLossPct × startingCash (fires at once)
   cashAfter: number, benchmarkCashAfter: number, redLine: number, boardMoodAfter: number,
   lines: [{ exposureId, movePct, exposureImpact, hedgeImpact, realisedNotional, forecastNotional }],
   event: { id, choice } | null, powerUp: string|null }
@@ -60,15 +61,21 @@ activeExposures(run) -> Exposure[]            // unlockQuarter <= run.quarter
 createRun({ industry, seed, startedAt, market, crisisId = null, forcedYear = null }) -> RunState
 simulateQuarter(run, decisions, market, content) -> { run, summary }   // pure; content = { events: SimpleEvent[] }
 isRunOver(run) -> boolean                     // status !== 'playing'
+classifyBreach({ inMandate, marketResult, startingCash }) -> { breach: 'none'|'lucky'|'loss', severe: boolean }
+                                              // A8: used by simulateQuarter; F1's Pro adapter imports it
+                                              // R38: non-finite marketResult counts as 0; startingCash not finite or <= 0 -> severe false
 ```
 
-## BALANCE (A3, `js/engine/sim/balance.js`; A5 adds `points`; A7 tuned values, R34)
+A severe breach is scored as a normal `'loss'` breach (A5 scoring is unchanged).
+
+## BALANCE (A3, `js/engine/sim/balance.js`; A5 adds `points`; A7 tuned values, R34; A8 adds `severeBreachLossPct`, R35)
 
 ```js
 { startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: 0.05, eventChance: 0.35,
   mandates: [{min:0.25,max:0.5},{min:0.5,max:0.75},{min:0.75,max:1}],
   mood: { inMandate: 4, luckyBreach: -3, breachLoss: -25, beatBenchmark: 3, redZone: -12 },
   breachLossesToFire: 2,
+  severeBreachLossPct: 0.35,
   notionalScale: 6,
   points: { inMandate: 100, luckyBreach: 25, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 12, survival: 500 } }
 ```
@@ -90,9 +97,10 @@ Board mood (step 7), clamped to 0..100:
 Status (step 8), checked in this order:
 
 1. `cash <= 0` -> `'bankrupt'`.
-2. the run's count of `breach === 'loss'` quarters reaches `BALANCE.breachLossesToFire` -> `'fired'`.
-3. `boardMood <= BALANCE.fireThreshold` -> `'fired'`.
-4. `quarter === 8` -> `'complete'`.
+2. this quarter's `severe` is true -> `'fired'` (A8, R35: one particularly bad losing breach fires at once).
+3. the run's count of `breach === 'loss'` quarters reaches `BALANCE.breachLossesToFire` -> `'fired'`.
+4. `boardMood <= BALANCE.fireThreshold` -> `'fired'`.
+5. `quarter === 8` -> `'complete'`.
 
 ## Power-ups and events (A4)
 
@@ -197,7 +205,7 @@ Result-quip selection rules (B3):
 
 Board line selection (B1): `breach === 'loss'` -> `breachLoss`. This is a heavy, scathing telling-off, and the angry sprite always wins over other moods. `breach === 'lucky'` -> `luckyBreach`: a grudging "it worked, but don't do that again". Otherwise `redZone`, `moodUp` or `moodDown` by mood change.
 
-Tone: `luckyBreach` is mild and wry; `breachLoss` is the harshest in the game (the board is furious, with HR hints). The `fired` lines follow from repeated losing breaches.
+Tone: `luckyBreach` is mild and wry; `breachLoss` is the harshest in the game (the board is furious, with HR hints). The `fired` lines follow from repeated losing breaches (or one severe one, A8).
 
 ## Events and power-ups (A4)
 

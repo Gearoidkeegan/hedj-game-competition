@@ -76,8 +76,11 @@ test('forecasting halves variance', () => {
 
 test('forecasting variance stays permanent across quarters', () => {
     const run = newRun();
-    const q1 = simulateQuarter(run, decide(run, { buyPowerUp: 'forecasting' }), marketEngine, content);
-    const q2 = simulateQuarter({ ...q1.run, pendingEvent: null }, decide(q1.run), marketEngine, content);
+    // Hedge inside the mandate: unhedged, 2010 Q1 is a severe losing breach (A8) and the run would end.
+    const inBand = Object.fromEntries(run.exposures.map(e => [e.id, run.mandate.min]));
+    const q1 = simulateQuarter(run, decide(run, { hedges: inBand, buyPowerUp: 'forecasting' }), marketEngine, content);
+    assert.equal(q1.run.status, 'playing');
+    const q2 = simulateQuarter({ ...q1.run, pendingEvent: null }, decide(q1.run, { hedges: inBand }), marketEngine, content);
     assert.equal(q2.run.varianceMultiplier, 0.5);
 });
 

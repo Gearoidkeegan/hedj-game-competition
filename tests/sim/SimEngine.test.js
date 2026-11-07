@@ -4,7 +4,7 @@ import { loadMarketData, loadIndustries } from '../helpers/loadData.js';
 import { marketEngine } from '../../js/engine/MarketEngine.js';
 import { exposureCashImpact } from '../../js/engine/sim/exposureMath.js';
 import { BALANCE } from '../../js/engine/sim/balance.js';
-import { createRun, simulateQuarter, activeExposures, isRunOver } from '../../js/engine/sim/SimEngine.js';
+import { createRun, simulateQuarter, activeExposures, isRunOver, classifyBreach } from '../../js/engine/sim/SimEngine.js';
 
 marketEngine.loadFromObjects(loadMarketData());
 const airline = loadIndustries().find(i => i.id === 'airline');
@@ -13,6 +13,7 @@ const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg || ''} ${a}
 
 // Every underlying moves by `factor` each quarter from its real 2010 Q1 level (use forcedYear 2010).
 // For the airline, factor > 1 hurts unhedged (fuel up, EURUSD up), factor < 1 helps.
+// Unhedged airline Q1 loss as a share of starting cash: 1.05 -> about 15% (mild), 1.2 -> about 58% (severe).
 function trendMarket(factor) {
     return {
         getDataset: (u) => marketEngine.getDataset(u),
@@ -156,15 +157,18 @@ test('in-mandate quarter that beats the benchmark gains inMandate + beatBenchmar
     assert.equal(sd.boardMoodAfter - runD.boardMood, BALANCE.mood.inMandate);
 });
 
+// A mild market (no severe quarter), so the two-strike rule is tested on its own.
 test('two losing breaches -> fired', () => {
-    const up = trendMarket(1.1);
+    const up = trendMarket(1.05);
     let run = newRun(up, { forcedYear: 2010 });
     const first = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
     assert.equal(first.summary.breach, 'loss');
+    assert.equal(first.summary.severe, false);
     assert.equal(first.run.status, 'playing');
     run = first.run;
     const second = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
     assert.equal(second.summary.breach, 'loss');
+    assert.equal(second.summary.severe, false);
     assert.ok(second.run.boardMood > BALANCE.fireThreshold, `mood ${second.run.boardMood}`);
     assert.equal(second.run.status, 'fired');
     assert.equal(isRunOver(second.run), true);
@@ -193,14 +197,99 @@ test('status precedence: bankrupt beats a 2nd losing breach in the same quarter'
 });
 
 test('status precedence: a 2nd losing breach fires even with a happy board', () => {
-    const up = trendMarket(1.1);
+    const up = trendMarket(1.05);
     let run = newRun(up, { forcedYear: 2010 });
     run = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content).run;
     run = { ...run, boardMood: 100 };
-    const { run: after } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
+    const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
+    assert.equal(summary.severe, false);
     assert.ok(after.cash > 0);
     assert.ok(after.boardMood > BALANCE.fireThreshold, `mood ${after.boardMood}`);
     assert.equal(after.status, 'fired');
+});
+
+test('classifyBreach: in band -> none, not severe', () => {
+    for (const marketResult of [500, 0, -999]) {
+        assert.deepEqual(classifyBreach({ inMandate: true, marketResult, startingCash: 1000 }), { breach: 'none', severe: false });
+    }
+});
+
+test('classifyBreach: off band with a gain -> lucky, not severe', () => {
+    for (const marketResult of [0, 1, 5000]) {
+        assert.deepEqual(classifyBreach({ inMandate: false, marketResult, startingCash: 1000 }), { breach: 'lucky', severe: false });
+    }
+});
+
+test('classifyBreach: off band with a small loss -> loss, not severe', () => {
+    const startingCash = 1000;
+    const edge = BALANCE.severeBreachLossPct * startingCash;
+    for (const marketResult of [-1, -edge / 2, -edge + 0.001]) {
+        assert.deepEqual(classifyBreach({ inMandate: false, marketResult, startingCash }), { breach: 'loss', severe: false });
+    }
+});
+
+test('classifyBreach: off band with a loss at or beyond the threshold -> loss and severe', () => {
+    const startingCash = 1000;
+    const edge = BALANCE.severeBreachLossPct * startingCash;
+    for (const marketResult of [-edge, -edge - 1, -10 * startingCash]) {
+        assert.deepEqual(classifyBreach({ inMandate: false, marketResult, startingCash }), { breach: 'loss', severe: true });
+    }
+});
+
+test('classifyBreach: a loss of exactly the threshold is severe', () => {
+    const startingCash = 2e8;
+    const marketResult = -BALANCE.severeBreachLossPct * startingCash;
+    assert.deepEqual(classifyBreach({ inMandate: false, marketResult, startingCash }), { breach: 'loss', severe: true });
+});
+
+// R38: bad startingCash never makes a breach severe (running out of cash is bankruptcy's job).
+test('classifyBreach: startingCash 0, negative or not finite -> never severe, breach still loss', () => {
+    for (const startingCash of [0, -1, NaN, Infinity, undefined]) {
+        assert.deepEqual(classifyBreach({ inMandate: false, marketResult: -1e9, startingCash }), { breach: 'loss', severe: false },
+            `startingCash ${startingCash}`);
+    }
+});
+
+// R38: a non-finite marketResult is classified as 0 (off mandate: lucky; in mandate: none).
+test('classifyBreach: marketResult not finite is classified as 0', () => {
+    for (const marketResult of [NaN, -Infinity, Infinity, undefined]) {
+        assert.deepEqual(classifyBreach({ inMandate: false, marketResult, startingCash: 1000 }),
+            classifyBreach({ inMandate: false, marketResult: 0, startingCash: 1000 }), `marketResult ${marketResult}`);
+        assert.deepEqual(classifyBreach({ inMandate: false, marketResult, startingCash: 1000 }), { breach: 'lucky', severe: false });
+        assert.deepEqual(classifyBreach({ inMandate: true, marketResult, startingCash: 1000 }), { breach: 'none', severe: false });
+    }
+});
+
+test('a severe losing breach in Q1 fires at once, even with the board above the threshold', () => {
+    const up = trendMarket(1.2);
+    const run = newRun(up, { forcedYear: 2010 });
+    const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
+    assert.equal(summary.breach, 'loss');
+    assert.ok(summary.marketResult <= -BALANCE.severeBreachLossPct * run.startingCash, `marketResult ${summary.marketResult}`);
+    assert.equal(summary.severe, true);
+    assert.ok(after.cash > 0);
+    assert.ok(after.boardMood > BALANCE.fireThreshold, `mood ${after.boardMood}`);
+    assert.equal(after.history.filter(s => s.breach === 'loss').length, 1);
+    assert.equal(after.status, 'fired');
+    assert.equal(after.pendingEvent, null);
+});
+
+test('a mild losing breach in Q1 keeps the player in the job', () => {
+    const up = trendMarket(1.05);
+    const run = newRun(up, { forcedYear: 2010 });
+    const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
+    assert.equal(summary.breach, 'loss');
+    assert.equal(summary.severe, false);
+    assert.equal(after.status, 'playing');
+});
+
+test('status precedence: bankrupt beats a severe losing breach in the same quarter', () => {
+    const up = trendMarket(1.2);
+    const run = { ...newRun(up, { forcedYear: 2010 }), cash: 1 };
+    const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
+    assert.equal(summary.severe, true);
+    assert.ok(summary.cashAfter <= 0);
+    assert.equal(after.status, 'bankrupt');
 });
 
 function playFull(seed) {

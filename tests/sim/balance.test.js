@@ -1,4 +1,4 @@
-// A7 balance criteria (as restated by ruling R34) at 300 seeded runs per strategy across all 7 industries.
+// A7 balance criteria (as restated by ruling R34, unhedged bankruptcy floor 0.015 per R37) at 300 seeded runs per strategy across all 7 industries.
 // Deterministic: fixed seeds. The 1000-run table lives at the top of js/engine/sim/balance.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +27,7 @@ test('luck still matters', () => {
 });
 
 test('unhedged players sometimes go bankrupt; mandate players rarely do', () => {
-    inRange(res.unhedged.bankruptRate, 0.03, 0.30, 'bankruptRate(unhedged)');
+    inRange(res.unhedged.bankruptRate, 0.015, 0.30, 'bankruptRate(unhedged)');
     assert.ok(res.mandate.bankruptRate < 0.05, `bankruptRate(mandate) ${res.mandate.bankruptRate}`);
 });
 
@@ -36,6 +36,14 @@ test('losing breaches get you fired; the mandate keeps you employed', () => {
     assert.ok(BALANCE.mandates.every(m => m.min > 0));
     assert.ok(res.unhedged.firedRate >= 0.15, `firedRate(unhedged) ${res.unhedged.firedRate}`);
     assert.ok(res.mandate.firedRate < 0.05, `firedRate(mandate) ${res.mandate.firedRate}`);
+});
+
+// R35: only an off-mandate loss can be severe. Mandate never breaches, and full (100% forward) is never
+// hurt badly enough.
+test('a severe losing breach fires unhedged players, never mandate or full ones', () => {
+    assert.equal(res.mandate.severeFiredRate, 0);
+    assert.equal(res.full.severeFiredRate, 0);
+    assert.ok(res.unhedged.severeFiredRate > 0, `severeFiredRate(unhedged) ${res.unhedged.severeFiredRate}`);
 });
 
 test('a run lasts at most 8 quarters', () => {
