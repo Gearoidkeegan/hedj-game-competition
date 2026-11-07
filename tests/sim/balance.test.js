@@ -1,4 +1,4 @@
-// A7 balance criteria (as restated by ruling R34) at 300 seeded runs per strategy across all 7 industries.
+// A7 balance criteria (as restated by ruling R34, unhedged bankruptcy floor 0.015 per R37) at 300 seeded runs per strategy across all 7 industries.
 // Deterministic: fixed seeds. The 1000-run table lives at the top of js/engine/sim/balance.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +27,7 @@ test('luck still matters', () => {
 });
 
 test('unhedged players sometimes go bankrupt; mandate players rarely do', () => {
-    inRange(res.unhedged.bankruptRate, 0.03, 0.30, 'bankruptRate(unhedged)');
+    inRange(res.unhedged.bankruptRate, 0.015, 0.30, 'bankruptRate(unhedged)');
     assert.ok(res.mandate.bankruptRate < 0.05, `bankruptRate(mandate) ${res.mandate.bankruptRate}`);
 });
 

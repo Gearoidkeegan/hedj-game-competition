@@ -134,7 +134,7 @@ export function runAll(n, seedBase = 1) {
     return Object.fromEntries(STRATEGIES.map(s => [s, runStrategy(s, n, seedBase)]));
 }
 
-// The A7 balance criteria as restated by ruling R34, evaluated on runAll() output.
+// The A7 balance criteria as restated by ruling R34 (R37: unhedged bankruptcy floor 0.015), evaluated on runAll() output.
 export function criteria(res) {
     const medMandate = quantile(res.mandate.scores, 0.5);
     const maxQ = Math.max(...STRATEGIES.map(s => res[s].maxQuarters));
@@ -147,7 +147,7 @@ export function criteria(res) {
             shareAbove(res.random.scores, medMandate) >= 0.02, shareAbove(res.random.scores, medMandate).toFixed(3)],
         ['p25(mandate) > median(unhedged)', quantile(res.mandate.scores, 0.25) > quantile(res.unhedged.scores, 0.5),
             `${quantile(res.mandate.scores, 0.25).toFixed(0)} vs ${quantile(res.unhedged.scores, 0.5).toFixed(0)}`],
-        ['bankruptRate(unhedged) in [0.03, 0.30]', between(res.unhedged.bankruptRate, 0.03, 0.30), res.unhedged.bankruptRate.toFixed(3)],
+        ['bankruptRate(unhedged) in [0.015, 0.30]', between(res.unhedged.bankruptRate, 0.015, 0.30), res.unhedged.bankruptRate.toFixed(3)],
         ['bankruptRate(mandate) < 0.05', res.mandate.bankruptRate < 0.05, res.mandate.bankruptRate.toFixed(3)],
         ['firedRate(mandate) < 0.05', res.mandate.firedRate < 0.05, res.mandate.firedRate.toFixed(3)],
         ['firedRate(unhedged) >= 0.15', res.unhedged.firedRate >= 0.15, res.unhedged.firedRate.toFixed(3)],

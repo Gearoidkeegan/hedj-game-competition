@@ -70,7 +70,7 @@ A severe breach is scored as a normal `'loss'` breach (A5 scoring is unchanged).
 ## BALANCE (A3, `js/engine/sim/balance.js`; A5 adds `points`; A7 tuned values, R34; A8 adds `severeBreachLossPct`, R35)
 
 ```js
-{ startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: 0.035, eventChance: 0.35,
+{ startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: 0.05, eventChance: 0.35,
   mandates: [{min:0.25,max:0.5},{min:0.5,max:0.75},{min:0.75,max:1}],
   mood: { inMandate: 4, luckyBreach: -3, breachLoss: -25, beatBenchmark: 3, redZone: -12 },
   breachLossesToFire: 2,

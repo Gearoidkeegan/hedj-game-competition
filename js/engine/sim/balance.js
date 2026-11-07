@@ -20,25 +20,27 @@
 // (unhedged p90 50.7%, flat50 24.8%, full 4.3%, random 34.6%; mandate never breaches).
 // severeBreachLossPct = 0.35, so 9.7% of losing breaches are severe.
 // Severe firings pre-empt later bankruptcies: unhedged bankruptRate fell 0.042 -> 0.020 (n = 1000) and
-// 0.043 -> 0.027 (n = 300). notionalScale is at its R34 cap, so baseOcfPct 0.05 -> 0.035 is the retune;
-// it brings the n = 300 test back to 0.030 but no allowed retune lifts n = 1000 above 0.021.
-// `node tools/simulate.js --n 1000` after A8 (`severe` = share of runs fired by a severe breach):
+// 0.043 -> 0.027 (n = 300), and no allowed retune (notionalScale, baseOcfPct, points) restores 0.03.
+// Ruling R37: baseOcfPct stays at the A7 value 0.05; the unhedged bankruptcy floor drops 0.03 -> 0.015
+// (ceiling 0.30 and bankruptRate(mandate) < 0.05 unchanged). Every R34 criterion as amended by R37 passes.
+// `node tools/simulate.js --n 1000` after A8/R37 (`severe` = share of runs fired by a severe breach):
 //
 //  strategy   mean    p10    p25 median    p75    p90    max bankrupt  fired severe meanQ
-//  unhedged     19      0      0      0      0      0    778    0.021  0.956  0.253  3.71
-//    flat50   1665      0     12   2254   2604   3115   4473    0.016  0.340  0.031  6.58
-//   mandate   2525   1964   2215   2441   2798   3387   5879    0.031  0.000  0.000  7.93
+//  unhedged     19      0      0      0      0      0    778    0.020  0.957  0.254  3.71
+//    flat50   1674      0     12   2254   2605   3131   4601    0.008  0.340  0.031  6.58
+//   mandate   2537   1981   2220   2441   2801   3407   5879    0.022  0.000  0.000  7.96
 //      full   1179      0      0    195   2500   3325   7082    0.000  0.638  0.000  5.30
-//    random    577      0      0    189   1023   1761   4286    0.016  0.720  0.134  5.46
+//    random    576      0      0    188   1022   1761   4286    0.016  0.720  0.134  5.47
 //
-// share(full > median(mandate)) 0.261; share(random > median(mandate)) 0.027. gameOverTitles bands
-// move by at most 0.3 points per band pooled, so their `min` values are unchanged.
+// share(full > median(mandate)) 0.261; share(random > median(mandate)) 0.027.
+// At n = 300 (the test): unhedged bankrupt 0.027, severe 0.270; random severe 0.143; flat50 severe 0.030.
+// gameOverTitles bands move by at most 0.3 points per band pooled vs A7, so their `min` values are unchanged.
 
 export const BALANCE = {
     startMood: 60,
     fireThreshold: 10,
     redLinePct: 0.2,
-    baseOcfPct: 0.035,
+    baseOcfPct: 0.05,
     eventChance: 0.35,
     mandates: [{ min: 0.25, max: 0.5 }, { min: 0.5, max: 0.75 }, { min: 0.75, max: 1 }],
     mood: { inMandate: 4, luckyBreach: -3, breachLoss: -25, beatBenchmark: 3, redZone: -12 },
