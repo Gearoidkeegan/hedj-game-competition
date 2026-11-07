@@ -62,15 +62,15 @@ simulateQuarter(run, decisions, market, content) -> { run, summary }   // pure; 
 isRunOver(run) -> boolean                     // status !== 'playing'
 ```
 
-## BALANCE (A3, `js/engine/sim/balance.js`; A5 adds `points`; A7 tunes)
+## BALANCE (A3, `js/engine/sim/balance.js`; A5 adds `points`; A7 tuned values, R34)
 
 ```js
-{ startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: -0.03, eventChance: 0.35,
+{ startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: 0.05, eventChance: 0.35,
   mandates: [{min:0.25,max:0.5},{min:0.5,max:0.75},{min:0.75,max:1}],
   mood: { inMandate: 4, luckyBreach: -3, breachLoss: -25, beatBenchmark: 3, redZone: -12 },
   breachLossesToFire: 2,
-  notionalScale: 1,
-  points: { inMandate: 100, luckyBreach: 0, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 40, survival: 500 } }
+  notionalScale: 6,
+  points: { inMandate: 100, luckyBreach: 25, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 12, survival: 500 } }
 ```
 
 ## simulateQuarter rules fixed by the contract (A3)
@@ -121,7 +121,7 @@ applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult, quarterVar
 
 ```js
 quarterPoints(summary, startingCash) -> number
-  // sums: BALANCE.points.inMandate (100) when breach === 'none'; luckyBreach (0) when 'lucky';
+  // sums: BALANCE.points.inMandate (100) when breach === 'none'; luckyBreach (25) when 'lucky';
   // breachLoss (-300) when 'loss'; aboveRedLine (50) when cashAfter >= redLine; plus the stability bonus
 finalScore({ history, status, startingCash, boardMood }, gameOverTitles?) ->
   { total: number, breakdown: { quarters, outperformance, survival, moodMultiplier }, title: string }

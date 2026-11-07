@@ -129,20 +129,20 @@ export function runAll(n, seedBase = 1) {
     return Object.fromEntries(STRATEGIES.map(s => [s, runStrategy(s, n, seedBase)]));
 }
 
-// The A7 balance criteria, evaluated on runAll() output.
+// The A7 balance criteria as restated by ruling R34, evaluated on runAll() output.
 export function criteria(res) {
     const medMandate = quantile(res.mandate.scores, 0.5);
     const maxQ = Math.max(...STRATEGIES.map(s => res[s].maxQuarters));
     return [
         ['mean(mandate) > 1.3 x mean(unhedged)', mean(res.mandate.scores) > 1.3 * mean(res.unhedged.scores),
             `${mean(res.mandate.scores).toFixed(0)} vs ${(1.3 * mean(res.unhedged.scores)).toFixed(0)}`],
-        ['share(unhedged > median(mandate)) in [0.08, 0.30]',
-            between(shareAbove(res.unhedged.scores, medMandate), 0.08, 0.30), shareAbove(res.unhedged.scores, medMandate).toFixed(3)],
         ['share(full > median(mandate)) in [0.08, 0.30]',
             between(shareAbove(res.full.scores, medMandate), 0.08, 0.30), shareAbove(res.full.scores, medMandate).toFixed(3)],
+        ['share(random > median(mandate)) >= 0.02',
+            shareAbove(res.random.scores, medMandate) >= 0.02, shareAbove(res.random.scores, medMandate).toFixed(3)],
         ['p25(mandate) > median(unhedged)', quantile(res.mandate.scores, 0.25) > quantile(res.unhedged.scores, 0.5),
             `${quantile(res.mandate.scores, 0.25).toFixed(0)} vs ${quantile(res.unhedged.scores, 0.5).toFixed(0)}`],
-        ['bankruptRate(unhedged) in [0.08, 0.30]', between(res.unhedged.bankruptRate, 0.08, 0.30), res.unhedged.bankruptRate.toFixed(3)],
+        ['bankruptRate(unhedged) in [0.03, 0.30]', between(res.unhedged.bankruptRate, 0.03, 0.30), res.unhedged.bankruptRate.toFixed(3)],
         ['bankruptRate(mandate) < 0.05', res.mandate.bankruptRate < 0.05, res.mandate.bankruptRate.toFixed(3)],
         ['firedRate(mandate) < 0.05', res.mandate.firedRate < 0.05, res.mandate.firedRate.toFixed(3)],
         ['firedRate(unhedged) >= 0.15', res.unhedged.firedRate >= 0.15, res.unhedged.firedRate.toFixed(3)],

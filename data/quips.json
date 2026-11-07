@@ -244,14 +244,14 @@
 
     "gameOverTitles": [
         { "min": 0, "title": "Unpaid Intern", "line": "You've earned a lanyard and supervised access to the stationery cupboard." },
-        { "min": 500, "title": "Spreadsheet Wrangler", "line": "VLOOKUP whisperer. The board knows your name. Roughly." },
+        { "min": 250, "title": "Spreadsheet Wrangler", "line": "VLOOKUP whisperer. The board knows your name. Roughly." },
         { "min": 1000, "title": "Treasury Analyst", "line": "Promising. You've been trusted with the coffee order and a hedge ratio." },
-        { "min": 1500, "title": "Assistant Treasurer", "line": "Solid work. You now get invited to meetings you can't leave." },
-        { "min": 2000, "title": "Group Treasurer", "line": "Respectable. The banks send you Christmas cards and conference invites." },
-        { "min": 2750, "title": "Head of Treasury", "line": "The board trusts you. The auditors tolerate you. That's the dream." },
-        { "min": 3500, "title": "Chief Financial Officer", "line": "Corner office, panel slot, 4,000 unread emails. You've made it." },
-        { "min": 5000, "title": "Treasury Legend", "line": "Keynote material. You'll overrun by forty minutes and nobody will mind." },
-        { "min": 7000, "title": "Master of the Hedge", "line": "Flawless. Bankers whisper your name in the coffee queue." }
+        { "min": 1800, "title": "Assistant Treasurer", "line": "Solid work. You now get invited to meetings you can't leave." },
+        { "min": 2200, "title": "Group Treasurer", "line": "Respectable. The banks send you Christmas cards and conference invites." },
+        { "min": 2500, "title": "Head of Treasury", "line": "The board trusts you. The auditors tolerate you. That's the dream." },
+        { "min": 2900, "title": "Chief Financial Officer", "line": "Corner office, panel slot, 4,000 unread emails. You've made it." },
+        { "min": 3500, "title": "Treasury Legend", "line": "Keynote material. You'll overrun by forty minutes and nobody will mind." },
+        { "min": 4200, "title": "Master of the Hedge", "line": "Flawless. Bankers whisper your name in the coffee queue." }
     ],
 
     "bankrupt": [

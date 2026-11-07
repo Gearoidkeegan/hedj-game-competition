@@ -98,7 +98,7 @@ test('quarterPoints components: red line and stability', () => {
 test('breakdown and mood multiplier', () => {
     const r = finalScore(input(history(1100, 1000), { boardMood: 100 }));
     assert.ok(Math.abs(r.breakdown.moodMultiplier - 1.2) < 1e-9);
-    assert.equal(r.breakdown.outperformance, Math.round(40 * 100 * 100 / START));
+    assert.equal(r.breakdown.outperformance, Math.round(BALANCE.points.outperformPerPct * 100 * 100 / START));
     assert.equal(r.breakdown.quarters, 8 * (BALANCE.points.inMandate + BALANCE.points.aboveRedLine));
     assert.ok(Math.abs(finalScore(input(history(1000, 1000), { boardMood: 0 })).breakdown.moodMultiplier - 0.8) < 1e-9);
 });
