@@ -24,27 +24,44 @@ function recordingContext(width = 360, height = 640) {
 const fills = (ctx) => ctx.calls.filter(([name]) => name === 'fillRect').length;
 
 // A fake DOM: a container, a document that makes canvases, and the event
-// listeners each one holds, so tests can tap, press keys and check clean-up.
-function fakeDom({ width = 360, height = 640 } = {}) {
-    const listeners = (owner) => {
-        owner.handlers = {};
-        owner.addEventListener = (type, fn) => { (owner.handlers[type] ||= new Set()).add(fn); };
-        owner.removeEventListener = (type, fn) => { owner.handlers[type]?.delete(fn); };
-        owner.fire = (type, event = {}) => { for (const fn of [...(owner.handlers[type] || [])]) fn({ type, ...event }); };
-        owner.count = () => Object.values(owner.handlers).reduce((n, set) => n + set.size, 0);
-        return owner;
+// listeners each one holds (with their capture flag), so tests can tap, press
+// keys and check clean-up. fire() returns the event so tests can see whether it
+// was consumed.
+function withListeners(owner) {
+    owner.handlers = [];
+    owner.addEventListener = (type, fn, opts) => {
+        const capture = opts === true || Boolean(opts?.capture);
+        if (!owner.handlers.some((h) => h.type === type && h.fn === fn && h.capture === capture)) owner.handlers.push({ type, fn, capture });
     };
-    const container = listeners({
+    owner.removeEventListener = (type, fn, opts) => {
+        const capture = opts === true || Boolean(opts?.capture);
+        owner.handlers = owner.handlers.filter((h) => !(h.type === type && h.fn === fn && h.capture === capture));
+    };
+    owner.fire = (type, init = {}) => {
+        const event = {
+            type, ...init, defaultPrevented: false, propagationStopped: false,
+            preventDefault() { this.defaultPrevented = true; },
+            stopPropagation() { this.propagationStopped = true; },
+        };
+        for (const h of owner.handlers.filter((x) => x.type === type)) h.fn(event);
+        return event;
+    };
+    owner.count = () => owner.handlers.length;
+    return owner;
+}
+
+function fakeDom({ width = 360, height = 640 } = {}) {
+    const container = withListeners({
         clientWidth: width, clientHeight: height, children: [],
         appendChild(el) { this.children.push(el); el.parentNode = this; return el; },
         removeChild(el) { this.children = this.children.filter((c) => c !== el); el.parentNode = null; return el; },
     });
     const created = [];
-    const document = listeners({
+    const document = withListeners({
         hidden: false,
         createElement(tag) {
             assert.equal(tag, 'canvas');
-            const canvas = { width: 300, height: 150, style: {}, attrs: {}, parentNode: null };
+            const canvas = withListeners({ width: 300, height: 150, style: {}, attrs: {}, parentNode: null });
             canvas.setAttribute = (k, v) => { canvas.attrs[k] = v; };
             canvas.ctx = recordingContext();
             canvas.ctx.canvas = canvas;
@@ -110,7 +127,7 @@ test('an unknown id resolves immediately without throwing', async () => {
 });
 
 for (const [how, skip] of [
-    ['a tap', (dom) => dom.container.fire('click')],
+    ['a tap', (dom) => dom.created[0].fire('click')],
     ['a key press', (dom) => dom.document.fire('keydown', { key: 'Enter' })],
 ]) {
     test(`${how} skips the cutscene, then its canvas, listeners, frame and timer are gone`, async () => {
@@ -119,7 +136,8 @@ for (const [how, skip] of [
         const p = playCutscene(dom.container, 'personalBest', { industryId: 'retail' }, envFor(dom, clock));
         assert.equal(dom.container.children.length, 1, 'canvas added');
         const canvas = dom.created[0];
-        assert.ok(dom.container.count() + dom.document.count() >= 2, 'tap and key listeners attached');
+        assert.equal(canvas.count(), 1, 'tap listener on the canvas');
+        assert.deepEqual(dom.document.handlers.map((h) => [h.type, h.capture]), [['keydown', true]], 'key listener in the capture phase');
         clock.tick(1000);
         clock.tick(1400);
         assert.ok(fills(canvas.ctx) > 50, 'frames are drawn');
@@ -129,13 +147,113 @@ for (const [how, skip] of [
         assert.equal(await settled(p), 'resolved');
         assert.equal(dom.container.children.length, 0, 'canvas removed');
         assert.equal(canvas.parentNode, null);
-        assert.equal(dom.container.count(), 0, 'container listeners removed');
-        assert.equal(dom.document.count(), 0, 'document listeners removed');
+        assert.equal(canvas.count() + dom.container.count(), 0, 'tap listener removed');
+        assert.equal(dom.document.handlers.filter((h) => h.type === 'keydown').length, 0, 'key listener removed');
         assert.equal(clock.frames.size, 0, 'no frame left scheduled');
-        assert.equal(clock.timers.size, 0, 'backstop timer cleared');
-        skip(dom); // a second tap after the end is harmless
+        dom.document.fire('keyup', { key: 'Enter' }); // ends the one-shot keyup swallow, if any
+        assert.equal(dom.document.count(), 0, 'no document listeners left');
+        assert.equal(clock.timers.size, 0, 'timers cleared');
+        skip(dom); // a second tap or key after the end is harmless
     });
 }
+
+test('the skipping tap and key are consumed, and so is the matching keyup, once', async () => {
+    let dom = fakeDom();
+    let clock = fakeClock();
+    let p = playCutscene(dom.container, 'fired', {}, envFor(dom, clock));
+    const tap = dom.created[0].fire('click');
+    assert.equal(await settled(p), 'resolved');
+    assert.ok(tap.defaultPrevented && tap.propagationStopped, 'tap consumed');
+    assert.equal(dom.created[0].style.pointerEvents, 'auto');
+
+    dom = fakeDom();
+    clock = fakeClock();
+    p = playCutscene(dom.container, 'fired', {}, envFor(dom, clock));
+    const down = dom.document.fire('keydown', { key: ' ' });
+    assert.equal(await settled(p), 'resolved');
+    assert.ok(down.defaultPrevented && down.propagationStopped, 'keydown consumed');
+    const up = dom.document.fire('keyup', { key: ' ' });
+    assert.ok(up.defaultPrevented && up.propagationStopped, 'its keyup consumed');
+    const later = dom.document.fire('keyup', { key: ' ' });
+    assert.ok(!later.defaultPrevented && !later.propagationStopped, 'only once');
+    assert.equal(dom.document.count(), 0);
+    assert.equal(clock.timers.size, 0);
+
+    // If the keyup never comes, a timer drops the swallow.
+    dom = fakeDom();
+    clock = fakeClock();
+    playCutscene(dom.container, 'fired', {}, envFor(dom, clock));
+    dom.document.fire('keydown', { key: 'Enter' });
+    assert.equal(clock.timers.size, 1);
+    const [[, drop]] = clock.timers;
+    drop.fn();
+    assert.equal(dom.document.count(), 0);
+});
+
+test('Tab, modifier keys, auto-repeat and IME composition do not skip', async () => {
+    const dom = fakeDom();
+    const clock = fakeClock();
+    const p = playCutscene(dom.container, 'bankrupt', {}, envFor(dom, clock));
+    for (const init of [{ key: 'Tab' }, { key: 'Shift' }, { key: 'Control' }, { key: 'Alt' }, { key: 'Meta' },
+        { key: 'Enter', repeat: true }, { key: 'a', isComposing: true }]) {
+        const e = dom.document.fire('keydown', init);
+        assert.ok(!e.defaultPrevented && !e.propagationStopped, JSON.stringify(init));
+    }
+    assert.equal(await settled(p), 'pending');
+    assert.equal(dom.container.children.length, 1);
+    dom.document.fire('keydown', { key: 'Escape' });
+    assert.equal(await settled(p), 'resolved');
+});
+
+test('never rejects: a throwing render or a throwing DOM resolves and leaves nothing behind', async () => {
+    // Drawing throws on the first frame.
+    let dom = fakeDom();
+    let clock = fakeClock();
+    const make = dom.document.createElement;
+    dom.document.createElement = (tag) => {
+        const c = make(tag);
+        c.ctx.fillRect = () => { throw new Error('boom'); };
+        return c;
+    };
+    let p = playCutscene(dom.container, 'intro', {}, envFor(dom, clock));
+    assert.equal(await settled(p), 'resolved');
+    assert.equal(dom.container.children.length, 0);
+    assert.equal(dom.document.count() + dom.created[0].count(), 0);
+    assert.equal(clock.frames.size + clock.timers.size, 0);
+
+    // appendChild throws inside the promise executor.
+    dom = fakeDom();
+    clock = fakeClock();
+    dom.container.appendChild = () => { throw new Error('detached'); };
+    p = playCutscene(dom.container, 'personalBest', {}, envFor(dom, clock));
+    assert.equal(await settled(p), 'resolved');
+    assert.equal(dom.document.count() + dom.container.count() + dom.created[0].count(), 0);
+    assert.equal(clock.frames.size + clock.timers.size, 0);
+
+    // A later frame throws.
+    dom = fakeDom();
+    clock = fakeClock();
+    p = playCutscene(dom.container, 'fired', {}, envFor(dom, clock));
+    dom.created[0].ctx.fillRect = () => { throw new Error('lost context'); };
+    clock.tick(100);
+    assert.equal(await settled(p), 'resolved');
+    assert.equal(clock.frames.size, 0);
+    assert.equal(dom.container.children.length, 0);
+});
+
+test('one cutscene per container: a second call ends the first, then plays', async () => {
+    const dom = fakeDom();
+    const clock = fakeClock();
+    const first = playCutscene(dom.container, 'intro', { industryId: 'tech' }, envFor(dom, clock));
+    const second = playCutscene(dom.container, 'personalBest', {}, envFor(dom, clock));
+    assert.equal(await settled(first), 'resolved');
+    assert.equal(await settled(second), 'pending');
+    assert.deepEqual(dom.container.children, [dom.created[1]]);
+    assert.equal(dom.document.handlers.filter((h) => h.type === 'keydown').length, 1);
+    dom.created[1].fire('click');
+    assert.equal(await settled(second), 'resolved');
+    assert.equal(dom.container.children.length, 0);
+});
 
 test('each cutscene lasts 2-4 s, plays to the end and resolves; the backstop timer also ends it', async () => {
     assert.deepEqual(Object.keys(CUTSCENES).sort(), [...IDS].sort());
@@ -221,7 +339,7 @@ test('the canvas is sized from the container at dpr 2 and stays stable; a zero-h
     clock.tick(400);
     clock.tick(440);
     assert.deepEqual([canvas.width, canvas.height], [800, 600]);
-    dom.container.fire('click');
+    canvas.fire('click');
 
     const flat = fakeDom({ width: 360, height: 0 });
     const clock2 = fakeClock();
@@ -229,5 +347,5 @@ test('the canvas is sized from the container at dpr 2 and stays stable; a zero-h
     const c2 = flat.created[0];
     assert.match(c2.style.height, /^\d+px$/);
     assert.ok(c2.width === 720 && c2.height > 0, `${c2.width}x${c2.height}`);
-    flat.container.fire('click');
+    c2.fire('click');
 });

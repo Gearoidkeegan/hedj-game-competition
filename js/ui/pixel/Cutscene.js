@@ -3,9 +3,11 @@
 //   playCutscene(container, id, { industryId }) -> Promise<void>
 //     id: 'intro' | 'bankrupt' | 'fired' | 'personalBest'
 //     Adds a canvas to the container, plays the sequence once, then removes the
-//     canvas and its listeners and resolves. A tap (click) or any key skips it.
-//     It resolves at once, drawing nothing, under prefers-reduced-motion or for
-//     an unknown id.
+//     canvas and its listeners and resolves. A tap on the canvas or a key (not
+//     Tab or a lone modifier) skips it, and the skipping event is consumed so
+//     the game never sees it. It resolves at once, drawing nothing, under
+//     prefers-reduced-motion or for an unknown id, and it never rejects. One
+//     cutscene plays per container: a second call ends the first.
 //   drawCutscene(ctx, id, { industryId }, tMs, dpr)   one frame, pure (the gallery uses it)
 //
 // All motion is a function of tMs; cosmetic randomness comes from hash(), never
@@ -515,42 +517,91 @@ export function drawCutscene(ctx, id, { industryId } = {}, tMs = 0, dpr = 1) {
 
 // ---------------------------------------------------------------- player
 
+// Keys that never skip: focus moves, modifiers on their own and IME keys.
+const IGNORED_KEYS = new Set(['Tab', 'Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'OS', 'Fn', 'FnLock',
+    'CapsLock', 'NumLock', 'ScrollLock', 'Hyper', 'Super', 'Symbol', 'SymbolLock', 'Process', 'Dead', 'Unidentified']);
+
+// The finish function of the cutscene playing in each container, so a second
+// call ends the first before it starts.
+const active = new WeakMap();
+
+// Stops an event reaching the game's own handlers.
+function consume(e) {
+    try { e?.preventDefault?.(); } catch { /* cosmetic */ }
+    try { e?.stopPropagation?.(); } catch { /* cosmetic */ }
+}
+
 // env lets tests inject document, matchMedia, requestAnimationFrame,
 // cancelAnimationFrame, setTimeout, clearTimeout and devicePixelRatio.
+// Never rejects: any failure ends the cutscene and resolves.
 export function playCutscene(container, id, { industryId } = {}, env = {}) {
     const g = globalThis;
-    const seq = Object.hasOwn(CUTSCENES, id) ? CUTSCENES[id] : null;
-    const doc = env.document || container?.ownerDocument || g.document || null;
-    if (!seq || !container || !doc || prefersReducedMotion(env)) return Promise.resolve();
+    try {
+        if (container && typeof container === 'object') active.get(container)?.();
+    } catch { /* the previous cutscene cleans itself up */ }
+    let seq = null, doc = null;
+    try {
+        seq = Object.hasOwn(CUTSCENES, id) ? CUTSCENES[id] : null;
+        doc = env.document || container?.ownerDocument || g.document || null;
+        if (!seq || !container || !doc || prefersReducedMotion(env)) return Promise.resolve();
+    } catch {
+        return Promise.resolve();
+    }
 
     const raf = env.requestAnimationFrame || ((fn) => g.requestAnimationFrame(fn));
     const caf = env.cancelAnimationFrame || ((h) => g.cancelAnimationFrame(h));
     const setT = env.setTimeout || ((fn, ms) => g.setTimeout(fn, ms));
     const clearT = env.clearTimeout || ((h) => g.clearTimeout(h));
     const dpr = () => Math.min(3, env.devicePixelRatio || g.devicePixelRatio || 1);
+    const safely = (fn) => { try { fn(); } catch { /* clean-up is best effort */ } };
 
     return new Promise((resolve) => {
-        const canvas = doc.createElement('canvas');
-        Object.assign(canvas.style, {
-            display: 'block', width: '100%', height: '100%',
-            imageRendering: 'pixelated', cursor: 'pointer', touchAction: 'manipulation',
-        });
-        canvas.setAttribute('role', 'img');
-        canvas.setAttribute('aria-label', `${seq.label} (tap to skip)`);
-        container.appendChild(canvas);
-        const ctx = canvas.getContext('2d');
-
+        let canvas = null, ctx = null;
         let done = false, handle = null, timer = null, t0 = null, fitted = null;
+        let keyupTimer = null;
+
+        // The keyup of the key that skipped is swallowed once, so a Space keyup
+        // can't click a button that the next screen has focused.
+        const dropKeyup = () => {
+            safely(() => doc.removeEventListener('keyup', onKeyup, true));
+            if (keyupTimer !== null) {
+                const k = keyupTimer;
+                keyupTimer = null;
+                safely(() => clearT(k));
+            }
+        };
+        const onKeyup = (e) => {
+            consume(e);
+            dropKeyup();
+        };
 
         const finish = () => {
             if (done) return;
             done = true;
-            if (handle !== null) caf(handle);
-            if (timer !== null) clearT(timer);
-            container.removeEventListener('click', finish);
-            doc.removeEventListener('keydown', finish);
-            if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+            if (handle !== null) safely(() => caf(handle));
+            if (timer !== null) safely(() => clearT(timer));
+            safely(() => doc.removeEventListener('keydown', onKey, true));
+            if (canvas) {
+                safely(() => canvas.removeEventListener('click', onTap));
+                safely(() => { if (canvas.parentNode) canvas.parentNode.removeChild(canvas); });
+            }
+            safely(() => { if (active.get(container) === finish) active.delete(container); });
             resolve();
+        };
+
+        const onTap = (e) => {
+            consume(e);
+            finish();
+        };
+        const onKey = (e) => {
+            if (!e || IGNORED_KEYS.has(e.key) || e.repeat || e.isComposing) return;
+            consume(e);
+            if (done) return;
+            finish();
+            safely(() => {
+                doc.addEventListener('keyup', onKeyup, true);
+                keyupTimer = setT(dropKeyup, 1500);   // the keyup may never come (focus lost)
+            });
         };
 
         // Size the backing store from the container, never from the canvas, so
@@ -584,20 +635,38 @@ export function playCutscene(container, id, { industryId } = {}, env = {}) {
         const frame = (time) => {
             handle = null;
             if (done) return;
-            if (t0 === null) t0 = time;
-            const elapsed = time - t0;
-            if (elapsed >= seq.duration) return finish();
-            render(elapsed);
-            if (!done) handle = raf(frame);
+            try {
+                if (t0 === null) t0 = time;
+                const elapsed = time - t0;
+                if (elapsed >= seq.duration) return finish();
+                render(elapsed);
+                if (!done) handle = raf(frame);
+            } catch {
+                finish();
+            }
         };
 
-        if (!ctx) return finish();
-        container.addEventListener('click', finish);
-        doc.addEventListener('keydown', finish);
-        // A backstop for throttled frames (a hidden tab), so the game never waits forever.
-        timer = setT(finish, seq.duration + 1500);
-        render(0);
-        if (!done) handle = raf(frame);
+        try {
+            active.set(container, finish);
+            canvas = doc.createElement('canvas');
+            Object.assign(canvas.style, {
+                display: 'block', width: '100%', height: '100%', pointerEvents: 'auto',
+                imageRendering: 'pixelated', cursor: 'pointer', touchAction: 'manipulation',
+            });
+            canvas.setAttribute('role', 'img');
+            canvas.setAttribute('aria-label', `${seq.label} (tap to skip)`);
+            container.appendChild(canvas);
+            ctx = canvas.getContext('2d');
+            if (!ctx) return finish();
+            canvas.addEventListener('click', onTap);
+            doc.addEventListener('keydown', onKey, true);
+            // A backstop for throttled frames (a hidden tab), so the game never waits forever.
+            timer = setT(finish, seq.duration + 1500);
+            render(0);
+            if (!done) handle = raf(frame);
+        } catch {
+            finish();
+        }
     });
 }
 
