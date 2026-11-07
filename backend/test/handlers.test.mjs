@@ -61,7 +61,63 @@ test('re-register keeps registeredAt and marketingConsent:true', async () => {
     assert.equal(again.registeredAt, first.registeredAt);
     assert.equal(again.registeredAt, new Date(T0).toISOString());
     assert.equal(again.marketingConsent, true);
-    assert.notEqual(again.gameToken, first.gameToken);
+    assert.equal(again.gameTokens.length, 3);
+    assert.equal(first.gameTokens.length, 1);
+});
+
+test('re-register with a different name keeps the stored identity and returns it', async () => {
+    const { deps, ddb } = setup();
+    await register(deps, { company: 'Acme' });
+    const res = await register(deps, { playerName: 'Mallory', company: 'Evil Corp' });
+    assert.equal(res.playerName, 'Ann');
+    assert.equal(res.company, 'Acme');
+    const p = row(ddb, 'P', 'ann@example.com');
+    assert.equal(p.playerName, 'Ann');
+    assert.equal(p.company, 'Acme');
+});
+
+test("device A's token still works after device B registers", async () => {
+    const { deps } = setup();
+    const a = await register(deps);
+    const b = await register(deps);
+    assert.notEqual(a.gameToken, b.gameToken);
+    assert.equal((await submit(deps, scoreBody(a.gameToken, { gameId: 'ga' }))).statusCode, 200);
+    assert.equal((await submit(deps, scoreBody(b.gameToken, { gameId: 'gb' }))).statusCode, 200);
+});
+
+test('the 6th registration evicts the oldest token', async () => {
+    const { deps, ddb } = setup();
+    const tokens = [];
+    for (let i = 0; i < 6; i++) tokens.push((await register(deps)).gameToken);
+    assert.equal(row(ddb, 'P', 'ann@example.com').gameTokens.length, 5);
+    assert.equal((await submit(deps, scoreBody(tokens[0], { gameId: 'x0' }))).statusCode, 401);
+    for (let i = 1; i < 6; i++) {
+        assert.equal((await submit(deps, scoreBody(tokens[i], { gameId: `x${i}` }))).statusCode, 200, `token ${i}`);
+    }
+});
+
+test('an expired token is rejected while a newer one still works; expired tokens are dropped on write', async () => {
+    const { deps, ddb, advance } = setup();
+    const a = await register(deps);
+    advance(100 * HOUR);
+    const b = await register(deps);
+    advance(30 * HOUR); // a expired (120h), b has 90h left
+    assert.equal((await submit(deps, scoreBody(a.gameToken, { startedAt: T0, gameId: 'e1' }))).statusCode, 401);
+    assert.equal((await submit(deps, scoreBody(b.gameToken, { startedAt: T0, gameId: 'e2' }))).statusCode, 200);
+    await register(deps);
+    const tokens = row(ddb, 'P', 'ann@example.com').gameTokens.map(t => t.token);
+    assert.ok(!tokens.includes(a.gameToken));
+    assert.ok(tokens.includes(b.gameToken));
+});
+
+test('legacy single gameToken/gameTokenExpiry rows still authenticate and survive re-registration', async () => {
+    const { deps, ddb } = setup();
+    ddb.tables.P.set('ann@example.com', {
+        email: 'ann@example.com', playerName: 'Ann', company: 'Acme', gameToken: 'legacy', gameTokenExpiry: T0 + HOUR
+    });
+    assert.equal((await submit(deps, scoreBody('legacy'))).statusCode, 200);
+    await register(deps);
+    assert.equal((await submit(deps, scoreBody('legacy', { gameId: 'g9' }))).statusCode, 200);
 });
 
 test('marketingConsent defaults to false; ttl is event end + 90 days', async () => {
@@ -314,6 +370,16 @@ test('admin requires key; analytics counts; csv tolerates non-string values', as
     const csv = await admin({ headers: { 'x-admin-key': 'k' }, queryStringParameters: { format: 'csv' } });
     assert.equal(csv.statusCode, 200);
     assert.ok(csv.body.includes('"42"'));
+
+    // CSV formula injection: every dangerous leading character is neutralised, normal values are untouched
+    for (const lead of ['=', '+', '-', '@', '\t', '\r']) {
+        ddb.tables.P.set('f@example.com', { email: 'f@example.com', playerName: `${lead}CMD()`, company: 'Acme', registeredAt: 'x' });
+        const out = await admin({ headers: { 'x-admin-key': 'k' }, queryStringParameters: { format: 'csv' } });
+        assert.ok(out.body.includes(`"'${lead}CMD()"`), JSON.stringify(lead));
+    }
+    ddb.tables.P.set('f@example.com', { email: 'f@example.com', playerName: 'Normal-Name', company: 'a=b', registeredAt: 'x' });
+    const norm = await admin({ headers: { 'x-admin-key': 'k' }, queryStringParameters: { format: 'csv' } });
+    assert.ok(norm.body.includes('"Normal-Name"') && norm.body.includes('"a=b"'));
 
     const a = createAnalytics(deps);
     assert.equal((await a({ body: '{"event":"play"}', requestContext: { http: { method: 'POST' } } })).statusCode, 204);

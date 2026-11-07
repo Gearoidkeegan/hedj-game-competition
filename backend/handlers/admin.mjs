@@ -21,7 +21,12 @@ export function createHandler(deps) {
 
         const format = event.queryStringParameters?.format;
         if (format === 'csv') {
-            const csvEscape = v => `"${(typeof v === 'string' ? v : String(v ?? '')).replace(/"/g, '""')}"`;
+            // Prefix ' on values a spreadsheet would read as a formula (= + - @ tab CR).
+            const csvEscape = v => {
+                let str = typeof v === 'string' ? v : String(v ?? '');
+                if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+                return `"${str.replace(/"/g, '""')}"`;
+            };
             const rows = [
                 'Name,Email,Company,Registered At,Marketing Consent',
                 ...players.map(p =>

@@ -1,10 +1,12 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'node:crypto';
+import { playerTokens } from '../lib/auth.mjs';
 import { json, parseBody, errorResponse, validName } from '../lib/http.mjs';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEFAULT_TOKEN_TTL_HOURS = 120;
+const MAX_TOKENS = 5;
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 export function validCompany(s) {
@@ -42,23 +44,35 @@ export function createHandler(deps) {
         const nowMs = now();
         const gameTokenExpiry = nowMs + ttlHours * 60 * 60 * 1000;
 
+        const key = email.toLowerCase().trim();
+        const existing = (await ddb.send(new GetCommand({ TableName: env.PLAYERS_TABLE, Key: { email: key } }))).Item;
+
+        // Keep unexpired tokens (so other devices stay signed in), add the new one, keep the 5 most recent.
+        const kept = existing ? playerTokens(existing).filter(t => t.expiry > nowMs) : [];
+        const gameTokens = [...kept, { token: gameToken, expiry: gameTokenExpiry }].slice(-MAX_TOKENS);
+
         const names = {};
         const values = {
-            ':pn': playerName.trim(),
-            ':co': company.trim(),
             ':t': true,
             ':ra': new Date(nowMs).toISOString(),
             ':mc': marketingConsent === true,
-            ':gt': gameToken,
-            ':ge': gameTokenExpiry
+            ':gts': gameTokens
         };
         const sets = [
-            'playerName = :pn', 'company = :co', 'consentGiven = :t',
+            'consentGiven = :t',
             'registeredAt = if_not_exists(registeredAt, :ra)',
             // true when sent true, otherwise keep what is stored (default false)
             marketingConsent === true ? 'marketingConsent = :mc' : 'marketingConsent = if_not_exists(marketingConsent, :mc)',
-            'gameToken = :gt', 'gameTokenExpiry = :ge'
+            'gameTokens = :gts'
         ];
+        // Identity is set once: a re-registration never changes the stored name or company.
+        const storedName = existing ? existing.playerName : playerName.trim();
+        const storedCompany = existing ? existing.company : company.trim();
+        if (!existing) {
+            values[':pn'] = storedName;
+            values[':co'] = storedCompany;
+            sets.push('playerName = :pn', 'company = :co');
+        }
         const endMs = Date.parse(env.EVENT_END_ISO || '');
         if (Number.isFinite(endMs)) {
             names['#ttl'] = 'ttl';
@@ -68,13 +82,13 @@ export function createHandler(deps) {
 
         await ddb.send(new UpdateCommand({
             TableName: env.PLAYERS_TABLE,
-            Key: { email: email.toLowerCase().trim() },
+            Key: { email: key },
             UpdateExpression: `SET ${sets.join(', ')}`,
             ...(Object.keys(names).length ? { ExpressionAttributeNames: names } : {}),
             ExpressionAttributeValues: values
         }));
 
-        return json(200, { gameToken, expiresAt: gameTokenExpiry });
+        return json(200, { gameToken, expiresAt: gameTokenExpiry, playerName: storedName, company: storedCompany });
     };
 }
 
