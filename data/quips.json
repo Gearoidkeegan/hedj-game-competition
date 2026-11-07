@@ -1,0 +1,276 @@
+{
+    "result": {
+        "bigSave": [
+            "The hedge paid out. Somewhere, a sceptical CFO quietly deletes an angry email.",
+            "Hedged before the storm. Treasury is briefly the most popular department in the building.",
+            "Your forwards earned their keep. Expect zero thanks and one extra audit question.",
+            "The market swung. Your hedges swung back. Nobody outside treasury will ever know.",
+            "Saved by the hedge. That's the slide for next year's conference panel.",
+            "A textbook save. Someone will put it in a textbook and misspell your name.",
+            "Protected. The kind of quarter that makes 'boring' sound like a compliment.",
+            "Hedge accounting just became a pleasure. Remember this feeling. It's rare."
+        ],
+        "bigMiss": [
+            "The market went your way. You'd politely hedged it away.",
+            "Unhedged would have won. Hindsight is 20/20 and it's sitting on the board.",
+            "You bought an umbrella. It was sunny. The board would like a word about umbrellas.",
+            "Opportunity cost: never on an invoice, always in the board pack.",
+            "The hedge did its job. Unfortunately, this quarter its job was to cost money.",
+            "Somewhere a speculator is buying a boat with the move you hedged away.",
+            "Insurance this quarter, and the house didn't burn down. Annoying, isn't it?"
+        ],
+        "overHedged": [
+            "You hedged more than you sold. That's not a hedge, it's a hobby.",
+            "Forecast optimism meets reality. The extra forwards are now a position. Congratulations.",
+            "Over-hedged. The excess is speculation, and the auditors have a word for it.",
+            "Sales came in light; the hedges didn't. 'Forecast' and 'wish' are different words.",
+            "You hedged 100% of a forecast that turned out to be fan fiction.",
+            "The business sold less than it promised. Shocking. Nobody has ever seen that before.",
+            "Hedged above actuals. The board calls that a bet with extra paperwork."
+        ],
+        "nearBankrupt": [
+            "Below the red line. Your relationship manager has stopped returning calls.",
+            "Liquidity: low. Like your phone battery at 3% during the closing keynote.",
+            "The red line is behind you. The overdraft is in front of you. Choose wisely.",
+            "Below the red line. The credit insurers have started using the word 'concerned'.",
+            "Cash is so tight the office plants are on a watering rota.",
+            "The lenders are reading the covenants aloud. Slowly. With emphasis.",
+            "Treasury now forecasts cash by the hour. Daily was for the good times."
+        ],
+        "calm": [
+            "A quiet quarter. The most underrated outcome in treasury.",
+            "Nothing dramatic happened. Frame it. It won't last.",
+            "Markets moved, you didn't panic. Quietly excellent. Nobody will mention it.",
+            "Calm, like the coffee queue five minutes before the keynote ends.",
+            "Steady. The board barely looked up from their phones. That's a win.",
+            "Volatility took the quarter off. Probably stuck in the lanyard queue.",
+            "Uneventful. In treasury, that's the highest form of praise.",
+            "Nothing to see here. Exactly how a treasurer likes it."
+        ],
+        "boom": [
+            "The market moved your way. Act like you planned it. Everyone else does.",
+            "A tailwind quarter. Accept the compliments. Deflect the questions.",
+            "A big favourable move. The CEO will call it 'strategy' on the earnings call.",
+            "Windfall! Sales will claim it by Friday. Procurement by Thursday.",
+            "Lovely move. Enjoy it before someone asks you to forecast the next one.",
+            "Lucky market, happy board. Don't tell them those two things are related.",
+            "Boom. The board is so pleased they almost read the treasury report."
+        ]
+    },
+
+    "board": {
+        "aggressive": {
+            "moodUp": [
+                "Good. Our competitors would kill for that quarter. Let them.",
+                "That's the treasurer I hired. Don't make me regret saying it out loud.",
+                "Finally, numbers I can wave at the analysts. Keep them coming.",
+                "Decent. Now do it again, faster, and with fewer meetings.",
+                "I'll be taking credit for this at the AGM. You understand.",
+                "Acceptable. I'm upgrading you from 'concern' to 'watch list'."
+            ],
+            "moodDown": [
+                "That's not a quarter. That's an apology with a spreadsheet attached.",
+                "Our competitors are laughing. I can hear them from the exhibition hall.",
+                "I didn't fly in for this. Well, I flew in for the golf. But still.",
+                "Explain it to me slowly. Then explain it faster, so I can leave.",
+                "If this is a strategy, it's hiding very well.",
+                "Do better. I don't care how. That's literally your job."
+            ],
+            "redZone": [
+                "We're below the red line. I want cash, a plan, and nobody hearing about it.",
+                "The bank phoned ME. Do you know how rarely that's good news?",
+                "Red line breached. I'm cancelling the Christmas party. And possibly Christmas.",
+                "Cash this low makes me nervous. I don't do nervous. I do shouting.",
+                "Fix the cash, or I fix the org chart.",
+                "The red line exists for a reason. Get back above it. Today."
+            ],
+            "luckyBreach": [
+                "Off-policy and it worked. I'm not congratulating you. I'm not not congratulating you.",
+                "You broke the mandate and made money. Don't make a habit of it.",
+                "Lucky. Next time, be lucky inside the policy.",
+                "I like the result. I don't like how you got it. The minutes will say both.",
+                "An off-mandate win is still off-mandate. Compliance has your extension number.",
+                "It paid off. So does roulette, occasionally. Back inside the bands."
+            ],
+            "breachLoss": [
+                "Outside the mandate AND losing money? HR is booking a meeting room. A small one.",
+                "You gambled with my company and lost. Put your lanyard on the table.",
+                "Off-policy losses. The board isn't angry. The board is drafting.",
+                "You ignored the policy and torched our cash. HR says 'process'. I say 'out'.",
+                "I asked HR how fast we can do this. They said 'faster than your hedges paid out'.",
+                "Speculating with company money and losing it? That's a career, ending.",
+                "The policy exists so this never happens. It happened. Check your access card works."
+            ]
+        },
+        "cautious": {
+            "moodUp": [
+                "The figures reconcile. I've checked twice. Well done.",
+                "Within limits and profitable. I may permit myself a second biscuit.",
+                "A clean quarter. The auditors will be almost disappointed.",
+                "Variance within tolerance. My favourite four words.",
+                "I've minuted this as 'satisfactory'. Please don't let it go to your head.",
+                "Disciplined and documented. Exactly as the policy intended."
+            ],
+            "moodDown": [
+                "I'd like a root-cause analysis. And then an analysis of the analysis.",
+                "This variance will need a footnote. Possibly a chapter.",
+                "I flagged this risk two quarters ago. Page 14 of the minutes.",
+                "The risk committee will want a word. Several words. Mostly 'why'.",
+                "I don't enjoy surprises. This one was expensive and unscheduled.",
+                "We'll need a lessons-learned session. I've booked three."
+            ],
+            "redZone": [
+                "Cash is below the red line. I've already drafted the covenant waiver request.",
+                "Our liquidity headroom is now a rounding error. This is not a drill.",
+                "Below the red line. Cash forecasting moves to daily. Then hourly.",
+                "The bank has asked for management accounts early. That's never good.",
+                "We're under the red line. I'd like a 13-week cash flow forecast by tonight.",
+                "Red line breached. I haven't slept, and I've made a spreadsheet about it."
+            ],
+            "luckyBreach": [
+                "You breached the mandate and made money. It's still a breach. It's minuted.",
+                "A profitable breach is still a breach. The auditors aren't impressed by luck.",
+                "The outcome was good. The process was not. I only mark the process.",
+                "I'll note the gain. I'll also note the breach. In bold.",
+                "Luck isn't a control. Please return to the approved bands.",
+                "Off-policy, in profit. I've added it to the near-miss register."
+            ],
+            "breachLoss": [
+                "A breach AND a loss. I've informed the audit committee and, frankly, HR.",
+                "Outside approved limits, with losses. This is now a disciplinary matter.",
+                "I've documented this breach in full. HR has asked for a copy. So has legal.",
+                "Unauthorised positions, realised losses. Your trading limits are suspended.",
+                "This is exactly what the policy forbids. The investigation starts on Monday.",
+                "Off-mandate losses. I'm recommending an independent review. Of you."
+            ]
+        },
+        "operational": {
+            "moodUp": [
+                "Good quarter. Can I have my capex request back out of the bin?",
+                "Stable costs! The factory floor might actually believe a forecast.",
+                "Nice. Procurement can stop hiding from the suppliers.",
+                "Predictable cash. I can plan production without crossing my fingers.",
+                "Good. The warehouse lights stay on another quarter.",
+                "Helpful. Suppliers love us when we pay on time."
+            ],
+            "moodDown": [
+                "That loss just ate my maintenance budget. Again.",
+                "Every pound lost here is a pound I can't spend on spare parts.",
+                "Suppliers will hear about this. They always do. Then prices go up.",
+                "I don't understand derivatives, but I understand 'less money'.",
+                "My team's been asking for new kit. I'll tell them 'next year'. Again.",
+                "That makes Monday's supplier negotiation a lot harder."
+            ],
+            "redZone": [
+                "Cash under the red line? I've got payroll on Friday.",
+                "Suppliers want paying up front now. Thanks for that.",
+                "We're so short on cash I'm rationing pallets. Actual pallets.",
+                "Below the red line. I've delayed a machine repair. It's making noises.",
+                "The bank's nervous, the suppliers are nervous, and now I'm nervous.",
+                "Low cash means the factory runs on hope. Hope is not a raw material."
+            ],
+            "luckyBreach": [
+                "Off-policy, but it worked. The CFO's eye is twitching. Please don't repeat it.",
+                "We made money the wrong way. My team calls that 'getting away with it'.",
+                "Good result, wrong route. On the floor we'd log that as a near miss.",
+                "It worked. So does skipping the safety check, until it doesn't.",
+                "Nice gain. But the rulebook exists for a reason. I live by mine.",
+                "I wouldn't run a production line on luck. Don't run treasury on it."
+            ],
+            "breachLoss": [
+                "You broke the rules and lost my payroll money. HR wants a chat. Today.",
+                "Off-policy and in the red. On the floor, that's how you lose your pass.",
+                "That loss cancelled my new machine. HR has asked me about your 'judgement'.",
+                "No checklist, no policy, no money. I've asked HR what happens next.",
+                "Rule-breaking that costs money? Where I work, that's a final written warning.",
+                "You gambled the supplier payments and lost. Security has asked for your lanyard."
+            ]
+        }
+    },
+
+    "chairman": {
+        "jameson": [
+            "THIS KEYNOTE IS 40 MINUTES OVER! GET ME THE HEDGE NUMBERS! AND A SANDWICH!",
+            "I DON'T WANT A LANYARD! I WANT RESULTS!",
+            "HEDGE IT! UNHEDGE IT! I DON'T CARE! JUST GET ME A HEADLINE!",
+            "COFFEE! NUMBERS! IN THAT ORDER! MOVE!",
+            "Networking? I don't network. I SHOUT. There's a difference!"
+        ],
+        "musk": [
+            "What if the hedge book was a rocket? Just thinking out loud.",
+            "I've renamed the treasury department 'T'. New logo tonight.",
+            "Forwards are legacy tech. We're hedging with memes now.",
+            "I polled my followers. 60% voted to unhedge everything. Democracy.",
+            "Skipped the keynote. Gave my own in the coffee queue. Standing room only."
+        ],
+        "oleary": [
+            "Free conference coffee? I've taken forty. Someone bring the van round.",
+            "Options? You want to PAY for a maybe? Absolutely not.",
+            "From next quarter the board pays to sit in the boardroom chairs. Fair's fair.",
+            "The lanyard was free. That's the only reason I'm wearing it.",
+            "Hedging's like legroom. Lovely to have. Now, who's paying for it?"
+        ],
+        "dimon": [
+            "Fortress balance sheet. That's the whole strategy. Write it down.",
+            "A good outcome isn't a good decision. Ask me how I know.",
+            "Show me the real risk report. Not the conference-stand version.",
+            "I've seen every crisis since '87. Your hedge ratio worries me more."
+        ],
+        "buffett": [
+            "Price is what you pay for a hedge. Value is sleeping at night.",
+            "When the tide goes out, you find out who forgot to hedge.",
+            "I'd rather be approximately hedged than precisely wrong.",
+            "Our favourite holding period is forever. Our favourite keynote is short."
+        ],
+        "jobs": [
+            "One more thing. Your hedge book has too many buttons.",
+            "Simplicity. One exposure, one hedge, one beautiful slide.",
+            "I wouldn't let my kids use this hedge book. That's a compliment. Mostly.",
+            "Design is how it works. Your hedges work. They just look terrible."
+        ],
+        "dorsey": [
+            "I meditated through the market crash. The crash did not notice.",
+            "Day four of my fast, I understood basis risk. Day five, I forgot it.",
+            "Ice bath at 5am, board meeting at 9. Both equally cold.",
+            "Have we considered moving the reserves into Bitcoin? Asking for my soul."
+        ],
+        "ackman": [
+            "A brief comment. Page one of forty-seven.",
+            "I've posted my hedging thesis online. It's a thread. It's 112 posts long.",
+            "I'll keep it short. Slide one of my second deck.",
+            "High conviction: we're mispriced. Low conviction: we'll finish on time."
+        ]
+    },
+
+    "gameOverTitles": [
+        { "min": 0, "title": "Unpaid Intern", "line": "You've earned a lanyard and supervised access to the stationery cupboard." },
+        { "min": 500, "title": "Spreadsheet Wrangler", "line": "VLOOKUP whisperer. The board knows your name. Roughly." },
+        { "min": 1000, "title": "Treasury Analyst", "line": "Promising. You've been trusted with the coffee order and a hedge ratio." },
+        { "min": 1500, "title": "Assistant Treasurer", "line": "Solid work. You now get invited to meetings you can't leave." },
+        { "min": 2000, "title": "Group Treasurer", "line": "Respectable. The banks send you Christmas cards and conference invites." },
+        { "min": 2750, "title": "Head of Treasury", "line": "The board trusts you. The auditors tolerate you. That's the dream." },
+        { "min": 3500, "title": "Chief Financial Officer", "line": "Corner office, panel slot, 4,000 unread emails. You've made it." },
+        { "min": 5000, "title": "Treasury Legend", "line": "Keynote material. You'll overrun by forty minutes and nobody will mind." },
+        { "min": 7000, "title": "Master of the Hedge", "line": "Flawless. Bankers whisper your name in the coffee queue." }
+    ],
+
+    "bankrupt": [
+        "Out of cash. The administrators are lovely. They brought their own biscuits.",
+        "Bankrupt. On the bright side, your exposures are now someone else's problem.",
+        "The company's gone. Your lanyard still works until 5pm.",
+        "Cash: zero. Hedging turned out not to be optional after all.",
+        "Insolvent. The banks stopped returning calls and started sending lawyers.",
+        "Bust. You'll be a case study at next year's conference. Anonymised, if you're lucky.",
+        "Out of money, out of time, and out of office. Permanently."
+    ],
+
+    "fired": [
+        "Two off-policy losses. The board has accepted a resignation you haven't written yet.",
+        "You're fired. Security will walk you out. They'll let you stop at the coffee queue.",
+        "The board is 'going in a different direction'. That direction is away from you.",
+        "Fired. Please leave your lanyard, your access card and your hedge ideas at reception.",
+        "Breaking the mandate is bad. Losing money doing it twice? Clear your desk.",
+        "HR would like a quick chat. Bring your coat.",
+        "Your LinkedIn now says 'exploring new opportunities'. The board made sure of it."
+    ]
+}
