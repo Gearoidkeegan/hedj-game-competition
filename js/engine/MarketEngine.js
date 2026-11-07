@@ -41,21 +41,7 @@ class MarketEngineController {
                 fetch(`${basePath}/commodities-monthly.json`).then(r => r.json())
             ]);
 
-            this.fxData = this.stripMeta(fxRes);
-            this.ratesData = this.stripMeta(ratesRes);
-            this.commoditiesData = this.stripMeta(commoditiesRes);
-
-            // Derived proxy: Jet CIF NWE ≈ Brent × 1.8 × 7.4 ($/bbl → $/tonne with crack spread)
-            if (this.commoditiesData.BRENT && !this.commoditiesData.JETNWE) {
-                const k = 1.8 * 7.4;
-                const jet = {};
-                for (const [date, px] of Object.entries(this.commoditiesData.BRENT)) {
-                    jet[date] = px * k;
-                }
-                this.commoditiesData.JETNWE = jet;
-            }
-
-            this.loaded = true;
+            this.loadFromObjects({ fx: fxRes, rates: ratesRes, commodities: commoditiesRes });
             console.log('MarketEngine: data loaded', {
                 fx: Object.keys(this.fxData).length,
                 rates: Object.keys(this.ratesData).length,
@@ -65,6 +51,28 @@ class MarketEngineController {
             console.warn('MarketEngine: could not load market data, will use placeholders', e);
             this.loaded = false;
         }
+    }
+
+    /**
+     * Set the datasets from already-parsed JSON objects (used by Node and by loadData).
+     * Derives the JETNWE proxy and marks the engine as loaded.
+     */
+    loadFromObjects({ fx, rates, commodities }) {
+        this.fxData = this.stripMeta(fx);
+        this.ratesData = this.stripMeta(rates);
+        this.commoditiesData = this.stripMeta(commodities);
+
+        // Derived proxy: Jet CIF NWE ≈ Brent × 1.8 × 7.4 ($/bbl → $/tonne with crack spread)
+        if (this.commoditiesData.BRENT && !this.commoditiesData.JETNWE) {
+            const k = 1.8 * 7.4;
+            const jet = {};
+            for (const [date, px] of Object.entries(this.commoditiesData.BRENT)) {
+                jet[date] = px * k;
+            }
+            this.commoditiesData.JETNWE = jet;
+        }
+
+        this.loaded = true;
     }
 
     stripMeta(data) {

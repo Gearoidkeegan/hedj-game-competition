@@ -255,18 +255,6 @@
                     "budgetRateSpread": 0.04,
                     "description": "Copper for circuit boards and wiring",
                     "unlockQuarter": 4
-                },
-                {
-                    "id": "floating-debt",
-                    "type": "ir",
-                    "underlying": "SOFR",
-                    "direction": "pay",
-                    "notional": 3000000000,
-                    "quarterlyNotional": 3000000000,
-                    "unit": "USD",
-                    "budgetRateSpread": 0.003,
-                    "description": "Term loan facility (floating rate)",
-                    "unlockQuarter": 6
                 }
             ],
             "boardMembers": [
@@ -532,18 +520,6 @@
                     "budgetRateSpread": 0.02,
                     "description": "UK North Sea operations revenue",
                     "unlockQuarter": 4
-                },
-                {
-                    "id": "floating-debt",
-                    "type": "ir",
-                    "underlying": "SOFR",
-                    "direction": "pay",
-                    "notional": 4000000000,
-                    "quarterlyNotional": 4000000000,
-                    "unit": "USD",
-                    "budgetRateSpread": 0.003,
-                    "description": "Infrastructure and capex financing (floating rate)",
-                    "unlockQuarter": 6
                 }
             ],
             "boardMembers": [
@@ -609,18 +585,6 @@
                     "budgetRateSpread": 0.015,
                     "description": "European supplier and logistics payments",
                     "unlockQuarter": 4
-                },
-                {
-                    "id": "floating-debt",
-                    "type": "ir",
-                    "underlying": "SONIA",
-                    "direction": "pay",
-                    "notional": 1200000000,
-                    "quarterlyNotional": 1200000000,
-                    "unit": "GBP",
-                    "budgetRateSpread": 0.004,
-                    "description": "Revolving credit facility & property leases (floating rate)",
-                    "unlockQuarter": 6
                 }
             ],
             "boardMembers": [
