@@ -33,6 +33,20 @@ test('first completed run unlocks mode:pro', () => {
     assert.deepEqual(r.newlyUnlocked, ['mode:pro']);
 });
 
+test('bankrupt or fired first run counts and sets best but does not unlock mode:pro', () => {
+    for (const status of ['bankrupt', 'fired']) {
+        const r = run1(emptyProgress(), { status, score: 600 });
+        assert.equal(r.progress.runs, 1, status);
+        assert.equal(r.progress.best.simple, 600, status);
+        assert.equal(r.isPersonalBest, true, status);
+        assert.ok(!r.progress.unlocked.includes('mode:pro'), status);
+        assert.ok(!r.newlyUnlocked.includes('mode:pro'), status);
+        const later = run1(r.progress, { status: 'complete' });
+        assert.ok(later.progress.unlocked.includes('mode:pro'), status);
+        assert.deepEqual(later.newlyUnlocked, ['mode:pro', 'powerup:visibility']);
+    }
+});
+
 test('unlock thresholds are exact', () => {
     // runs counts the run just applied, so prior runs = n gives n + 1.
     const at = (over) => run1(prog(over), { score: 0 }).progress.unlocked;
@@ -106,6 +120,26 @@ test('mergeProgress is commutative on values and idempotent', () => {
     assert.deepEqual(mergeProgress(m, a), m);
     assert.equal(m.runs, 5);
     assert.deepEqual(m.best, { simple: 900, pro: 600 });
+});
+
+test('mergeProgress and applyRunToProgress tolerate missing or older progress', () => {
+    const a = prog({ runs: 2, best: { simple: 500, pro: 0 }, unlocked: ['mode:pro'] });
+    assert.deepEqual(mergeProgress(a, undefined), mergeProgress(a, a));
+    assert.deepEqual(mergeProgress(undefined, a), mergeProgress(a, a));
+    assert.deepEqual(mergeProgress(undefined, undefined), { ...emptyProgress(), unlocked: [] });
+    const older = { version: 2, runs: 4, best: { simple: 900 }, unlocked: ['industry:pharma'] };
+    const m = mergeProgress(a, older);
+    assert.equal(m.version, 3);
+    assert.equal(m.runs, 4);
+    assert.deepEqual(m.best, { simple: 900, pro: 0 });
+    assert.deepEqual(m.unlocked, ['mode:pro', 'industry:pharma']);
+    assert.deepEqual(m.chairmenMet, []);
+    assert.deepEqual(m.crisisBadges, []);
+    const r = applyRunToProgress({ runs: 1 }, { mode: 'simple', score: 10, chairmenMet: undefined, crisisId: null, status: 'complete' });
+    assert.equal(r.progress.runs, 2);
+    assert.equal(r.progress.version, 3);
+    assert.deepEqual(r.progress.best, { simple: 10, pro: 0 });
+    assert.deepEqual(r.progress.chairmenMet, []);
 });
 
 test('mergeProgress orders a first, then b, de-duplicated, without mutating', () => {

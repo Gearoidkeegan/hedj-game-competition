@@ -6,8 +6,12 @@ import { CRISES } from './crises.js';
 const FREE_UNLOCKS = ['industry:airline', 'industry:agrifoods', 'industry:retail', 'powerup:forecasting'];
 const CRISIS_RUNS_REQUIRED = 4;
 
+// Run status rules (R32): every finished run (complete, bankrupt or fired) counts toward `runs`,
+// and every non-crisis run may set best[mode] whatever its status. Each rule's test receives the
+// progress after the run is applied, plus the run itself; only mode:pro looks at the run, because
+// Pro unlocks after the first COMPLETED run (progress.runs alone cannot tell completed from not).
 export const UNLOCK_RULES = [
-    { id: 'mode:pro', test: p => p.runs >= 1 },
+    { id: 'mode:pro', test: (p, run) => run.status === 'complete' },
     { id: 'industry:construction', test: p => p.best.simple >= 1500 },
     { id: 'industry:pharma', test: p => p.runs >= 3 },
     { id: 'industry:tech', test: p => p.best.simple >= 2500 },
@@ -36,7 +40,21 @@ function union(a, b) {
 
 const num = v => (Number.isFinite(v) ? v : 0);
 
-export function applyRunToProgress(progress, { mode, score, chairmenMet, crisisId, status }) {
+// Tolerates missing or partial (older) stored progress. The result is always version 3.
+function normalise(p) {
+    const src = p && typeof p === 'object' ? p : {};
+    return {
+        version: 3,
+        runs: num(src.runs),
+        best: { simple: num(src.best?.simple), pro: num(src.best?.pro) },
+        unlocked: union(src.unlocked, []),
+        chairmenMet: union(src.chairmenMet, []),
+        crisisBadges: union(src.crisisBadges, [])
+    };
+}
+
+export function applyRunToProgress(rawProgress, { mode, score, chairmenMet, crisisId, status }) {
+    const progress = normalise(rawProgress);
     const key = mode === 'pro' ? 'pro' : 'simple';
     const points = num(score);
     const isCrisis = !!crisisId;
@@ -55,7 +73,7 @@ export function applyRunToProgress(progress, { mode, score, chairmenMet, crisisI
 
     const newlyUnlocked = [];
     for (const rule of UNLOCK_RULES) {
-        if (!next.unlocked.includes(rule.id) && rule.test(next)) {
+        if (!next.unlocked.includes(rule.id) && rule.test(next, { status })) {
             next.unlocked.push(rule.id);
             newlyUnlocked.push(rule.id);
         }
@@ -64,17 +82,17 @@ export function applyRunToProgress(progress, { mode, score, chairmenMet, crisisI
 }
 
 // Mirrors the backend merge: max of runs and each best, ordered union of arrays.
+// Tolerates a missing or partial a or b; the output is always version 3.
 export function mergeProgress(a, b) {
+    const x = normalise(a);
+    const y = normalise(b);
     return {
         version: 3,
-        runs: Math.max(num(a.runs), num(b.runs)),
-        best: {
-            simple: Math.max(num(a.best?.simple), num(b.best?.simple)),
-            pro: Math.max(num(a.best?.pro), num(b.best?.pro))
-        },
-        unlocked: union(a.unlocked, b.unlocked),
-        chairmenMet: union(a.chairmenMet, b.chairmenMet),
-        crisisBadges: union(a.crisisBadges, b.crisisBadges)
+        runs: Math.max(x.runs, y.runs),
+        best: { simple: Math.max(x.best.simple, y.best.simple), pro: Math.max(x.best.pro, y.best.pro) },
+        unlocked: union(x.unlocked, y.unlocked),
+        chairmenMet: union(x.chairmenMet, y.chairmenMet),
+        crisisBadges: union(x.crisisBadges, y.crisisBadges)
     };
 }
 

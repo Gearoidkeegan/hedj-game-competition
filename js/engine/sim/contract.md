@@ -142,9 +142,12 @@ UNLOCK_RULES                     // mode:pro runs>=1; industry:construction best
                                  // industry:tech best.simple>=2500; industry:energy runs>=6; powerup:visibility runs>=2;
                                  // powerup:options best.simple>=2000; crisis:* runs>=4
 applyRunToProgress(progress, { mode, score, chairmenMet, crisisId, status }) -> { progress, newlyUnlocked: string[], isPersonalBest: boolean }
-mergeProgress(a, b) -> Progress  // max of runs and each best; union of arrays
+mergeProgress(a, b) -> Progress  // max of runs and each best; ordered union of arrays (a first); tolerates missing/partial a or b; output is always version 3
 CRISES                           // each { id, label, forcedYear, industryId }; unranked (never submitted to leaderboard)
                                  // gfc2008 2008 airline; brexit2016 2016 retail; covid2020 2020 airline; energy2022 <=2021 construction
+// Run status (R32): every finished run (complete, bankrupt, fired) counts toward `runs`; every non-crisis run may
+// set best[mode] whatever its status; mode:pro unlocks only when a run finishes with status 'complete'
+// (checked in applyRunToProgress, no extra Progress field). Crisis runs count toward `runs` but never set best.
 serialiseSave(run) -> string
 parseSave(str) -> RunState|null  // null on bad JSON or version !== 3
 ```
