@@ -38,6 +38,14 @@ test('losing breaches get you fired; the mandate keeps you employed', () => {
     assert.ok(res.mandate.firedRate < 0.05, `firedRate(mandate) ${res.mandate.firedRate}`);
 });
 
+// R35: only an off-mandate loss can be severe. Mandate never breaches, and full (100% forward) is never
+// hurt badly enough.
+test('a severe losing breach fires unhedged players, never mandate or full ones', () => {
+    assert.equal(res.mandate.severeFiredRate, 0);
+    assert.equal(res.full.severeFiredRate, 0);
+    assert.ok(res.unhedged.severeFiredRate > 0, `severeFiredRate(unhedged) ${res.unhedged.severeFiredRate}`);
+});
+
 test('a run lasts at most 8 quarters', () => {
     assert.equal(Math.max(...Object.values(res).map(r => r.maxQuarters)), 8);
 });

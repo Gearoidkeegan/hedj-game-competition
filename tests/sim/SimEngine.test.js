@@ -236,6 +236,30 @@ test('classifyBreach: off band with a loss at or beyond the threshold -> loss an
     }
 });
 
+test('classifyBreach: a loss of exactly the threshold is severe', () => {
+    const startingCash = 2e8;
+    const marketResult = -BALANCE.severeBreachLossPct * startingCash;
+    assert.deepEqual(classifyBreach({ inMandate: false, marketResult, startingCash }), { breach: 'loss', severe: true });
+});
+
+// R38: bad startingCash never makes a breach severe (running out of cash is bankruptcy's job).
+test('classifyBreach: startingCash 0, negative or not finite -> never severe, breach still loss', () => {
+    for (const startingCash of [0, -1, NaN, Infinity, undefined]) {
+        assert.deepEqual(classifyBreach({ inMandate: false, marketResult: -1e9, startingCash }), { breach: 'loss', severe: false },
+            `startingCash ${startingCash}`);
+    }
+});
+
+// R38: a non-finite marketResult is classified as 0 (off mandate: lucky; in mandate: none).
+test('classifyBreach: marketResult not finite is classified as 0', () => {
+    for (const marketResult of [NaN, -Infinity, Infinity, undefined]) {
+        assert.deepEqual(classifyBreach({ inMandate: false, marketResult, startingCash: 1000 }),
+            classifyBreach({ inMandate: false, marketResult: 0, startingCash: 1000 }), `marketResult ${marketResult}`);
+        assert.deepEqual(classifyBreach({ inMandate: false, marketResult, startingCash: 1000 }), { breach: 'lucky', severe: false });
+        assert.deepEqual(classifyBreach({ inMandate: true, marketResult, startingCash: 1000 }), { breach: 'none', severe: false });
+    }
+});
+
 test('a severe losing breach in Q1 fires at once, even with the board above the threshold', () => {
     const up = trendMarket(1.2);
     const run = newRun(up, { forcedYear: 2010 });

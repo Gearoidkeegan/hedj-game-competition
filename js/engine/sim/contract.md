@@ -63,6 +63,7 @@ simulateQuarter(run, decisions, market, content) -> { run, summary }   // pure; 
 isRunOver(run) -> boolean                     // status !== 'playing'
 classifyBreach({ inMandate, marketResult, startingCash }) -> { breach: 'none'|'lucky'|'loss', severe: boolean }
                                               // A8: used by simulateQuarter; F1's Pro adapter imports it
+                                              // R38: non-finite marketResult counts as 0; startingCash not finite or <= 0 -> severe false
 ```
 
 A severe breach is scored as a normal `'loss'` breach (A5 scoring is unchanged).

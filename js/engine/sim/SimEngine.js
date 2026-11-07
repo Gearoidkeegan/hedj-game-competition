@@ -76,10 +76,15 @@ export function createRun({ industry, seed, startedAt, market, crisisId = null, 
 
 // Off mandate: 'lucky' if the market result made money, 'loss' if it lost. A loss of at least
 // BALANCE.severeBreachLossPct of starting cash is severe (fires at once).
+// R38: a non-finite marketResult counts as 0; a non-finite or non-positive startingCash is never severe
+// (running out of cash is bankruptcy's job).
 export function classifyBreach({ inMandate, marketResult, startingCash }) {
     if (inMandate) return { breach: 'none', severe: false };
-    if (marketResult >= 0) return { breach: 'lucky', severe: false };
-    return { breach: 'loss', severe: marketResult <= -BALANCE.severeBreachLossPct * startingCash };
+    const result = Number.isFinite(marketResult) ? marketResult : 0;
+    if (result >= 0) return { breach: 'lucky', severe: false };
+    const severe = Number.isFinite(startingCash) && startingCash > 0
+        && result <= -BALANCE.severeBreachLossPct * startingCash;
+    return { breach: 'loss', severe };
 }
 
 function usableRate(r) {
