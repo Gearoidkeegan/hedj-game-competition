@@ -73,6 +73,32 @@ test('the two choices of every simple event have different effects', () => {
     }
 });
 
+// Axes on which one choice can beat the other. notionalMult is ignored: whether a bigger or smaller notional helps
+// depends on the industry and the market, and it does nothing for industries without that exposure.
+function axes(effects) {
+    return {
+        cash: effects.cashPct ?? 0,
+        mood: effects.mood ?? 0,
+        calm: -(effects.varianceMult ?? 1) // lower variance is better
+    };
+}
+
+function winsOnSomeAxis(a, b) {
+    const x = axes(a);
+    const y = axes(b);
+    return Object.keys(x).some(k => x[k] > y[k]);
+}
+
+test('neither choice of a simple event is strictly dominated (each wins on cash, mood or variance)', () => {
+    const dominated = [];
+    for (const e of simpleEvents()) {
+        const [a, b] = e.choices;
+        if (!winsOnSomeAxis(a.effects, b.effects)) dominated.push(`${e.id}.${a.id}`);
+        if (!winsOnSomeAxis(b.effects, a.effects)) dominated.push(`${e.id}.${b.id}`);
+    }
+    assert.deepEqual(dominated, []);
+});
+
 test('simple event effects stay within the magnitude bounds', () => {
     for (const e of simpleEvents()) {
         for (const c of e.choices) {

@@ -17,7 +17,7 @@
                     "id": "phase_it",
                     "label": "Phase it over two years",
                     "quip": "Prudent. Sales have stopped speaking to you.",
-                    "effects": { "mood": -3, "notionalMult": { "usd-revenue": 1.1, "eur-revenue": 1.1, "gbp-revenue": 1.1 } }
+                    "effects": { "mood": -3, "varianceMult": 0.85, "notionalMult": { "usd-revenue": 1.1, "eur-revenue": 1.1, "gbp-revenue": 1.1 } }
                 }
             ]
         },
@@ -73,8 +73,8 @@
                 {
                     "id": "all_nighter",
                     "label": "Pull an all-nighter",
-                    "quip": "Paperwork immaculate. You, less so.",
-                    "effects": { "cashPct": -0.005, "mood": 5 }
+                    "quip": "Paperwork immaculate. You, less so. Mind the typos tomorrow.",
+                    "effects": { "cashPct": -0.005, "mood": 5, "varianceMult": 1.1 }
                 },
                 {
                     "id": "hire_consultants",
@@ -116,13 +116,13 @@
                     "id": "call_ceo",
                     "label": "Ring the real CEO",
                     "quip": "Fake, obviously. The CEO is touched you checked. Briefly.",
-                    "effects": { "mood": 3 }
+                    "effects": { "mood": 4 }
                 },
                 {
-                    "id": "forward_to_it",
-                    "label": "Forward it to IT and go home",
-                    "quip": "IT was at lunch. Accounts paid it. Recovery is ongoing.",
-                    "effects": { "cashPct": -0.01, "mood": -4 }
+                    "id": "payment_controls",
+                    "label": "Buy proper payment controls",
+                    "quip": "Dual sign-off on everything now. Even the biscuit order.",
+                    "effects": { "cashPct": -0.01, "mood": 2, "varianceMult": 0.9 }
                 }
             ]
         },
@@ -136,14 +136,14 @@
                 {
                     "id": "use_forward",
                     "label": "Use the forward rate",
-                    "quip": "Defensible, boring, correct. The board nods off approvingly.",
-                    "effects": { "mood": 4, "varianceMult": 0.9 }
+                    "quip": "Defensible, boring, correct. Half the board nods off.",
+                    "effects": { "mood": 1, "varianceMult": 0.9 }
                 },
                 {
                     "id": "average_guesses",
                     "label": "Average everyone's guess",
-                    "quip": "Democracy in action. Nobody's right, but nobody's left out.",
-                    "effects": { "mood": 2, "varianceMult": 1.2 }
+                    "quip": "Democracy in action. Nobody's right, but everyone feels heard.",
+                    "effects": { "mood": 6, "varianceMult": 1.2 }
                 }
             ]
         },
@@ -179,7 +179,7 @@
                     "id": "take_tickets",
                     "label": "Sign up, enjoy Wimbledon",
                     "quip": "Lovely strawberries. Then the board read the 14 pages of footnotes.",
-                    "effects": { "cashPct": -0.02, "mood": -3 }
+                    "effects": { "cashPct": -0.02, "mood": -3, "varianceMult": 0.85 }
                 },
                 {
                     "id": "plain_forward",
@@ -200,7 +200,7 @@
                     "id": "sign_and_fix",
                     "label": "Sign and fix most of it",
                     "quip": "Fee paid, rates tamed. The bankers celebrate with your money.",
-                    "effects": { "cashPct": -0.01, "notionalMult": { "floating-debt": 0.6 } }
+                    "effects": { "cashPct": -0.01, "mood": 2, "notionalMult": { "floating-debt": 0.6 } }
                 },
                 {
                     "id": "stay_floating",
@@ -326,7 +326,7 @@
                     "id": "take_call",
                     "label": "Take the call, skip coffee",
                     "quip": "Hedges rolled, nerves frayed. You now speak in basis points.",
-                    "effects": { "mood": 3 }
+                    "effects": { "mood": 3, "varianceMult": 1.1 }
                 },
                 {
                     "id": "hold_for_flat_white",
@@ -346,8 +346,8 @@
                 {
                     "id": "join_and_steer",
                     "label": "Join in and steer",
-                    "quip": "You stay on message and buy the round. Expensed, obviously.",
-                    "effects": { "cashPct": -0.005, "mood": 5 }
+                    "quip": "You stay on message and buy the round. All of it. Expensed.",
+                    "effects": { "cashPct": -0.015, "mood": 5 }
                 },
                 {
                     "id": "leave_them",
