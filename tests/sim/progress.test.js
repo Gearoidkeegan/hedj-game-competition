@@ -142,6 +142,18 @@ test('mergeProgress and applyRunToProgress tolerate missing or older progress', 
     assert.deepEqual(r.progress.chairmenMet, []);
 });
 
+test('non-array stored lists are treated as empty, not spread', () => {
+    const bad = { runs: 1, unlocked: 'mode:pro', chairmenMet: { musk: true }, crisisBadges: 7 };
+    const m = mergeProgress(bad, undefined);
+    assert.deepEqual(m.unlocked, []);
+    assert.deepEqual(m.chairmenMet, []);
+    assert.deepEqual(m.crisisBadges, []);
+});
+
+test('unlock rule predicates tolerate a missing run', () => {
+    for (const rule of UNLOCK_RULES) assert.doesNotThrow(() => rule.test(emptyProgress(), undefined), rule.id);
+});
+
 test('mergeProgress orders a first, then b, de-duplicated, without mutating', () => {
     const a = prog({ unlocked: ['x:1', 'x:2'], chairmenMet: ['musk'] });
     const b = prog({ unlocked: ['x:3', 'x:1'], chairmenMet: ['dimon', 'musk'] });

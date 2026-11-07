@@ -11,7 +11,7 @@ const CRISIS_RUNS_REQUIRED = 4;
 // progress after the run is applied, plus the run itself; only mode:pro looks at the run, because
 // Pro unlocks after the first COMPLETED run (progress.runs alone cannot tell completed from not).
 export const UNLOCK_RULES = [
-    { id: 'mode:pro', test: (p, run) => run.status === 'complete' },
+    { id: 'mode:pro', test: (p, run) => run?.status === 'complete' },
     { id: 'industry:construction', test: p => p.best.simple >= 1500 },
     { id: 'industry:pharma', test: p => p.runs >= 3 },
     { id: 'industry:tech', test: p => p.best.simple >= 2500 },
@@ -39,6 +39,8 @@ function union(a, b) {
 }
 
 const num = v => (Number.isFinite(v) ? v : 0);
+// Stored lists that are not arrays (corrupt or foreign data) count as empty rather than being spread.
+const list = v => (Array.isArray(v) ? v : []);
 
 // Tolerates missing or partial (older) stored progress. The result is always version 3.
 function normalise(p) {
@@ -47,9 +49,9 @@ function normalise(p) {
         version: 3,
         runs: num(src.runs),
         best: { simple: num(src.best?.simple), pro: num(src.best?.pro) },
-        unlocked: union(src.unlocked, []),
-        chairmenMet: union(src.chairmenMet, []),
-        crisisBadges: union(src.crisisBadges, [])
+        unlocked: union(list(src.unlocked), []),
+        chairmenMet: union(list(src.chairmenMet), []),
+        crisisBadges: union(list(src.crisisBadges), [])
     };
 }
 

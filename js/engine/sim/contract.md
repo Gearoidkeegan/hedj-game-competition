@@ -138,7 +138,7 @@ SCORE_MAX = 10000
   unlocked: string[], chairmenMet: string[], crisisBadges: string[] }
 
 emptyProgress() -> Progress      // unlocked: ['industry:airline','industry:agrifoods','industry:retail','powerup:forecasting']
-UNLOCK_RULES                     // mode:pro runs>=1; industry:construction best.simple>=1500; industry:pharma runs>=3;
+UNLOCK_RULES                     // mode:pro: first completed run (R32); industry:construction best.simple>=1500; industry:pharma runs>=3;
                                  // industry:tech best.simple>=2500; industry:energy runs>=6; powerup:visibility runs>=2;
                                  // powerup:options best.simple>=2000; crisis:* runs>=4
 applyRunToProgress(progress, { mode, score, chairmenMet, crisisId, status }) -> { progress, newlyUnlocked: string[], isPersonalBest: boolean }
