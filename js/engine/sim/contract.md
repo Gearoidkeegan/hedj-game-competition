@@ -35,6 +35,8 @@ Shapes and signatures only. Every stream reads this first. Source of truth: the 
 
 ```js
 { q: number, inMandate: boolean, playerDelta: number, benchmarkDelta: number,
+  marketResult: number,   // Σ(exposureImpact + hedgeImpact) − option premiums this quarter (excludes baseOcf, events, power-ups)
+  breach: 'none'|'lucky'|'loss',   // 'none' if inMandate; else 'lucky' if marketResult ≥ 0, 'loss' if marketResult < 0
   cashAfter: number, benchmarkCashAfter: number, redLine: number, boardMoodAfter: number,
   lines: [{ exposureId, movePct, exposureImpact, hedgeImpact, realisedNotional, forecastNotional }],
   event: { id, choice } | null, powerUp: string|null }
@@ -56,10 +58,28 @@ isRunOver(run) -> boolean                     // status !== 'playing'
 ```js
 { startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: -0.03, eventChance: 0.35,
   mandates: [{min:0.25,max:0.5},{min:0.5,max:0.75},{min:0.75,max:1}],
-  mood: { inMandate: 4, outMandate: -10, beatBenchmark: 3, redZone: -12 },
+  mood: { inMandate: 4, luckyBreach: -3, breachLoss: -25, beatBenchmark: 3, redZone: -12 },
+  breachLossesToFire: 2,
   notionalScale: 1,
-  points: { inMandate: 100, aboveRedLine: 50, stability: 100, outperformPerPct: 40, survival: 500 } }
+  points: { inMandate: 100, luckyBreach: 0, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 40, survival: 500 } }
 ```
+
+## simulateQuarter rules fixed by the contract (A3)
+
+Board mood (step 7), clamped to 0..100:
+
+- `breach === 'none'`: `+BALANCE.mood.inMandate`.
+- `breach === 'lucky'`: `+BALANCE.mood.luckyBreach` (a mild telling-off).
+- `breach === 'loss'`: `+BALANCE.mood.breachLoss` (a heavy telling-off).
+- `+BALANCE.mood.beatBenchmark` if `playerDelta >= benchmarkDelta`.
+- `+BALANCE.mood.redZone` if `cashAfter < redLine`.
+
+Status (step 8), checked in this order:
+
+1. `cash <= 0` -> `'bankrupt'`.
+2. the run's count of `breach === 'loss'` quarters reaches `BALANCE.breachLossesToFire` -> `'fired'`.
+3. `boardMood <= BALANCE.fireThreshold` -> `'fired'`.
+4. `quarter === 8` -> `'complete'`.
 
 ## Power-ups and events (A4)
 
@@ -86,6 +106,8 @@ applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult }   // unkn
 
 ```js
 quarterPoints(summary, startingCash) -> number
+  // sums: BALANCE.points.inMandate (100) when breach === 'none'; luckyBreach (0) when 'lucky';
+  // breachLoss (-300) when 'loss'; aboveRedLine (50) when cashAfter >= redLine; plus the stability bonus
 finalScore({ history, status, startingCash, boardMood }, gameOverTitles = []) ->
   { total: number, breakdown: { quarters, outperformance, survival, moodMultiplier }, title: string }
 SCORE_MAX = 10000
@@ -137,9 +159,9 @@ CHAIRMAN_SPRITES                                // ids: jameson, musk, oleary, d
 
 ```json
 { "result": { "bigSave": [], "bigMiss": [], "overHedged": [], "nearBankrupt": [], "calm": [], "boom": [] },
-  "board": { "aggressive": { "moodUp": [], "moodDown": [], "redZone": [], "mandateBreach": [] },
-             "cautious":   { "moodUp": [], "moodDown": [], "redZone": [], "mandateBreach": [] },
-             "operational":{ "moodUp": [], "moodDown": [], "redZone": [], "mandateBreach": [] } },
+  "board": { "aggressive": { "moodUp": [], "moodDown": [], "redZone": [], "luckyBreach": [], "breachLoss": [] },
+             "cautious":   { "moodUp": [], "moodDown": [], "redZone": [], "luckyBreach": [], "breachLoss": [] },
+             "operational":{ "moodUp": [], "moodDown": [], "redZone": [], "luckyBreach": [], "breachLoss": [] } },
   "chairman": { "jameson": [], "musk": [], "oleary": [], "dimon": [], "buffett": [], "jobs": [], "dorsey": [], "ackman": [] },
   "gameOverTitles": [ { "min": 0, "title": "", "line": "" } ],
   "bankrupt": [], "fired": [] }
@@ -154,3 +176,7 @@ Result-quip selection rules (B3):
 - `overHedged`: any line with `h * forecast > 1.15 * realised`.
 - `nearBankrupt`: `cashAfter < redLine`.
 - otherwise `calm`, or `boom` on a large favourable move.
+
+Board line selection (B1): `breach === 'loss'` -> `breachLoss`. This is a heavy, scathing telling-off, and the angry sprite always wins over other moods. `breach === 'lucky'` -> `luckyBreach`: a grudging "it worked, but don't do that again". Otherwise `redZone`, `moodUp` or `moodDown` by mood change.
+
+Tone: `luckyBreach` is mild and wry; `breachLoss` is the harshest in the game (the board is furious, with HR hints). The `fired` lines follow from repeated losing breaches.
