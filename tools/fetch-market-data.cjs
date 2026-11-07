@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * fetch-market-data.js
+ * fetch-market-data.cjs
  *
  * Fetches historical market data from free APIs and writes static JSON files
  * for the Treasury Manager Simulator game.
@@ -17,7 +17,7 @@
  *   - data/market/rates-monthly.json
  *
  * Usage:
- *   node tools/fetch-market-data.js [--fred-key YOUR_KEY]
+ *   node tools/fetch-market-data.cjs [--fred-key YOUR_KEY]
  */
 
 const https = require('https');
