@@ -119,6 +119,13 @@ with its bugs fixed (credit release, IR P&L, trading costs, unwinds). It has its
   - a board-mood multiplier.
 
   Weights get tuned with the simulator (see Verification).
+- **Mandate breaches** (user decision, 2026-11-07):
+  - Following the mandate should beat doing nothing on average, but **luck must still matter sometimes**, so a
+    gamble can pay off.
+  - **Off-mandate and the quarter made money:** the success mitigates the criticism. A mild, wry telling-off, a
+    small mood dip, and no mandate points.
+  - **Off-mandate and the quarter lost money:** scored very negatively, with the harshest criticism in the game. A
+    second such quarter gets you fired.
 - **Unlocks:**
   - industries;
   - Pro mode;

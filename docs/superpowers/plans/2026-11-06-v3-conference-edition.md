@@ -88,7 +88,7 @@ If time is short, cut in this order:
 
 **Files:**
 - Create: `package.json` (repo root), `tests/helpers/loadData.js`, `js/engine/sim/contract.md`
-- Rename: `tools/fetch-market-data.js` → `tools/fetch-market-data.cjs` (it uses `require`; the root becomes `"type": "module"`)
+- Rename: `tools/fetch-market-data.js` → `tools/fetch-market-data.cjs` (done in Task 0) (it uses `require`; the root becomes `"type": "module"`)
 
 **Interfaces:**
 - Produces:
@@ -212,6 +212,8 @@ If time is short, cut in this order:
 { hedges: { [exposureId]: 0|0.25|0.5|0.75|1 }, useOptions: boolean, buyPowerUp: string|null, eventChoice: string|null }
 // QuarterSummary (shared with Pro, consumed by score.js)
 { q: number, inMandate: boolean, playerDelta: number, benchmarkDelta: number,
+  marketResult: number,   // Σ(exposureImpact + hedgeImpact) − option premiums this quarter (excludes baseOcf, events, power-ups)
+  breach: 'none'|'lucky'|'loss',   // 'none' if inMandate; else 'lucky' if marketResult ≥ 0, 'loss' if marketResult < 0
   cashAfter: number, benchmarkCashAfter: number, redLine: number, boardMoodAfter: number,
   lines: [{ exposureId, movePct, exposureImpact, hedgeImpact, realisedNotional, forecastNotional }],
   event: { id, choice } | null, powerUp: string|null }
@@ -235,13 +237,20 @@ If time is short, cut in this order:
        `useOptions` and `options` is owned, minus the premium);
      - benchmark delta += exposure impact only.
   5. Both sides add `BALANCE.baseOcfPct × startingCash`.
-  6. `inMandate`: every active non-zero-notional exposure has `h` within `[mandate.min, mandate.max]`.
-  7. Board mood:
-     - `+BALANCE.mood.inMandate` or `+BALANCE.mood.outMandate`;
+  6. `inMandate`: every active non-zero-notional exposure has `h` within `[mandate.min, mandate.max]`. Compute
+     `marketResult` and `breach` as defined in QuarterSummary.
+  7. Board mood (user decision: success mitigates a breach; a losing breach is punished hard):
+     - `breach === 'none'`: `+BALANCE.mood.inMandate`;
+     - `breach === 'lucky'`: `+BALANCE.mood.luckyBreach` (a mild telling-off);
+     - `breach === 'loss'`: `+BALANCE.mood.breachLoss` (a heavy telling-off);
      - `+BALANCE.mood.beatBenchmark` if playerDelta ≥ benchmarkDelta;
      - `+BALANCE.mood.redZone` if `cashAfter < redLine`;
      - clamped to 0..100.
-  8. Status: `cash ≤ 0` → `'bankrupt'`; `boardMood ≤ BALANCE.fireThreshold` → `'fired'`; `quarter === 8` → `'complete'`.
+  8. Status, checked in this order:
+     1. `cash ≤ 0` → `'bankrupt'`;
+     2. the run's count of `breach === 'loss'` quarters reaches `BALANCE.breachLossesToFire` → `'fired'`;
+     3. `boardMood ≤ BALANCE.fireThreshold` → `'fired'`;
+     4. `quarter === 8` → `'complete'`.
   9. Roll the next `pendingEvent` with `rng.chance(BALANCE.eventChance)`, from events not yet seen this run, using
      weighted selection (A4).
 - `isRunOver(run) → boolean`: `status !== 'playing'`.
@@ -250,7 +259,8 @@ If time is short, cut in this order:
   ```
   { startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: -0.03, eventChance: 0.35,
     mandates: [{min:0.25,max:0.5},{min:0.5,max:0.75},{min:0.75,max:1}],
-    mood: { inMandate: 4, outMandate: -10, beatBenchmark: 3, redZone: -12 },
+    mood: { inMandate: 4, luckyBreach: -3, breachLoss: -25, beatBenchmark: 3, redZone: -12 },
+    breachLossesToFire: 2,
     notionalScale: 1 }
   ```
 
@@ -264,6 +274,10 @@ If time is short, cut in this order:
   - `100% forward on every active exposure: |playerDelta − benchmarkDelta| equals |Σ exposure impact on (realised − forecast)|`
     (only the over- or under-hedge remains).
   - `simulateQuarter does not mutate its input` (deep-freeze the input; no throw).
+  - `breach classification`: out-of-band dials with `marketResult ≥ 0` give `'lucky'`; out-of-band with
+    `marketResult < 0` gives `'loss'`; in-band gives `'none'` whatever the result.
+  - `lucky breach is criticised less than a losing breach`: the mood change for `lucky` > the change for `loss`.
+  - `two losing breaches → fired`: force two `'loss'` quarters → `status === 'fired'` even when mood > fireThreshold.
   - `bankruptcy`: set `run.cash = 1`, force a bad quarter → `status === 'bankrupt'`.
   - `complete after 8`: 8 calls with valid decisions → `status === 'complete'`, `history.length === 8`.
   - `GBP exposure unlocks at Q4`: `activeExposures` at quarter 4 includes `gbp-revenue`.
@@ -325,7 +339,9 @@ If time is short, cut in this order:
 - Consumes: `QuarterSummary[]` (A3), the final `status`, `startingCash` and `boardMood`.
 - Produces:
   - `quarterPoints(summary, startingCash) → number`, summing:
-    - `BALANCE.points.inMandate` (100) when `inMandate`;
+    - `BALANCE.points.inMandate` (100) when `breach === 'none'`;
+    - `BALANCE.points.luckyBreach` (0) when `breach === 'lucky'` (no reward for gambling, but no penalty);
+    - `BALANCE.points.breachLoss` (−300) when `breach === 'loss'` (user decision: a losing breach scores very negatively);
     - `BALANCE.points.aboveRedLine` (50) when `cashAfter ≥ redLine`;
     - a stability bonus: `round(BALANCE.points.stability × clamp(1 − |playerDelta − baseOcf| / max(1, |benchmarkDelta − baseOcf|), 0, 1))`
       with `stability = 100`, where `baseOcf = BALANCE.baseOcfPct × startingCash`.
@@ -347,6 +363,9 @@ If time is short, cut in this order:
   - `total never negative`.
   - `a perfect 8-quarter run is ≤ SCORE_MAX`.
   - `score is an integer`.
+  - `lucky breach scores less than in-mandate, more than losing breach`: three otherwise-identical summaries with
+    breach `none` > `lucky` > `loss` in `quarterPoints`.
+  - `a losing breach costs more than an in-mandate quarter earns`: `quarterPoints(loss)` < 0 when stability is 0.
 - [ ] **Step 2:** Run the tests. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run the tests. Expected: PASS.
@@ -422,10 +441,13 @@ If time is short, cut in this order:
 
 - [ ] **Step 1: Write the failing test** (it fails until tuned): over 300 runs per strategy across all 7 industries:
   - `mean(mandate) > mean(unhedged) × 1.3`;
-  - `p25(mandate) > p75(unhedged)`;
+  - **luck still matters** (user decision: don't eliminate it): the share of `unhedged` runs scoring above
+    `median(mandate)` is between 0.08 and 0.30, and the same for `full`;
+  - `p25(mandate) > median(unhedged)` (skill wins on balance);
   - `0.08 ≤ bankruptRate(unhedged) ≤ 0.30`;
   - `bankruptRate(mandate) < 0.05`;
   - `firedRate(mandate) < 0.05`;
+  - `firedRate(unhedged) ≥ 0.15` when the mandate band excludes 0 (losing breaches get you fired);
   - `max quarters === 8`.
 - [ ] **Step 2:** Run `node tools/simulate.js --n 1000` and print a table per strategy.
 - [ ] **Step 3:** Tune only the `BALANCE` numbers (`notionalScale`, `baseOcfPct`, `redLinePct`, mood and points) until
@@ -535,9 +557,9 @@ offscreen buffer (`160×64` for scenes, `32×32` for sprites), then scale with `
 
 ```json
 { "result": { "bigSave": [], "bigMiss": [], "overHedged": [], "nearBankrupt": [], "calm": [], "boom": [] },
-  "board": { "aggressive": { "moodUp": [], "moodDown": [], "redZone": [], "mandateBreach": [] },
-             "cautious":   { "moodUp": [], "moodDown": [], "redZone": [], "mandateBreach": [] },
-             "operational":{ "moodUp": [], "moodDown": [], "redZone": [], "mandateBreach": [] } },
+  "board": { "aggressive": { "moodUp": [], "moodDown": [], "redZone": [], "luckyBreach": [], "breachLoss": [] },
+             "cautious":   { "moodUp": [], "moodDown": [], "redZone": [], "luckyBreach": [], "breachLoss": [] },
+             "operational":{ "moodUp": [], "moodDown": [], "redZone": [], "luckyBreach": [], "breachLoss": [] } },
   "chairman": { "jameson": [], "musk": [], "oleary": [], "dimon": [], "buffett": [], "jobs": [], "dorsey": [], "ackman": [] },
   "gameOverTitles": [ { "min": 0, "title": "", "line": "" } ],
   "bankrupt": [], "fired": [] }
@@ -549,6 +571,11 @@ offscreen buffer (`160×64` for scenes, `32×32` for sprites), then scale with `
   - `overHedged`: any line with `h × forecast > 1.15 × realised`;
   - `nearBankrupt`: `cashAfter < redLine`;
   - otherwise `calm`, or `boom` on a large favourable move.
+- Board line selection (B1): `breach === 'loss'` → `breachLoss`. This is a heavy, scathing telling-off, and the angry
+  sprite always wins over other moods. `breach === 'lucky'` → `luckyBreach`: a grudging "it worked, but don't do that
+  again". Otherwise `redZone`, `moodUp` or `moodDown` by mood change.
+- Tone: `luckyBreach` is mild and wry; `breachLoss` is the harshest in the game (the board is furious, with HR
+  hints). The `fired` lines follow from repeated losing breaches.
 
 - [ ] **Step 1: Write the failing test.** Every array has ≥ 6 entries (`chairman.*` ≥ 4, `gameOverTitles` ≥ 6 sorted
   by `min` and starting at 0). Every string is ≤ 90 characters. Every `board-dialogue.json` string is ≤ 90
@@ -906,6 +933,8 @@ Use the `frontend-design` skill. The layout is mobile-first at 360–430 px wide
     - `benchmarkDelta` = Σ exposure P&L details;
     - `playerDelta` = net P&L;
     - `inMandate` = the existing compliance result;
+    - `marketResult` = Σ exposure P&L + hedge P&L − trading costs and premiums for the quarter, with `breach`
+      derived exactly as in A3;
     - `redLine = 0.2 × startingCash`.
   - `scorePro(state) → finalScore(...)` result (A5).
 
