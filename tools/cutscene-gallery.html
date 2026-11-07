@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cutscene gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+    /* Dev-only: the four cutscenes. Serve the repo root with `python -m http.server 8080`
+       and open /tools/cutscene-gallery.html. By default each one loops through
+       playCutscene (tap a stage to skip). Query params: ?t=mid freezes every
+       cutscene at its mid-point, ?t=<ms> at that time; ?industry=<industryId>
+       sets the intro's scene; ?shape=portrait uses phone-portrait stages. */
+    :root { --bg: #1a1a2e; --panel: #2d2d44; --edge: #5a5a7a; --text: #e8e8f0; --muted: #aaaacc; --gold: #ffcc00; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 18px/1.3 'VT323', monospace; }
+    header { padding: 16px; }
+    h1 { font: 14px/1.4 'Press Start 2P', monospace; margin: 0; color: var(--gold); }
+    main { padding: 0 16px 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 360px)); gap: 16px; }
+    figure { margin: 0; background: var(--panel); border: 2px solid var(--edge); }
+    .stage { width: 100%; height: 300px; }
+    .portrait .stage { height: 640px; }
+    .stage canvas { image-rendering: pixelated; }
+    figcaption { padding: 2px 8px; font-size: 16px; color: var(--muted); }
+    @media (max-width: 768px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header><h1>Cutscene gallery</h1></header>
+<main id="grid"></main>
+<script type="module">
+import { playCutscene, drawCutscene, CUTSCENES } from '../js/ui/pixel/Cutscene.js';
+
+const params = new URLSearchParams(location.search);
+const industryId = params.get('industry') || 'airline';
+const t = params.get('t');
+if (params.get('shape') === 'portrait') document.body.classList.add('portrait');
+
+const grid = document.getElementById('grid');
+for (const [id, seq] of Object.entries(CUTSCENES)) {
+    const fig = document.createElement('figure');
+    const stage = document.createElement('div');
+    stage.className = 'stage';
+    const cap = document.createElement('figcaption');
+    fig.append(stage, cap);
+    grid.append(fig);
+
+    if (t !== null) {
+        const ms = t === 'mid' ? seq.duration / 2 : Number(t);
+        cap.textContent = `${id} · ${ms} ms of ${seq.duration} ms`;
+        const canvas = document.createElement('canvas');
+        canvas.style.cssText = 'display:block;width:100%;height:100%';
+        stage.append(canvas);
+        const dpr = Math.min(3, window.devicePixelRatio || 1);
+        canvas.width = Math.round(stage.clientWidth * dpr);
+        canvas.height = Math.round(stage.clientHeight * dpr);
+        drawCutscene(canvas.getContext('2d'), id, { industryId }, ms, dpr);
+    } else {
+        cap.textContent = `${id} · ${seq.duration} ms · tap to skip`;
+        (async function loop() {
+            for (;;) {
+                await playCutscene(stage, id, { industryId });
+                await new Promise((r) => setTimeout(r, 700));
+            }
+        })();
+    }
+}
+</script>
+</body>
+</html>
