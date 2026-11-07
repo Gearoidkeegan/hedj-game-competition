@@ -1,0 +1,17 @@
+{
+    "forecasting": {
+        "name": "Cash Forecasting",
+        "blurb": "Halves your forecast surprises for the rest of the run. Fewer nasty volume shocks.",
+        "hedjLine": "In real life, Hedj turns messy cash forecasts into numbers you can hedge against."
+    },
+    "visibility": {
+        "name": "Cash Visibility",
+        "blurb": "One use: finds 3% of starting cash hiding in forgotten bank accounts.",
+        "hedjLine": "In real life, Hedj puts every bank balance in one place, so idle cash stops hiding."
+    },
+    "options": {
+        "name": "Options Desk",
+        "blurb": "Unlocks options: pay a premium, keep the upside, sleep at night.",
+        "hedjLine": "In real life, Hedj helps you weigh options against forwards before you trade."
+    }
+}
