@@ -325,7 +325,7 @@
             const [analyticsData, playersResult, metrics] = await Promise.all([
                 apiFetch('/analytics'),
                 apiFetch('/admin/players'),
-                apiFetch('/admin/metrics')
+                apiFetch('/admin/metrics').catch(err => (/40[13]/.test(err.message) ? Promise.reject(err) : {}))
             ]);
 
             // Unlock UI

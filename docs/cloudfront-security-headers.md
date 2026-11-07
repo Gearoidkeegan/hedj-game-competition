@@ -62,7 +62,13 @@ aws cloudfront create-response-headers-policy \
   --query 'ResponseHeadersPolicy.Id' --output text
 ```
 
-3. Fetch the distribution config (keep the `ETag`) and edit it:
+3. Before touching any distribution, confirm which one it is. **Never attach to the hedj.eu distribution — verify `$CF_COMP_DISTRIBUTION_ID`'s aliases are competition.hedj.eu first:**
+
+```sh
+aws cloudfront get-distribution --id "$CF_COMP_DISTRIBUTION_ID" --query 'Distribution.DistributionConfig.Aliases.Items'
+```
+
+   Then fetch the distribution config (keep the `ETag`) and edit it:
 
 ```sh
 aws cloudfront get-distribution-config --id "$CF_COMP_DISTRIBUTION_ID" > dist.json

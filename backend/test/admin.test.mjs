@@ -88,3 +88,19 @@ test('players route still works when rawPath is absent or /admin/players', async
     assert.equal(JSON.parse((await get(admin, '/admin/players')).body).total, 1);
     assert.equal((await get(admin, '/admin/nope')).statusCode, 404);
 });
+
+test('prize limit is clamped and the download has a CSV Content-Disposition', async () => {
+    const { ddb, admin } = setup();
+    for (let i = 0; i < 12; i++) {
+        const email = `p${i}@x.com`;
+        ddb.tables.B.set(`ev#simple#all\u0000${email}`, { board: 'ev#simple#all', email, score: i, playerName: `P${i}`, company: 'C' });
+    }
+    const rows = async limit => (await get(admin, '/admin/prize', { limit })).body.split('\r\n').length - 1;
+    assert.equal(await rows('0'), 1);        // below 1 clamps to 1
+    assert.equal(await rows('-5'), 1);
+    assert.equal(await rows('999'), 12);     // above max clamps to 200, so all 12
+    assert.equal(await rows('abc'), 10);     // unparseable falls back to the default
+    assert.equal(await rows(undefined), 10);
+    const res = await get(admin, '/admin/prize', { mode: 'simple', period: 'event' });
+    assert.equal(res.headers['Content-Disposition'], 'attachment; filename=prize-simple-event.csv');
+});

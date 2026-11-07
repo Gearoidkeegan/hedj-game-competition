@@ -67,3 +67,8 @@ test('admin function: read-only on players and best, three throttled routes', ()
         assert.match(rs, /ThrottlingBurstLimit: 5\s+ThrottlingRateLimit: 2/, route);
     }
 });
+
+test('HCompBest ByScore projection covers what the prize export reads', () => {
+    const idx = yaml.split('HCompBest:')[1].split('HCompAnalytics:')[0].split('IndexName: ByScore')[1];
+    assert.match(idx, /ProjectionType: ALL/); // email, playerName, company, score
+});
