@@ -17,6 +17,7 @@ const CEO_EMOJIS = {
 };
 import { StressFace } from '../ui/StressFace.js';
 import { soundFX } from '../ui/SoundFX.js';
+import { drawSprite, spriteIdForMember } from '../ui/pixel/sprites.js';
 
 export class BoardScreen {
     constructor(app) {
@@ -205,7 +206,7 @@ export class BoardScreen {
         } else {
             memberSlot.innerHTML = `
                 <div class="board-member">
-                    <div class="board-member-portrait">${this.getMemberEmoji(fb.member.personality)}</div>
+                    <div class="board-member-portrait"><canvas width="128" height="128" style="width:64px;height:64px;image-rendering:pixelated;"></canvas></div>
                     <div class="board-member-name">${fb.member.name}</div>
                     <div class="board-member-role">${fb.member.role}</div>
                     <div class="board-member-delta" style="font-family:var(--font-pixel);font-size:7px;color:${fb.satisfactionDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};">
@@ -218,18 +219,15 @@ export class BoardScreen {
             `;
         }
 
+        const portrait = memberSlot.querySelector('.board-member-portrait canvas');
+        if (portrait) {
+            const expression = fb.satisfactionDelta > 0 ? 'happy' : fb.satisfactionDelta < 0 ? 'angry' : 'neutral';
+            drawSprite(portrait.getContext('2d'), spriteIdForMember(fb.member, index), expression, 0, 0, 4);
+        }
+
         // Start typewriter for this member
         const text = fb.lines.join(' ');
         this.typewriteText('current-speech', text, 150);
-    }
-
-    getMemberEmoji(personality) {
-        switch (personality) {
-            case 'aggressive': return '👔';
-            case 'cautious': return '📊';
-            case 'operational': return '⚙️';
-            default: return '💼';
-        }
     }
 
     typewriteText(elementId, text, delay = 0) {
