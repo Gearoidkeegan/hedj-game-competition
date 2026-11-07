@@ -83,12 +83,13 @@ Status (step 8), checked in this order:
 
 ## Power-ups and events (A4)
 
+`POWER_UPS`, keyed by id (exact object shape is defined by Task A4):
+
+- `forecasting`: cost `0.01 × startingCash`; sets `varianceMultiplier = 0.5` permanently.
+- `visibility`: cost `0.005 × startingCash`, single use; adds `+0.03 × startingCash` to the player only.
+- `options`: cost `0.005 × startingCash`; unlocks `useOptions`.
+
 ```js
-POWER_UPS = {                                   // keyed by id
-  forecasting: { cost: 0.01  * startingCash },  // varianceMultiplier = 0.5 permanently
-  visibility:  { cost: 0.005 * startingCash },  // single use; +0.03 * startingCash to player only
-  options:     { cost: 0.005 * startingCash }   // unlocks useOptions
-}
 canBuyPowerUp(run, id, unlockedIds) -> boolean
 applyPowerUp(run, id) -> run
 rollEvent(run, events, rng) -> string|null
@@ -108,7 +109,7 @@ applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult }   // unkn
 quarterPoints(summary, startingCash) -> number
   // sums: BALANCE.points.inMandate (100) when breach === 'none'; luckyBreach (0) when 'lucky';
   // breachLoss (-300) when 'loss'; aboveRedLine (50) when cashAfter >= redLine; plus the stability bonus
-finalScore({ history, status, startingCash, boardMood }, gameOverTitles = []) ->
+finalScore({ history, status, startingCash, boardMood }, gameOverTitles?) ->
   { total: number, breakdown: { quarters, outperformance, survival, moodMultiplier }, title: string }
 SCORE_MAX = 10000
 ```
