@@ -21,10 +21,7 @@ export class IsometricScene {
         this.scene = sceneType || 'airport';
         this.yearOffset = yearOffset;
         this.quarter = quarter;
-        // SceneLoop sizes the backing store to the displayed size, so the
-        // canvas must take its size from CSS: fill the dashboard viewport.
-        this.canvas.style.width = '100%';
-        this.canvas.style.height = '100%';
+        // SceneLoop makes the canvas fill the dashboard viewport and sizes it.
         this.canvas.style.imageRendering = 'pixelated';
         if (!this.loop) {
             this.loop = new SceneLoop(this.canvas, () => ({ industryId: this.scene, sceneState: PRO_SCENE_STATE }));

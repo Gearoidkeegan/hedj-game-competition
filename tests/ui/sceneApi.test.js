@@ -174,3 +174,47 @@ test('IsometricScene keeps the Pro API: start(sceneType, yearOffset, quarter) dr
     scene.stop();
     assert.equal(pending.size, 0);
 });
+
+test('SceneLoop sizes the canvas from its parent at dpr 2 and the size stays stable over many frames', (t) => {
+    const savedDpr = globalThis.devicePixelRatio;
+    globalThis.devicePixelRatio = 2;
+    t.after(() => {
+        if (savedDpr === undefined) delete globalThis.devicePixelRatio;
+        else globalThis.devicePixelRatio = savedDpr;
+    });
+    const parent = { clientWidth: 320, clientHeight: 140 };
+    const ctx = recordingContext(620, 200);
+    // Like a real canvas: unstyled, its CSS size is its width/height attributes;
+    // styled 100%, it takes its parent's size.
+    const canvas = {
+        width: 620, height: 200, style: {}, parentElement: parent,
+        get clientWidth() { return this.style.width === '100%' ? parent.clientWidth : this.width; },
+        get clientHeight() { return this.style.height === '100%' ? parent.clientHeight : this.height; },
+        getContext: () => ctx,
+    };
+    ctx.canvas = canvas;
+    const pending = new Map();
+    let nextId = 1;
+    const loop = new SceneLoop(canvas, () => ({ industryId: 'retail', sceneState: { mood: 'calm', cashLevel: 0.5, highlight: null } }), {
+        requestAnimationFrame: (fn) => { const id = nextId++; pending.set(id, fn); return id; },
+        cancelAnimationFrame: (id) => pending.delete(id),
+        document: null,
+    });
+    const tick = (time) => { const [[id, fn]] = pending; pending.delete(id); fn(time); };
+
+    loop.start();
+    const sizes = [];
+    for (let i = 0; i < 8; i++) {
+        tick(i * 40);
+        sizes.push([canvas.width, canvas.height]);
+    }
+    for (const size of sizes) assert.deepEqual(size, [640, 280]);
+
+    // a real resize of the parent is picked up once, then stays put
+    parent.clientWidth = 375;
+    parent.clientHeight = 120;
+    tick(400);
+    tick(440);
+    assert.deepEqual([canvas.width, canvas.height], [750, 240]);
+    loop.stop();
+});

@@ -258,15 +258,21 @@ function cashPile(px, L, level) {
 
 // ---------------------------------------------------------------- loop
 
-// The single animation loop for a scene canvas. Each frame it matches the
-// canvas backing store to its displayed size (so the canvas must be sized by
-// CSS), asks getState() for { industryId, sceneState } and draws. It pauses
-// while the page is hidden.
+// The single animation loop for a scene canvas. It makes the canvas fill its
+// parent element and, whenever the parent's size changes, sizes the backing
+// store to that size x devicePixelRatio. The size is always measured from the
+// parent, never from the canvas itself, so assigning width/height can never
+// feed back into the next measurement. Each frame it asks getState() for
+// { industryId, sceneState } and draws. It pauses while the page is hidden.
 export class SceneLoop {
     // env lets tests inject requestAnimationFrame, cancelAnimationFrame and document.
     constructor(canvas, getState, env = {}) {
         const g = globalThis;
         this.canvas = canvas;
+        if (canvas.style) {
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+        }
         this.ctx = canvas.getContext('2d');
         this.getState = getState;
         this.raf = env.requestAnimationFrame || ((fn) => g.requestAnimationFrame(fn));
@@ -275,6 +281,7 @@ export class SceneLoop {
         this.handle = null;
         this.running = false;
         this.lastDraw = -Infinity;
+        this.fitted = null;   // the parent CSS size and dpr the backing store was last sized for
         this.onVisibility = () => {
             if (this.doc.hidden) this.cancel();
             else if (this.running) this.schedule();
@@ -315,15 +322,20 @@ export class SceneLoop {
         }
     }
 
-    // Match the backing store to the displayed size so pixels stay crisp.
+    // Fill the parent and match the backing store to its size, so pixels stay crisp.
     fitCanvas() {
         const c = this.canvas;
+        const parent = c.parentElement;
+        const cssW = parent ? parent.clientWidth || 0 : 0;
+        const cssH = parent ? parent.clientHeight || 0 : 0;
+        if (cssW <= 0 || cssH <= 0) return;   // detached or hidden: keep the current size
         const dpr = Math.min(3, globalThis.devicePixelRatio || 1);
-        const W = Math.round((c.clientWidth || 0) * dpr), H = Math.round((c.clientHeight || 0) * dpr);
-        if (W > 0 && H > 0 && (c.width !== W || c.height !== H)) {
-            c.width = W;
-            c.height = H;
-        }
+        const f = this.fitted;
+        if (f && f.cssW === cssW && f.cssH === cssH && f.dpr === dpr) return;
+        this.fitted = { cssW, cssH, dpr };
+        const W = Math.round(cssW * dpr), H = Math.round(cssH * dpr);
+        if (c.width !== W) c.width = W;
+        if (c.height !== H) c.height = H;
     }
 
     render(t) {
