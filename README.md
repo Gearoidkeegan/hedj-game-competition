@@ -374,7 +374,7 @@ A full privacy notice is available at `privacy.html`. Key points:
 - **Retention:** All competition data is auto-deleted 90 days after the competition closes (DynamoDB TTL).
 - **Infrastructure:** AWS EU region only. No third-party data sharing.
 - **Player rights:** Access, correction, deletion, and the right to lodge a complaint with the Data Protection Commission (Ireland).
-- **Contact:** [competition@hedj.eu](mailto:competition@hedj.eu)
+- **Contact:** [info@hedj.eu](mailto:info@hedj.eu)
 
 Marketing consent is stored separately and used only to identify players who opted in to follow-up communications. It is never assumed.
 

@@ -7,6 +7,11 @@ on:
       - main
     paths:
       - 'index.html'
+      - 'admin.html'
+      - 'privacy.html'
+      - 'stand.html'
+      - 'manifest.json'
+      - 'sw.js'
       - 'css/**'
       - 'js/**'
       - 'data/**'
@@ -44,6 +49,14 @@ jobs:
             --exclude "*.md" \
             --exclude ".gitignore" \
             --exclude ".claude/*" \
+            --exclude "tests/*" \
+            --exclude "docs/*" \
+            --exclude "node_modules/*" \
+            --exclude "package.json" \
+            --exclude "package-lock.json" \
+            --exclude ".superpowers/*" \
+            --exclude "Open Game.url" \
+            --exclude "Individual industry sample images.png" \
             --delete
 
           # Correct MIME types

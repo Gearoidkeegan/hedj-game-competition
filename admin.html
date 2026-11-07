@@ -242,6 +242,22 @@
     </div>
 
     <div class="panel">
+        <div class="panel-title">ENGAGEMENT</div>
+        <div class="stats-grid">
+            <div class="stat-box"><div class="stat-label">PLAYERS WHO PLAYED</div><div class="stat-value cyan" id="m-unique">—</div></div>
+            <div class="stat-box"><div class="stat-label">RUNS / PLAYER</div><div class="stat-value cyan" id="m-runs">—</div></div>
+            <div class="stat-box"><div class="stat-label">RETURN RATE</div><div class="stat-value green" id="m-return">—</div></div>
+            <div class="stat-box"><div class="stat-label">MULTI-DAY RATE</div><div class="stat-value green" id="m-multiday">—</div></div>
+        </div>
+        <div class="toolbar" style="margin-top:14px;">
+            <button class="btn-cyan" onclick="downloadPrize('simple','event')">PRIZE CSV: SIMPLE EVENT</button>
+            <button class="btn-cyan" onclick="downloadPrize('pro','event')">PRIZE CSV: PRO EVENT</button>
+            <button onclick="downloadPrize('simple','today')">SIMPLE TODAY</button>
+            <button onclick="downloadPrize('pro','today')">PRO TODAY</button>
+        </div>
+    </div>
+
+    <div class="panel">
         <div class="panel-title">REGISTERED PLAYERS</div>
         <div class="toolbar">
             <button class="btn-cyan" onclick="downloadCSV()">DOWNLOAD CSV</button>
@@ -306,9 +322,10 @@
         const authMsg = document.getElementById('auth-msg');
         authMsg.style.display = 'none';
         try {
-            const [analyticsData, playersResult] = await Promise.all([
+            const [analyticsData, playersResult, metrics] = await Promise.all([
                 apiFetch('/analytics'),
-                apiFetch('/admin/players')
+                apiFetch('/admin/players'),
+                apiFetch('/admin/metrics').catch(err => (/40[13]/.test(err.message) ? Promise.reject(err) : {}))
             ]);
 
             // Unlock UI
@@ -321,6 +338,12 @@
                 (counts.visit || 0).toLocaleString();
             document.getElementById('stat-plays').textContent =
                 (counts.play || 0).toLocaleString();
+
+            const pct = n => Math.round((n || 0) * 100) + '%';
+            document.getElementById('m-unique').textContent = (metrics.uniquePlayers || 0).toLocaleString();
+            document.getElementById('m-runs').textContent = (metrics.runsPerPlayer || 0).toFixed(1);
+            document.getElementById('m-return').textContent = pct(metrics.returnRate);
+            document.getElementById('m-multiday').textContent = pct(metrics.multiDayRate);
 
             // Players
             playersData = playersResult.players || [];
@@ -401,6 +424,23 @@
         a.download = `players-${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
+    }
+
+    // The prize export needs the admin key header, so fetch it and save the response as a file.
+    async function downloadPrize(mode, period) {
+        if (!adminKey) return;
+        try {
+            const res = await fetch(`${API}/admin/prize?mode=${mode}&period=${period}&limit=10`, { headers: { 'x-admin-key': adminKey } });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const url = URL.createObjectURL(new Blob([await res.text()], { type: 'text/csv' }));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `prize-${mode}-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('Prize export failed: ' + err.message);
+        }
     }
 
     function refresh() {

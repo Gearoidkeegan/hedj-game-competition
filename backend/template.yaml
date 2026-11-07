@@ -7,6 +7,18 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Secret key for the admin analytics GET endpoint
+  EventId:
+    Type: String
+    Default: test
+    Description: Identifier of the live event; selects the leaderboard partition
+  EventEndIso:
+    Type: String
+    Default: ''
+    Description: ISO-8601 event end; player and score rows expire 90 days after it (empty = 90 days after each write). Scores are not rejected after it.
+  TokenTtlHours:
+    Type: Number
+    Default: 120
+    Description: Lifetime of a game token in hours
 
 Globals:
   Function:
@@ -18,6 +30,10 @@ Globals:
         PLAYERS_TABLE: !Ref HCompPlayers
         SCORES_TABLE: !Ref HCompScores
         ANALYTICS_TABLE: !Ref HCompAnalytics
+        BEST_TABLE: !Ref HCompBest
+        EVENT_ID: !Ref EventId
+        EVENT_END_ISO: !Ref EventEndIso
+        TOKEN_TTL_HOURS: !Ref TokenTtlHours
         ADMIN_KEY: !Ref AdminKey
 
 Resources:
@@ -67,6 +83,36 @@ Resources:
         AttributeName: ttl
         Enabled: true
 
+  HCompBest:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'HCompBest-${AWS::StackName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: board
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: score
+          AttributeType: N
+      KeySchema:
+        - AttributeName: board
+          KeyType: HASH
+        - AttributeName: email
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: ByScore
+          KeySchema:
+            - AttributeName: board
+              KeyType: HASH
+            - AttributeName: score
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
   HCompAnalytics:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -85,17 +131,35 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: prod
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 50
+        ThrottlingRateLimit: 20
+      RouteSettings:
+        'GET /admin/players':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
+        'GET /admin/metrics':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
+        'GET /admin/prize':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
+        'GET /analytics':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
       CorsConfiguration:
         AllowOrigins:
           - 'https://competition.hedj.eu'
           - 'http://localhost:8080'
-          - 'http://localhost:3000'
         AllowHeaders:
           - Content-Type
           - x-admin-key
+          - x-player-email
+          - x-game-token
         AllowMethods:
           - GET
           - POST
+          - PUT
           - OPTIONS
 
   # ─── Lambda Functions ─────────────────────────────────────────────────────
@@ -135,6 +199,8 @@ Resources:
             TableName: !Ref HCompPlayers
         - DynamoDBCrudPolicy:
             TableName: !Ref HCompScores
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HCompBest
 
   LeaderboardFunction:
     Type: AWS::Serverless::Function
@@ -151,7 +217,7 @@ Resources:
             Method: GET
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref HCompScores
+            TableName: !Ref HCompBest
 
   AnalyticsFunction:
     Type: AWS::Serverless::Function
@@ -181,7 +247,7 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: handlers/admin.handler
-      Description: Admin endpoint — list registered players
+      Description: Admin endpoints — list players, engagement metrics, prize export
       Events:
         GetPlayers:
           Type: HttpApi
@@ -189,8 +255,45 @@ Resources:
             ApiId: !Ref CompetitionApi
             Path: /admin/players
             Method: GET
+        GetMetrics:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /admin/metrics
+            Method: GET
+        GetPrize:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /admin/prize
+            Method: GET
       Policies:
         - DynamoDBReadPolicy:
+            TableName: !Ref HCompPlayers
+        - DynamoDBReadPolicy:
+            TableName: !Ref HCompBest
+
+  ProgressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/progress.handler
+      Description: Read and merge a player's cross-device progress
+      Events:
+        GetProgress:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /progress
+            Method: GET
+        PutProgress:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /progress
+            Method: PUT
+      Policies:
+        - DynamoDBCrudPolicy:
             TableName: !Ref HCompPlayers
 
 Outputs:
@@ -201,5 +304,7 @@ Outputs:
     Value: !Ref HCompPlayers
   ScoresTable:
     Value: !Ref HCompScores
+  BestTable:
+    Value: !Ref HCompBest
   AnalyticsTable:
     Value: !Ref HCompAnalytics

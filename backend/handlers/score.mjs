@@ -1,135 +1,135 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { randomUUID } from 'crypto';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { json, parseBody, errorResponse, validName } from '../lib/http.mjs';
+import { loadPlayer } from '../lib/auth.mjs';
+import { validCompany, dublinDate, ttlSeconds } from '../lib/util.mjs';
 
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
+const SCORE_MAX = 10000;
+const MIN_RUN_MS = 60000;
+const INDUSTRY_RE = /^[a-z0-9_-]{1,40}$/;
+const MODES = ['simple', 'pro'];
 
-const PLAYERS_TABLE = process.env.PLAYERS_TABLE;
-const SCORES_TABLE = process.env.SCORES_TABLE;
+export function createHandler(deps) {
+    const { ddb, env, now } = deps;
+    const eventId = env.EVENT_ID || 'test';
 
-const LEADERBOARD_PARTITION = 'all';
-
-function response(statusCode, body) {
-    return {
-        statusCode,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    };
-}
-
-export async function handler(event) {
-    let body;
-    try {
-        body = JSON.parse(event.body || '{}');
-    } catch {
-        return response(400, { error: 'Invalid JSON' });
-    }
-
-    const { gameToken, gameId, email, playerName, company, industry, industryId,
-            score, grade, quartersPlayed, seed, cumulativePnL } = body;
-
-    // Basic validation
-    if (!gameToken || !gameId || !email) {
-        return response(400, { error: 'gameToken, gameId and email are required' });
-    }
-    if (typeof score !== 'number' || score < 0 || score > 100) {
-        return response(400, { error: 'score must be a number between 0 and 100' });
-    }
-    if (typeof quartersPlayed !== 'number' || quartersPlayed < 1 || quartersPlayed > 16) {
-        return response(400, { error: 'quartersPlayed must be between 1 and 16' });
-    }
-
-    // Verify game token
-    const playerResult = await ddb.send(new GetCommand({
-        TableName: PLAYERS_TABLE,
-        Key: { email: email.toLowerCase().trim() }
-    }));
-
-    if (!playerResult.Item) {
-        return response(401, { error: 'Player not registered' });
-    }
-
-    const player = playerResult.Item;
-    if (player.gameToken !== gameToken) {
-        return response(401, { error: 'Invalid game token' });
-    }
-    if (Date.now() > player.gameTokenExpiry) {
-        return response(401, { error: 'Game token expired — please register again' });
-    }
-
-    // Idempotency: check if this gameId was already submitted by this player
-    const existing = await ddb.send(new QueryCommand({
-        TableName: SCORES_TABLE,
-        IndexName: 'GlobalLeaderboard',
-        KeyConditionExpression: '#lb = :lb',
-        FilterExpression: '#gameId = :gameId AND #playerEmail = :email',
-        ExpressionAttributeNames: {
-            '#lb': 'leaderboard',
-            '#gameId': 'gameId',
-            '#playerEmail': 'playerEmail'
-        },
-        ExpressionAttributeValues: {
-            ':lb': LEADERBOARD_PARTITION,
-            ':gameId': gameId,
-            ':email': email.toLowerCase().trim()
-        },
-        Select: 'COUNT'
-    }));
-
-    if (existing.Count > 0) {
-        // Already submitted — return success without inserting duplicate
-        const rank = await getRank(score);
-        return response(200, { rank, duplicate: true });
-    }
-
-    const submittedAt = new Date().toISOString();
-    const scoreId = randomUUID();
-    const roundedScore = Math.round(score * 10) / 10;
-
-    await ddb.send(new PutCommand({
-        TableName: SCORES_TABLE,
-        Item: {
-            scoreId,
-            leaderboard: LEADERBOARD_PARTITION,
-            score: roundedScore,
-            email: email.toLowerCase().trim(),
-            playerEmail: email.toLowerCase().trim(),
-            playerName: (playerName || player.playerName || '').trim(),
-            company: (company || player.company || '').trim(),
-            industry: industry || '',
-            industryId: industryId || '',
-            grade: grade || '',
-            quartersPlayed,
-            seed: seed || 0,
-            gameId,
-            submittedAt,
-            cumulativePnL: typeof cumulativePnL === 'number' ? cumulativePnL : 0
-        }
-    }));
-
-    const rank = await getRank(roundedScore);
-    return response(200, { rank });
-}
-
-async function getRank(score) {
-    try {
+    async function rankOf(board, score) {
         const result = await ddb.send(new QueryCommand({
-            TableName: SCORES_TABLE,
-            IndexName: 'GlobalLeaderboard',
-            KeyConditionExpression: '#lb = :lb AND #sc > :score',
-            ExpressionAttributeNames: {
-                '#lb': 'leaderboard',
-                '#sc': 'score'
-            },
-            ExpressionAttributeValues: {
-                ':lb': LEADERBOARD_PARTITION,
-                ':score': score
-            },
+            TableName: env.BEST_TABLE,
+            IndexName: 'ByScore',
+            KeyConditionExpression: '#b = :b AND #s > :s',
+            ExpressionAttributeNames: { '#b': 'board', '#s': 'score' },
+            ExpressionAttributeValues: { ':b': board, ':s': score },
             Select: 'COUNT'
         }));
         return (result.Count || 0) + 1;
-    } catch {
-        return null;
     }
+
+    // Writes the player's row on a board only when the new score is higher. Returns true if written.
+    async function putIfHigher(board, item) {
+        try {
+            await ddb.send(new PutCommand({
+                TableName: env.BEST_TABLE,
+                Item: { board, ...item },
+                ConditionExpression: 'attribute_not_exists(score) OR score < :s',
+                ExpressionAttributeValues: { ':s': item.score }
+            }));
+            return true;
+        } catch (err) {
+            if (err?.name === 'ConditionalCheckFailedException') return false;
+            throw err;
+        }
+    }
+
+    return async function handler(event) {
+        try {
+            const body = parseBody(event);
+            const { gameToken, gameId, email, mode, score, quartersPlayed, startedAt, industryId, playerName, company } = body;
+            const nowMs = now();
+
+            if (typeof gameId !== 'string' || !gameId || gameId.length > 64 || typeof email !== 'string') {
+                return json(400, { error: 'gameToken, gameId and email are required' });
+            }
+            if (!MODES.includes(mode)) return json(400, { error: 'mode must be simple or pro' });
+            if (!Number.isInteger(score) || score < 0 || score > SCORE_MAX) {
+                return json(400, { error: `score must be an integer between 0 and ${SCORE_MAX}` });
+            }
+            if (!Number.isInteger(quartersPlayed) || quartersPlayed < 1 || quartersPlayed > 8) {
+                return json(400, { error: 'quartersPlayed must be between 1 and 8' });
+            }
+            if (!Number.isFinite(startedAt) || nowMs - startedAt < MIN_RUN_MS) {
+                return json(400, { error: 'Run too short' });
+            }
+            if (typeof industryId !== 'string' || !INDUSTRY_RE.test(industryId)) {
+                return json(400, { error: 'Invalid industryId' });
+            }
+            if (typeof playerName !== 'string' || !validName(playerName.trim())) {
+                return json(400, { error: 'Invalid player name' });
+            }
+            if (company !== undefined && !validCompany(company)) {
+                return json(400, { error: 'Invalid company name' });
+            }
+
+            const player = await loadPlayer(ddb, env.PLAYERS_TABLE, email, gameToken, nowMs);
+
+            // Boards always show the identity stored at registration, never the submitted one.
+            const name = player.playerName || playerName.trim().normalize('NFC');
+            const comp = player.company || (typeof company === 'string' ? company.trim() : '');
+            const industry = industryId;
+            const ttl = ttlSeconds(env, nowMs);
+            const submittedAt = new Date(nowMs).toISOString();
+
+            const seen = await ddb.send(new GetCommand({ TableName: env.SCORES_TABLE, Key: { scoreId: gameId } }));
+            if (seen.Item) return json(200, { duplicate: true });
+
+            const day = dublinDate(nowMs);
+            const bestItem = { email: player.email, score, playerName: name, company: comp, industryId: industry, submittedAt, gameId, ttl };
+            const allBoard = `${eventId}#${mode}#all`;
+            const wroteBest = await putIfHigher(allBoard, bestItem);
+            await putIfHigher(`${eventId}#${mode}#${day}`, bestItem);
+
+            await ddb.send(new UpdateCommand({
+                TableName: env.PLAYERS_TABLE,
+                Key: { email: player.email },
+                UpdateExpression: 'ADD playCount :one, playDays :d',
+                ExpressionAttributeValues: { ':one': 1, ':d': new Set([day]) }
+            }));
+
+            // Dedupe marker is written last so a retry after a partial failure re-runs the (idempotent) board updates.
+            const scoreItem = {
+                scoreId: gameId, email: player.email, eventId, mode, score, quartersPlayed,
+                startedAt, industryId: industry, playerName: name, company: comp, submittedAt, ttl
+            };
+
+            try {
+                await ddb.send(new PutCommand({
+                    TableName: env.SCORES_TABLE,
+                    Item: scoreItem,
+                    ConditionExpression: 'attribute_not_exists(scoreId)'
+                }));
+            } catch (err) {
+                if (err?.name === 'ConditionalCheckFailedException') return json(200, { duplicate: true });
+                throw err;
+            }
+
+            // wroteBest means first score or strictly higher. If not written, this is only "best" when the stored row
+            // came from this same gameId (a retry after a partial failure).
+            let best = score;
+            let isBest = wroteBest;
+            if (!wroteBest) {
+                const row = await ddb.send(new GetCommand({ TableName: env.BEST_TABLE, Key: { board: allBoard, email: player.email } }));
+                best = row.Item?.score ?? score;
+                isBest = row.Item?.gameId === gameId;
+            }
+            return json(200, { rank: await rankOf(allBoard, best), best, isBest });
+        } catch (err) {
+            return errorResponse(err);
+        }
+    };
 }
+
+export const handler = createHandler({
+    ddb: DynamoDBDocumentClient.from(new DynamoDBClient({})),
+    env: process.env,
+    now: () => Date.now()
+});
