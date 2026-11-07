@@ -95,7 +95,7 @@ export async function putRemoteProgress(progress) {
 
 let flushing = null;
 
-// Sends queued scores. Keeps an item on a network failure or 401 (and stops, to retry later), drops it on any other 4xx.
+// Sends queued scores. Keeps an item on a network failure or 401 (and stops, to retry later), drops it on any other 4xx (401, 408, 429 and 5xx are kept).
 // Returns how many were sent. Only sends a player's scores while that same player is registered on this device.
 export function flushScoreQueue() {
     if (!flushing) {
@@ -115,7 +115,7 @@ async function doFlush() {
             removeQueuedScore(item.gameId);
             sent++;
         } catch (err) {
-            if (err.status >= 400 && err.status < 500 && err.status !== 401) {
+            if (err.status >= 400 && err.status < 500 && ![401, 408, 429].includes(err.status)) {
                 removeQueuedScore(item.gameId);
                 continue;
             }

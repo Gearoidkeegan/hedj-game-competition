@@ -114,6 +114,19 @@ test('401 keeps item, 400 drops item', async () => {
     assert.equal(getQueuedScores().length, 0);
 });
 
+test('429 and 503 keep the item, 404 drops it', async () => {
+    reg(A, 't');
+    queueScore(score('g1'));
+    for (const status of [429, 503, 408]) {
+        fakeFetch(() => status);
+        assert.equal(await flushScoreQueue(), 0);
+        assert.equal(getQueuedScores().length, 1, `status ${status} should keep the item`);
+    }
+    fakeFetch(() => 404);
+    assert.equal(await flushScoreQueue(), 0);
+    assert.equal(getQueuedScores().length, 0);
+});
+
 test('a network failure keeps the item', async () => {
     reg(A, 't');
     queueScore(score('g1'));
