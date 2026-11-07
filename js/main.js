@@ -19,7 +19,7 @@ import { LevelCompleteScreen } from './screens/LevelCompleteScreen.js';
 import { GameOverScreen } from './screens/GameOverScreen.js';
 import { HowToPlayScreen } from './screens/HowToPlayScreen.js';
 import { RegistrationScreen } from './screens/RegistrationScreen.js';
-import { trackEvent, submitScore } from './utils/api.js';
+import { trackEvent, submitScore, flushScoreQueue } from './utils/api.js';
 import { getRegistration, getPendingScore, clearPendingScore } from './utils/storage.js';
 
 class App {
@@ -61,6 +61,8 @@ class App {
 
         // Flush any pending score submission from a previous session
         this.flushPendingScore();
+        flushScoreQueue().catch(() => {});
+        window.addEventListener('online', () => flushScoreQueue().catch(() => {}));
 
         // Always start at title screen
         this.showScreen('title');
