@@ -171,6 +171,32 @@ test('best board keeps the higher of two scores; one entry per player', async ()
     assert.deepEqual([...p.playDays], ['2023-11-14']);
 });
 
+test('retry after a failed Scores write succeeds (not duplicate) and the board holds the score', async () => {
+    const { deps, ddb } = setup();
+    const r = await register(deps);
+    const realSend = ddb.send;
+    let failed = false;
+    ddb.send = async cmd => {
+        if (!failed && cmd.constructor.name === 'PutCommand' && cmd.input.TableName === 'S') {
+            failed = true;
+            throw new Error('boom');
+        }
+        return realSend(cmd);
+    };
+    await assert.rejects(submit(deps, scoreBody(r.gameToken, { score: 2500 })), /boom/);
+    assert.equal(row(ddb, 'B', 'ev#simple#all', 'ann@example.com').score, 2500);
+    assert.equal(row(ddb, 'S', 'g1'), undefined);
+
+    const retry = await submit(deps, scoreBody(r.gameToken, { score: 2500 }));
+    assert.equal(retry.statusCode, 200);
+    const out = JSON.parse(retry.body);
+    assert.equal(out.duplicate, undefined);
+    assert.deepEqual(out, { rank: 1, best: 2500, isBest: true });
+    assert.equal(row(ddb, 'S', 'g1').score, 2500);
+    const again = JSON.parse((await submit(deps, scoreBody(r.gameToken, { score: 2500 }))).body);
+    assert.deepEqual(again, { duplicate: true });
+});
+
 test('modes are separate boards', async () => {
     const { deps } = setup();
     const r = await register(deps);

@@ -80,6 +80,23 @@ export function createHandler(deps) {
             const submittedAt = new Date(nowMs).toISOString();
             const endMs = Date.parse(env.EVENT_END_ISO || '');
 
+            const seen = await ddb.send(new GetCommand({ TableName: env.SCORES_TABLE, Key: { scoreId: gameId } }));
+            if (seen.Item) return json(200, { duplicate: true });
+
+            const day = dublinDate(nowMs);
+            const bestItem = { email: player.email, score, playerName: name, company: comp, industryId: industry, submittedAt };
+            const allBoard = `${eventId}#${mode}#all`;
+            const wroteBest = await putIfHigher(allBoard, bestItem);
+            await putIfHigher(`${eventId}#${mode}#${day}`, bestItem);
+
+            await ddb.send(new UpdateCommand({
+                TableName: env.PLAYERS_TABLE,
+                Key: { email: player.email },
+                UpdateExpression: 'ADD playCount :one, playDays :d',
+                ExpressionAttributeValues: { ':one': 1, ':d': new Set([day]) }
+            }));
+
+            // Dedupe marker is written last so a retry after a partial failure re-runs the (idempotent) board updates.
             const scoreItem = {
                 scoreId: gameId, email: player.email, eventId, mode, score, quartersPlayed,
                 startedAt, industryId: industry, playerName: name, company: comp, submittedAt
@@ -97,23 +114,12 @@ export function createHandler(deps) {
                 throw err;
             }
 
-            const day = dublinDate(nowMs);
-            const bestItem = { email: player.email, score, playerName: name, company: comp, industryId: industry, submittedAt };
-            const allBoard = `${eventId}#${mode}#all`;
-            const isBest = await putIfHigher(allBoard, bestItem);
-            await putIfHigher(`${eventId}#${mode}#${day}`, bestItem);
-
-            await ddb.send(new UpdateCommand({
-                TableName: env.PLAYERS_TABLE,
-                Key: { email: player.email },
-                UpdateExpression: 'ADD playCount :one, playDays :d',
-                ExpressionAttributeValues: { ':one': 1, ':d': new Set([day]) }
-            }));
-
             let best = score;
-            if (!isBest) {
+            let isBest = wroteBest;
+            if (!wroteBest) {
                 const row = await ddb.send(new GetCommand({ TableName: env.BEST_TABLE, Key: { board: allBoard, email: player.email } }));
                 best = row.Item?.score ?? score;
+                isBest = best === score; // equal means a retry after a partial failure already stored this score
             }
             return json(200, { rank: await rankOf(allBoard, best), best, isBest });
         } catch (err) {
