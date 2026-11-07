@@ -42,6 +42,15 @@ Shapes and signatures only. Every stream reads this first. Source of truth: the 
   event: { id, choice } | null, powerUp: string|null }
 ```
 
+Interest rates in the market data are decimals (EURIBOR 0.034671 = 3.47%). The IR cash impact is
+`−(end − start) × notional × 0.25` (one quarter of interest for a floating-rate payer).
+
+`lines[].movePct`: percent change of the rate for `fx` and `commodity`; for `ir` it is the change in percentage points,
+`(end − start) × 100`. A zero or missing start rate (or missing end rate) is no move: `movePct`, `exposureImpact` and
+`hedgeImpact` are all 0.
+
+`inMandate` is vacuously true when no active exposure has a non-zero notional (every current industry has one from Q1).
+
 `QuarterResult` (return of `simulateQuarter`): `{ run: RunState, summary: QuarterSummary }`.
 
 ## SimEngine (A3)
@@ -53,18 +62,22 @@ simulateQuarter(run, decisions, market, content) -> { run, summary }   // pure; 
 isRunOver(run) -> boolean                     // status !== 'playing'
 ```
 
-## BALANCE (A3, `js/engine/sim/balance.js`; A5 adds `points`; A7 tunes)
+## BALANCE (A3, `js/engine/sim/balance.js`; A5 adds `points`; A7 tuned values, R34)
 
 ```js
-{ startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: -0.03, eventChance: 0.35,
+{ startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: 0.05, eventChance: 0.35,
   mandates: [{min:0.25,max:0.5},{min:0.5,max:0.75},{min:0.75,max:1}],
   mood: { inMandate: 4, luckyBreach: -3, breachLoss: -25, beatBenchmark: 3, redZone: -12 },
   breachLossesToFire: 2,
-  notionalScale: 1,
-  points: { inMandate: 100, luckyBreach: 0, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 40, survival: 500 } }
+  notionalScale: 6,
+  points: { inMandate: 100, luckyBreach: 25, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 12, survival: 500 } }
 ```
 
 ## simulateQuarter rules fixed by the contract (A3)
+
+Forecast variance (step 4): `fx` and `commodity` exposures (volume-driven) have
+`realised = forecast × (1 + (rng.next()×2−1) × variance)`. `ir` exposures (debt principal, contractual) have
+`realised = forecast` exactly and draw no random number.
 
 Board mood (step 7), clamped to 0..100:
 
@@ -92,8 +105,9 @@ Status (step 8), checked in this order:
 ```js
 canBuyPowerUp(run, id, unlockedIds) -> boolean
 applyPowerUp(run, id) -> run
-rollEvent(run, events, rng) -> string|null
-applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult }   // unknown choiceId throws
+rollEvent(run, events, rng) -> string|null   // selects only (weighted, ids not yet seen this run); SimEngine applies
+                                             // rng.chance(BALANCE.eventChance) first and never rolls once the run is over
+applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult, quarterVarianceMult }   // unknown choiceId throws
 
 // SimpleEvent (JSON)
 { id, pool: 'business'|'conference', weight, title, text,
@@ -107,7 +121,7 @@ applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult }   // unkn
 
 ```js
 quarterPoints(summary, startingCash) -> number
-  // sums: BALANCE.points.inMandate (100) when breach === 'none'; luckyBreach (0) when 'lucky';
+  // sums: BALANCE.points.inMandate (100) when breach === 'none'; luckyBreach (25) when 'lucky';
   // breachLoss (-300) when 'loss'; aboveRedLine (50) when cashAfter >= redLine; plus the stability bonus
 finalScore({ history, status, startingCash, boardMood }, gameOverTitles?) ->
   { total: number, breakdown: { quarters, outperformance, survival, moodMultiplier }, title: string }
@@ -124,13 +138,16 @@ SCORE_MAX = 10000
   unlocked: string[], chairmenMet: string[], crisisBadges: string[] }
 
 emptyProgress() -> Progress      // unlocked: ['industry:airline','industry:agrifoods','industry:retail','powerup:forecasting']
-UNLOCK_RULES                     // mode:pro runs>=1; industry:construction best.simple>=1500; industry:pharma runs>=3;
+UNLOCK_RULES                     // mode:pro: first completed run (R32); industry:construction best.simple>=1500; industry:pharma runs>=3;
                                  // industry:tech best.simple>=2500; industry:energy runs>=6; powerup:visibility runs>=2;
                                  // powerup:options best.simple>=2000; crisis:* runs>=4
 applyRunToProgress(progress, { mode, score, chairmenMet, crisisId, status }) -> { progress, newlyUnlocked: string[], isPersonalBest: boolean }
-mergeProgress(a, b) -> Progress  // max of runs and each best; union of arrays
+mergeProgress(a, b) -> Progress  // max of runs and each best; ordered union of arrays (a first); tolerates missing/partial a or b; output is always version 3
 CRISES                           // each { id, label, forcedYear, industryId }; unranked (never submitted to leaderboard)
                                  // gfc2008 2008 airline; brexit2016 2016 retail; covid2020 2020 airline; energy2022 <=2021 construction
+// Run status (R32): every finished run (complete, bankrupt, fired) counts toward `runs`; every non-crisis run may
+// set best[mode] whatever its status; mode:pro unlocks only when a run finishes with status 'complete'
+// (checked in applyRunToProgress, no extra Progress field). Crisis runs count toward `runs` but never set best.
 serialiseSave(run) -> string
 parseSave(str) -> RunState|null  // null on bad JSON or version !== 3
 ```
@@ -181,3 +198,7 @@ Result-quip selection rules (B3):
 Board line selection (B1): `breach === 'loss'` -> `breachLoss`. This is a heavy, scathing telling-off, and the angry sprite always wins over other moods. `breach === 'lucky'` -> `luckyBreach`: a grudging "it worked, but don't do that again". Otherwise `redZone`, `moodUp` or `moodDown` by mood change.
 
 Tone: `luckyBreach` is mild and wry; `breachLoss` is the harshest in the game (the board is furious, with HR hints). The `fired` lines follow from repeated losing breaches.
+
+## Events and power-ups (A4)
+
+`applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult, quarterVarianceMult }`. `varianceMult` and `notionalMult` last only for the quarter the event resolves in (R21); `notionalMult` keys naming an exposure the industry lacks are ignored. `rollEvent(run, events, rng)` only selects an unseen event by weight (SimEngine rolls the chance). Fixture/content shape: `{ events: SimpleEvent[] }`. `visibility` is single use per run (recorded in `powerUps.used`); `forecasting` and `options` go in `powerUps.owned`.
