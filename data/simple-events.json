@@ -1,0 +1,403 @@
+{
+    "events": [
+        {
+            "id": "big_export_order",
+            "pool": "business",
+            "weight": 1,
+            "title": "Sales Land a Whopper",
+            "text": "Sales landed a huge overseas order. They'd like it booked before anyone checks the FX.",
+            "choices": [
+                {
+                    "id": "book_it_all",
+                    "label": "Book the lot",
+                    "quip": "Revenue up, risk up. Sales are buying the next round.",
+                    "effects": { "mood": 5, "notionalMult": { "usd-revenue": 1.4, "eur-revenue": 1.4, "gbp-revenue": 1.3 } }
+                },
+                {
+                    "id": "phase_it",
+                    "label": "Phase it over two years",
+                    "quip": "Prudent. Sales have stopped speaking to you.",
+                    "effects": { "mood": -3, "notionalMult": { "usd-revenue": 1.1, "eur-revenue": 1.1, "gbp-revenue": 1.1 } }
+                }
+            ]
+        },
+        {
+            "id": "hockey_stick_forecast",
+            "pool": "business",
+            "weight": 1,
+            "title": "The Sales Forecast Arrives",
+            "text": "Sales sent their forecast. It's a hockey stick drawn by someone who's never played hockey.",
+            "choices": [
+                {
+                    "id": "hedge_to_it",
+                    "label": "Hedge to the forecast",
+                    "quip": "Bold. The hockey stick has never once been right.",
+                    "effects": { "mood": 3, "varianceMult": 1.5 }
+                },
+                {
+                    "id": "haircut_it",
+                    "label": "Apply a 30% haircut",
+                    "quip": "Sales are wounded. The forecast is now merely optimistic.",
+                    "effects": { "mood": -2, "varianceMult": 0.8 }
+                }
+            ]
+        },
+        {
+            "id": "early_payment_discount",
+            "pool": "business",
+            "weight": 1,
+            "title": "Supplier Wants Paying Early",
+            "text": "Your biggest supplier offers a discount for paying early. Cash today, savings later.",
+            "choices": [
+                {
+                    "id": "pay_early",
+                    "label": "Pay early, bank the discount",
+                    "quip": "Discount banked. Runway a touch shorter. The board approves.",
+                    "effects": { "cashPct": -0.02, "mood": 4 }
+                },
+                {
+                    "id": "keep_cash",
+                    "label": "Keep the cash",
+                    "quip": "Cash is king. The supplier sends a passive-aggressive email.",
+                    "effects": { "cashPct": 0.01, "mood": -2 }
+                }
+            ]
+        },
+        {
+            "id": "auditors_in",
+            "pool": "business",
+            "weight": 1,
+            "title": "The Auditors Are In",
+            "text": "The auditors want your hedge documentation. All of it. By Friday.",
+            "choices": [
+                {
+                    "id": "all_nighter",
+                    "label": "Pull an all-nighter",
+                    "quip": "Paperwork immaculate. You, less so.",
+                    "effects": { "cashPct": -0.005, "mood": 5 }
+                },
+                {
+                    "id": "hire_consultants",
+                    "label": "Hire consultants",
+                    "quip": "The consultants bill £40k and ask you where the files are.",
+                    "effects": { "cashPct": -0.02, "mood": 2 }
+                }
+            ]
+        },
+        {
+            "id": "ceo_hunch",
+            "pool": "business",
+            "weight": 1,
+            "title": "The CEO Has a Hunch",
+            "text": "The CEO read one article and now 'has a feeling' about the dollar. A strong one.",
+            "choices": [
+                {
+                    "id": "humour_him",
+                    "label": "Humour him",
+                    "quip": "Risk goes up. The CEO tells everyone it was his idea.",
+                    "effects": { "mood": 6, "varianceMult": 1.3 }
+                },
+                {
+                    "id": "show_policy",
+                    "label": "Show him the hedging policy",
+                    "quip": "Correct, unpopular and minuted. The CEO sulks until Easter.",
+                    "effects": { "mood": -5 }
+                }
+            ]
+        },
+        {
+            "id": "fake_ceo_email",
+            "pool": "business",
+            "weight": 1,
+            "title": "Urgent Email from 'the CEO'",
+            "text": "'The CEO' emails from a Gmail account. He needs €2m wired to a new supplier. Tonight.",
+            "choices": [
+                {
+                    "id": "call_ceo",
+                    "label": "Ring the real CEO",
+                    "quip": "Fake, obviously. The CEO is touched you checked. Briefly.",
+                    "effects": { "mood": 3 }
+                },
+                {
+                    "id": "forward_to_it",
+                    "label": "Forward it to IT and go home",
+                    "quip": "IT was at lunch. Accounts paid it. Recovery is ongoing.",
+                    "effects": { "cashPct": -0.01, "mood": -4 }
+                }
+            ]
+        },
+        {
+            "id": "budget_rate",
+            "pool": "business",
+            "weight": 1,
+            "title": "Setting the Budget Rate",
+            "text": "The board wants a budget rate for next year. Every director has a different number.",
+            "choices": [
+                {
+                    "id": "use_forward",
+                    "label": "Use the forward rate",
+                    "quip": "Defensible, boring, correct. The board nods off approvingly.",
+                    "effects": { "mood": 4, "varianceMult": 0.9 }
+                },
+                {
+                    "id": "average_guesses",
+                    "label": "Average everyone's guess",
+                    "quip": "Democracy in action. Nobody's right, but nobody's left out.",
+                    "effects": { "mood": 2, "varianceMult": 1.2 }
+                }
+            ]
+        },
+        {
+            "id": "procurement_bargain",
+            "pool": "business",
+            "weight": 1,
+            "title": "Procurement Found a Bargain",
+            "text": "Procurement wants to buy a year of raw materials at once. 'It's a bargain,' they say.",
+            "choices": [
+                {
+                    "id": "stockpile",
+                    "label": "Stockpile it",
+                    "quip": "The car park is now a warehouse. Price risk: parked.",
+                    "effects": { "cashPct": -0.03, "notionalMult": { "fuel": 0.7, "coffee": 0.7, "dairy": 0.7, "steel": 0.7, "copper": 0.7, "nat-gas": 0.7 } }
+                },
+                {
+                    "id": "buy_as_normal",
+                    "label": "Buy as normal",
+                    "quip": "Procurement mutters about 'treasury killing deals'. Again.",
+                    "effects": { "mood": -3 }
+                }
+            ]
+        },
+        {
+            "id": "bank_bearing_gifts",
+            "pool": "business",
+            "weight": 1,
+            "title": "A Bank Bearing Gifts",
+            "text": "A new relationship manager offers a clever structured product. And Wimbledon tickets.",
+            "choices": [
+                {
+                    "id": "take_tickets",
+                    "label": "Sign up, enjoy Wimbledon",
+                    "quip": "Lovely strawberries. Then the board read the 14 pages of footnotes.",
+                    "effects": { "cashPct": -0.02, "mood": -3 }
+                },
+                {
+                    "id": "plain_forward",
+                    "label": "Ask for a plain forward",
+                    "quip": "The banker looks crestfallen. The board looks quietly relieved.",
+                    "effects": { "mood": 3 }
+                }
+            ]
+        },
+        {
+            "id": "refinance_offer",
+            "pool": "business",
+            "weight": 1,
+            "title": "Banks Offer to Refinance",
+            "text": "The banks will refinance your floating-rate debt if you sign today. For a fee, naturally.",
+            "choices": [
+                {
+                    "id": "sign_and_fix",
+                    "label": "Sign and fix most of it",
+                    "quip": "Fee paid, rates tamed. The bankers celebrate with your money.",
+                    "effects": { "cashPct": -0.01, "notionalMult": { "floating-debt": 0.6 } }
+                },
+                {
+                    "id": "stay_floating",
+                    "label": "Stay floating",
+                    "quip": "No fee. No sleep either, whenever the ECB clears its throat.",
+                    "effects": { "mood": -2 }
+                }
+            ]
+        },
+        {
+            "id": "cheque_in_the_post",
+            "pool": "business",
+            "weight": 1,
+            "title": "The Cheque Is in the Post",
+            "text": "Your largest customer says payment is 'in the post'. The post, apparently, takes 90 days.",
+            "choices": [
+                {
+                    "id": "chase_hard",
+                    "label": "Chase them hard",
+                    "quip": "Cash in. The customer is now 'reviewing suppliers'. Gulp.",
+                    "effects": { "cashPct": 0.02, "mood": -3 }
+                },
+                {
+                    "id": "let_it_slide",
+                    "label": "Let it slide",
+                    "quip": "Relationship preserved. Cash flow, less so.",
+                    "effects": { "cashPct": -0.02, "mood": 2 }
+                }
+            ]
+        },
+        {
+            "id": "intern_model",
+            "pool": "business",
+            "weight": 1,
+            "title": "The Intern Built a Model",
+            "text": "The intern built a forecasting model: 47 tabs and one macro, called 'PRAY'.",
+            "choices": [
+                {
+                    "id": "use_it",
+                    "label": "Use the intern's model",
+                    "quip": "Annoyingly, it works. The board asks why you need a team.",
+                    "effects": { "mood": -2, "varianceMult": 0.75 }
+                },
+                {
+                    "id": "keep_old_one",
+                    "label": "Stick with the old model",
+                    "quip": "Tradition wins. The intern quietly applies to a hedge fund.",
+                    "effects": { "mood": 2 }
+                }
+            ]
+        },
+        {
+            "id": "port_strike",
+            "pool": "business",
+            "weight": 1,
+            "title": "Port Strike",
+            "text": "The dockers are on strike. Your imports are bobbing about offshore with nowhere to go.",
+            "choices": [
+                {
+                    "id": "air_freight",
+                    "label": "Air-freight the urgent bits",
+                    "quip": "Costly, but the shelves are full. Your courier sends a hamper.",
+                    "effects": { "cashPct": -0.03, "mood": 3 }
+                },
+                {
+                    "id": "wait_it_out",
+                    "label": "Wait it out",
+                    "quip": "Volumes vanish. Your hedges are now bigger than your business.",
+                    "effects": { "mood": -4, "notionalMult": { "usd-imports": 0.6, "eur-imports": 0.6, "usd-costs": 0.6, "brl-costs": 0.6, "jpy-costs": 0.7, "usd-equipment": 0.6 } }
+                }
+            ]
+        },
+        {
+            "id": "keynote_overran",
+            "pool": "conference",
+            "weight": 1,
+            "title": "The Keynote Overran",
+            "text": "The keynote ran 40 minutes over. Your hedge committee is now a corridor chat.",
+            "choices": [
+                {
+                    "id": "decide_in_corridor",
+                    "label": "Decide it in the corridor",
+                    "quip": "Decisive. Also undocumented. The auditors will love this.",
+                    "effects": { "mood": 3, "varianceMult": 1.25 }
+                },
+                {
+                    "id": "reschedule",
+                    "label": "Reschedule it properly",
+                    "quip": "Minuted and correct. The board asks why it took a fortnight.",
+                    "effects": { "mood": -3 }
+                }
+            ]
+        },
+        {
+            "id": "lanyard_mixup",
+            "pool": "conference",
+            "weight": 1,
+            "title": "Lanyard Mix-up",
+            "text": "You've worn a rival CFO's lanyard all morning. Banks keep pitching you their prices.",
+            "choices": [
+                {
+                    "id": "lean_in",
+                    "label": "Lean into it",
+                    "quip": "You now know their bank pricing. Ethically grey, very useful.",
+                    "effects": { "cashPct": 0.01, "mood": -3 }
+                },
+                {
+                    "id": "swap_back",
+                    "label": "Swap back, sheepishly",
+                    "quip": "Honour intact. The rival CFO kept your free pen.",
+                    "effects": { "mood": 2 }
+                }
+            ]
+        },
+        {
+            "id": "coffee_queue",
+            "pool": "conference",
+            "weight": 1,
+            "title": "The Coffee Queue",
+            "text": "The coffee queue is 30 deep. The bank's FX desk is ringing about rolling your hedges.",
+            "choices": [
+                {
+                    "id": "take_call",
+                    "label": "Take the call, skip coffee",
+                    "quip": "Hedges rolled, nerves frayed. You now speak in basis points.",
+                    "effects": { "mood": 3 }
+                },
+                {
+                    "id": "hold_for_flat_white",
+                    "label": "Hold out for the flat white",
+                    "quip": "Superb flat white. Its true cost: one missed fixing.",
+                    "effects": { "cashPct": -0.01, "mood": -2 }
+                }
+            ]
+        },
+        {
+            "id": "cfo_at_the_bar",
+            "pool": "conference",
+            "weight": 1,
+            "title": "The CFO Is at the Bar",
+            "text": "Your CFO is at the bar, telling a banker your hedge ratios. Loudly.",
+            "choices": [
+                {
+                    "id": "join_and_steer",
+                    "label": "Join in and steer",
+                    "quip": "You stay on message and buy the round. Expensed, obviously.",
+                    "effects": { "cashPct": -0.005, "mood": 5 }
+                },
+                {
+                    "id": "leave_them",
+                    "label": "Leave them to it",
+                    "quip": "Next morning, the bank's forward quotes are mysteriously wider.",
+                    "effects": { "cashPct": -0.01, "mood": -2 }
+                }
+            ]
+        },
+        {
+            "id": "phone_at_3pct",
+            "pool": "conference",
+            "weight": 1,
+            "title": "Phone at 3%",
+            "text": "Your phone is on 3%. The team needs a yes or no on this quarter's hedges. Now.",
+            "choices": [
+                {
+                    "id": "text_yes",
+                    "label": "Text 'yes' and pray",
+                    "quip": "Sent at 1%. Autocorrect changed 'roll' to 'troll'.",
+                    "effects": { "mood": 3, "varianceMult": 1.2 }
+                },
+                {
+                    "id": "find_charger",
+                    "label": "Find a charger first",
+                    "quip": "A stranger lends you a charger. And a pitch for their fintech.",
+                    "effects": { "cashPct": -0.01, "mood": -2 }
+                }
+            ]
+        },
+        {
+            "id": "swag_overload",
+            "pool": "conference",
+            "weight": 1,
+            "title": "Swag Overload",
+            "text": "You've collected 14 tote bags and 9 stress balls. The board wants 'conference ROI'.",
+            "choices": [
+                {
+                    "id": "present_stress_balls",
+                    "label": "Present the stress balls",
+                    "quip": "The board squeezes them throughout your hedge report. Telling.",
+                    "effects": { "mood": -4 }
+                },
+                {
+                    "id": "write_trip_report",
+                    "label": "Write a proper trip report",
+                    "quip": "Three pages, two insights, one lanyard. The board is impressed.",
+                    "effects": { "cashPct": -0.005, "mood": 3 }
+                }
+            ]
+        }
+    ]
+}
