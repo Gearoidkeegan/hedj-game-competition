@@ -14,7 +14,7 @@ Parameters:
   EventEndIso:
     Type: String
     Default: ''
-    Description: ISO-8601 timestamp after which scores are no longer accepted (empty = no end)
+    Description: ISO-8601 event end; player and score rows expire 90 days after it (empty = 90 days after each write). Scores are not rejected after it.
   TokenTtlHours:
     Type: Number
     Default: 120
@@ -109,6 +109,9 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
 
   HCompAnalytics:
     Type: AWS::DynamoDB::Table

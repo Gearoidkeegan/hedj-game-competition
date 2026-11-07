@@ -28,6 +28,18 @@ test('validName accepts emoji incl. variation selector, ZWJ sequences and skin t
     }
 });
 
+test('validName accepts flags, keycaps and decomposed accents', () => {
+    for (const name of ['\u{1F1EE}\u{1F1EA}', 'Se\u00e1n \u{1F1EE}\u{1F1EA}', '#\uFE0F\u20E3', 'Zoe\u0308', '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}']) {
+        assert.equal(validName(name), true, JSON.stringify(name));
+    }
+});
+
+test('validName requires a letter, digit or emoji', () => {
+    for (const name of ['...', '\u200D', '\uFE0F', ' ', '-_-', '\u20E3', '#']) {
+        assert.equal(validName(name), false, JSON.stringify(name));
+    }
+});
+
 test('parseBody rejects a 5 KB body with 413', () => {
     const event = { body: JSON.stringify({ x: 'a'.repeat(5000) }) };
     assert.throws(() => parseBody(event), e => e instanceof HttpError && e.status === 413);

@@ -18,8 +18,8 @@ test('CORS is not wildcard and allows only the two permitted origins', () => {
     assert.ok(!yaml.includes('localhost:3000'));
 });
 
-test('TTL enabled on players and scores', () => {
-    assert.equal((yaml.match(/AttributeName: ttl\s+Enabled: true/g) || []).length, 2);
+test('TTL enabled on players, scores and best', () => {
+    assert.equal((yaml.match(/AttributeName: ttl\s+Enabled: true/g) || []).length, 3);
 });
 
 test('leaderboard function reads only the best table', () => {
@@ -49,4 +49,9 @@ test('progress function has GET and PUT routes and CRUD on players only', () => 
 
 test('CORS allows the player auth headers and PUT', () => {
     for (const needle of ['x-player-email', 'x-game-token', '- PUT']) assert.ok(yaml.includes(needle), needle);
+});
+
+test('EventEndIso description no longer claims scores are rejected', () => {
+    const desc = yaml.split('EventEndIso:')[1].split('TokenTtlHours:')[0];
+    assert.ok(!/no longer accepted/.test(desc));
 });

@@ -1,7 +1,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { json } from '../lib/http.mjs';
-import { dublinDate } from './score.mjs';
+import { dublinDate } from '../lib/util.mjs';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;

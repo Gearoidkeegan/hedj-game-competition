@@ -253,6 +253,84 @@ test('retry after a failed Scores write succeeds (not duplicate) and the board h
     assert.deepEqual(again, { duplicate: true });
 });
 
+const NINETY_DAYS_S = 90 * 24 * 3600;
+
+test('ttl is set on Scores, Best (all + today) and Players rows from the event end', async () => {
+    const { deps, ddb } = setup();
+    const r = await register(deps);
+    await submit(deps, scoreBody(r.gameToken));
+    const expected = Math.floor(Date.parse('2023-12-01T00:00:00Z') / 1000) + NINETY_DAYS_S;
+    assert.equal(row(ddb, 'S', 'g1').ttl, expected);
+    assert.equal(row(ddb, 'B', 'ev#simple#all', 'ann@example.com').ttl, expected);
+    assert.equal(row(ddb, 'B', 'ev#simple#2023-11-14', 'ann@example.com').ttl, expected);
+    assert.equal(row(ddb, 'P', 'ann@example.com').ttl, expected);
+});
+
+test('empty EventEndIso falls back to now + 90 days so rows always expire', async () => {
+    const { deps, ddb } = setup();
+    deps.env.EVENT_END_ISO = '';
+    const r = await register(deps);
+    await submit(deps, scoreBody(r.gameToken));
+    const expected = Math.floor(T0 / 1000) + NINETY_DAYS_S;
+    assert.equal(row(ddb, 'P', 'ann@example.com').ttl, expected);
+    assert.equal(row(ddb, 'S', 'g1').ttl, expected);
+    assert.equal(row(ddb, 'B', 'ev#simple#all', 'ann@example.com').ttl, expected);
+    assert.equal(row(ddb, 'B', 'ev#simple#2023-11-14', 'ann@example.com').ttl, expected);
+});
+
+test('industryId must match /^[a-z0-9_-]{1,40}$/', async () => {
+    const { deps } = setup();
+    const r = await register(deps);
+    for (const industryId of ['<img src=x>', 'Airline', 'a b', '', 'x'.repeat(41), 7, null, undefined]) {
+        const res = await submit(deps, scoreBody(r.gameToken, { industryId }));
+        assert.equal(res.statusCode, 400, String(industryId));
+    }
+    assert.equal((await submit(deps, scoreBody(r.gameToken, { industryId: 'agri-foods_2' }))).statusCode, 200);
+});
+
+test('boards show the stored name and company, not the submitted ones', async () => {
+    const { deps, ddb } = setup();
+    const r = await register(deps);
+    await submit(deps, scoreBody(r.gameToken, { playerName: 'Mallory', company: 'Evil' }));
+    const b = row(ddb, 'B', 'ev#simple#all', 'ann@example.com');
+    assert.equal(b.playerName, 'Ann');
+    assert.equal(b.company, 'Acme');
+    assert.equal(row(ddb, 'S', 'g1').playerName, 'Ann');
+});
+
+test('isBest is true for a first score and a strictly higher one, false for equal or lower', async () => {
+    const { deps } = setup();
+    const r = await register(deps);
+    const go = async (gameId, score) => JSON.parse((await submit(deps, scoreBody(r.gameToken, { gameId, score }))).body);
+    assert.equal((await go('a', 1000)).isBest, true);
+    assert.equal((await go('b', 1000)).isBest, false);
+    assert.equal((await go('c', 900)).isBest, false);
+    assert.equal((await go('d', 1001)).isBest, true);
+});
+
+test('a token with no finite expiry fails closed', async () => {
+    const { deps, ddb } = setup();
+    ddb.tables.P.set('ann@example.com', { email: 'ann@example.com', playerName: 'Ann', company: 'Acme', gameToken: 'legacy' });
+    assert.equal((await submit(deps, scoreBody('legacy'))).statusCode, 401);
+    ddb.tables.P.set('ann@example.com', { email: 'ann@example.com', playerName: 'Ann', company: 'Acme', gameToken: 'legacy', gameTokenExpiry: 'never' });
+    assert.equal((await submit(deps, scoreBody('legacy'))).statusCode, 401);
+});
+
+test('progress drops ids outside /^[a-z0-9:_-]{1,40}$/i', () => {
+    const m = mergeProgress({ unlocked: ['industry:airline', 'Mode_Pro', '<b>x', 'has space', 'x'.repeat(41), ''] }, {});
+    assert.deepEqual(m.unlocked, ['industry:airline', 'Mode_Pro']);
+});
+
+test('register and score store NFC-normalised names', async () => {
+    const { deps, ddb } = setup();
+    const decomposed = 'Zoe\u0308';
+    const r = await register(deps, { playerName: decomposed });
+    assert.equal(r.playerName, 'Zo\u00eb');
+    assert.equal(row(ddb, 'P', 'ann@example.com').playerName, 'Zo\u00eb');
+    await submit(deps, scoreBody(r.gameToken, { playerName: decomposed }));
+    assert.equal(row(ddb, 'B', 'ev#simple#all', 'ann@example.com').playerName, 'Zo\u00eb');
+});
+
 test('modes are separate boards', async () => {
     const { deps } = setup();
     const r = await register(deps);

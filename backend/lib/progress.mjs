@@ -2,12 +2,12 @@
 const SCORE_MAX = 10000;
 const ARRAY_KEYS = ['unlocked', 'chairmenMet', 'crisisBadges'];
 const MAX_ARRAY_LEN = 50;
-const MAX_ID_LEN = 40;
+const ID_RE = /^[a-z0-9:_-]{1,40}$/i;
 
 const count = v => (Number.isFinite(v) && v > 0 ? Math.min(Math.floor(v), 1_000_000) : 0);
 const bestScore = v => (Number.isFinite(v) && v > 0 ? Math.min(Math.round(v), SCORE_MAX) : 0);
 const ids = v => (Array.isArray(v)
-    ? v.filter(x => typeof x === 'string' && x.length > 0 && x.length <= MAX_ID_LEN)
+    ? v.filter(x => typeof x === 'string' && ID_RE.test(x))
     : []);
 
 export function normaliseProgress(p) {

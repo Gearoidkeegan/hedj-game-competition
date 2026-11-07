@@ -3,15 +3,11 @@ import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-
 import { randomUUID } from 'node:crypto';
 import { playerTokens } from '../lib/auth.mjs';
 import { json, parseBody, errorResponse, validName } from '../lib/http.mjs';
+import { validCompany, ttlSeconds } from '../lib/util.mjs';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEFAULT_TOKEN_TTL_HOURS = 120;
 const MAX_TOKENS = 5;
-const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
-
-export function validCompany(s) {
-    return typeof s === 'string' && s.trim().length > 0 && s.trim().length <= 60 && !/[<>]/.test(s);
-}
 
 export function createHandler(deps) {
     const { ddb, env, now, uuid } = deps;
@@ -66,25 +62,22 @@ export function createHandler(deps) {
             'gameTokens = :gts'
         ];
         // Identity is set once: a re-registration never changes the stored name or company.
-        const storedName = existing ? existing.playerName : playerName.trim();
+        const storedName = existing ? existing.playerName : playerName.trim().normalize('NFC');
         const storedCompany = existing ? existing.company : company.trim();
         if (!existing) {
             values[':pn'] = storedName;
             values[':co'] = storedCompany;
             sets.push('playerName = :pn', 'company = :co');
         }
-        const endMs = Date.parse(env.EVENT_END_ISO || '');
-        if (Number.isFinite(endMs)) {
-            names['#ttl'] = 'ttl';
-            values[':ttl'] = Math.floor((endMs + RETENTION_MS) / 1000);
-            sets.push('#ttl = :ttl');
-        }
+        names['#ttl'] = 'ttl';
+        values[':ttl'] = ttlSeconds(env, nowMs);
+        sets.push('#ttl = :ttl');
 
         await ddb.send(new UpdateCommand({
             TableName: env.PLAYERS_TABLE,
             Key: { email: key },
             UpdateExpression: `SET ${sets.join(', ')}`,
-            ...(Object.keys(names).length ? { ExpressionAttributeNames: names } : {}),
+            ExpressionAttributeNames: names,
             ExpressionAttributeValues: values
         }));
 

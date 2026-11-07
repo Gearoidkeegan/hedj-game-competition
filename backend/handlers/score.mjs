@@ -2,17 +2,12 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { json, parseBody, errorResponse, validName } from '../lib/http.mjs';
 import { loadPlayer } from '../lib/auth.mjs';
-import { validCompany } from './register.mjs';
+import { validCompany, dublinDate, ttlSeconds } from '../lib/util.mjs';
 
 const SCORE_MAX = 10000;
 const MIN_RUN_MS = 60000;
-const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+const INDUSTRY_RE = /^[a-z0-9_-]{1,40}$/;
 const MODES = ['simple', 'pro'];
-
-export function dublinDate(ms) {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Dublin', year: 'numeric', month: '2-digit', day: '2-digit' })
-        .format(new Date(ms));
-}
 
 export function createHandler(deps) {
     const { ddb, env, now } = deps;
@@ -65,6 +60,9 @@ export function createHandler(deps) {
             if (!Number.isFinite(startedAt) || nowMs - startedAt < MIN_RUN_MS) {
                 return json(400, { error: 'Run too short' });
             }
+            if (typeof industryId !== 'string' || !INDUSTRY_RE.test(industryId)) {
+                return json(400, { error: 'Invalid industryId' });
+            }
             if (typeof playerName !== 'string' || !validName(playerName.trim())) {
                 return json(400, { error: 'Invalid player name' });
             }
@@ -74,17 +72,18 @@ export function createHandler(deps) {
 
             const player = await loadPlayer(ddb, env.PLAYERS_TABLE, email, gameToken, nowMs);
 
-            const name = playerName.trim();
-            const comp = (company !== undefined ? company : player.company || '').trim();
-            const industry = typeof industryId === 'string' ? industryId.slice(0, 40) : '';
+            // Boards always show the identity stored at registration, never the submitted one.
+            const name = player.playerName || playerName.trim().normalize('NFC');
+            const comp = player.company || (typeof company === 'string' ? company.trim() : '');
+            const industry = industryId;
+            const ttl = ttlSeconds(env, nowMs);
             const submittedAt = new Date(nowMs).toISOString();
-            const endMs = Date.parse(env.EVENT_END_ISO || '');
 
             const seen = await ddb.send(new GetCommand({ TableName: env.SCORES_TABLE, Key: { scoreId: gameId } }));
             if (seen.Item) return json(200, { duplicate: true });
 
             const day = dublinDate(nowMs);
-            const bestItem = { email: player.email, score, playerName: name, company: comp, industryId: industry, submittedAt };
+            const bestItem = { email: player.email, score, playerName: name, company: comp, industryId: industry, submittedAt, gameId, ttl };
             const allBoard = `${eventId}#${mode}#all`;
             const wroteBest = await putIfHigher(allBoard, bestItem);
             await putIfHigher(`${eventId}#${mode}#${day}`, bestItem);
@@ -99,9 +98,8 @@ export function createHandler(deps) {
             // Dedupe marker is written last so a retry after a partial failure re-runs the (idempotent) board updates.
             const scoreItem = {
                 scoreId: gameId, email: player.email, eventId, mode, score, quartersPlayed,
-                startedAt, industryId: industry, playerName: name, company: comp, submittedAt
+                startedAt, industryId: industry, playerName: name, company: comp, submittedAt, ttl
             };
-            if (Number.isFinite(endMs)) scoreItem.ttl = Math.floor((endMs + RETENTION_MS) / 1000);
 
             try {
                 await ddb.send(new PutCommand({
@@ -114,12 +112,14 @@ export function createHandler(deps) {
                 throw err;
             }
 
+            // wroteBest means first score or strictly higher. If not written, this is only "best" when the stored row
+            // came from this same gameId (a retry after a partial failure).
             let best = score;
             let isBest = wroteBest;
             if (!wroteBest) {
                 const row = await ddb.send(new GetCommand({ TableName: env.BEST_TABLE, Key: { board: allBoard, email: player.email } }));
                 best = row.Item?.score ?? score;
-                isBest = best === score; // equal means a retry after a partial failure already stored this score
+                isBest = row.Item?.gameId === gameId;
             }
             return json(200, { rank: await rankOf(allBoard, best), best, isBest });
         } catch (err) {

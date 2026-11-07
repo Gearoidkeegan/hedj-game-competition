@@ -56,10 +56,14 @@ export function requireAdmin(event, env) {
     if (!isAdmin(event, env)) throw new HttpError(401, 'Unauthorized');
 }
 
-// Letters, digits, space, . ' _ - and emoji (incl. variation selector, ZWJ and skin-tone modifiers); 1-20 code points.
-const NAME_RE = /^[\p{L}\p{N}\p{Extended_Pictographic}\p{Emoji_Modifier}\u200D\uFE0F .'_-]{1,20}$/u;
+// Letters, digits, space, . ' _ - # * and emoji (variation selector, ZWJ, skin tones, flags, keycaps, tag sequences); 1-20 code points
+// after NFC normalisation. Must contain at least one letter, digit or emoji so joiners/punctuation alone are rejected.
+const NAME_RE = /^[\p{L}\p{N}\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}\u200D\uFE0F\u20E3\u{E0020}-\u{E007F} .'_#*-]{1,20}$/u;
+const NAME_CONTENT_RE = /[\p{L}\p{N}\p{Extended_Pictographic}\p{Regional_Indicator}]|[#*]️?⃣/u;
 export function validName(s) {
-    return typeof s === 'string' && NAME_RE.test(s);
+    if (typeof s !== 'string') return false;
+    const n = s.normalize('NFC');
+    return NAME_RE.test(n) && NAME_CONTENT_RE.test(n);
 }
 
 // Turns thrown HttpErrors into JSON responses; rethrows anything else.
