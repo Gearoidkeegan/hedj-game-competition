@@ -42,9 +42,14 @@ Shapes and signatures only. Every stream reads this first. Source of truth: the 
   event: { id, choice } | null, powerUp: string|null }
 ```
 
-`lines[].movePct`: percent change of the rate for `fx` and `commodity`; for `ir` it is the change in percentage points
-(`end − start`, the rates are already in percent). A zero or missing start rate (or missing end rate) is no move:
-`movePct`, `exposureImpact` and `hedgeImpact` are all 0.
+Interest rates in the market data are decimals (EURIBOR 0.034671 = 3.47%). The IR cash impact is
+`−(end − start) × notional × 0.25` (one quarter of interest for a floating-rate payer).
+
+`lines[].movePct`: percent change of the rate for `fx` and `commodity`; for `ir` it is the change in percentage points,
+`(end − start) × 100`. A zero or missing start rate (or missing end rate) is no move: `movePct`, `exposureImpact` and
+`hedgeImpact` are all 0.
+
+`inMandate` is vacuously true when no active exposure has a non-zero notional (every current industry has one from Q1).
 
 `QuarterResult` (return of `simulateQuarter`): `{ run: RunState, summary: QuarterSummary }`.
 

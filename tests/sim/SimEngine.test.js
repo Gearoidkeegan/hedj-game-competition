@@ -176,6 +176,53 @@ test('bankruptcy', () => {
     const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
     assert.ok(summary.cashAfter <= 0);
     assert.equal(after.status, 'bankrupt');
+    assert.equal(after.history.length, 1);
+    assert.deepEqual(after.history[0], summary);
+});
+
+test('status precedence: bankrupt beats a 2nd losing breach in the same quarter', () => {
+    const up = trendMarket(1.1);
+    let run = newRun(up, { forcedYear: 2010 });
+    run = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content).run;
+    run = { ...run, cash: 1 };
+    const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
+    assert.equal(summary.breach, 'loss');
+    assert.equal(after.history.filter(s => s.breach === 'loss').length, BALANCE.breachLossesToFire);
+    assert.equal(after.status, 'bankrupt');
+    assert.equal(after.history.length, 2);
+});
+
+test('status precedence: a 2nd losing breach fires even with a happy board', () => {
+    const up = trendMarket(1.1);
+    let run = newRun(up, { forcedYear: 2010 });
+    run = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content).run;
+    run = { ...run, boardMood: 100 };
+    const { run: after } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
+    assert.ok(after.cash > 0);
+    assert.ok(after.boardMood > BALANCE.fireThreshold, `mood ${after.boardMood}`);
+    assert.equal(after.status, 'fired');
+});
+
+function playFull(seed) {
+    let run = createRun({ industry: airline, seed, startedAt: 1, market: marketEngine });
+    while (!isRunOver(run)) {
+        run = simulateQuarter(run, decide(hedgesAt(run, 0.5)), marketEngine, content).run;
+    }
+    return run;
+}
+
+test('full runs are deterministic per seed and differ across seeds', () => {
+    const a = playFull(4242);
+    assert.deepEqual(playFull(4242), a);
+    assert.equal(a.history.length > 0, true);
+    assert.notDeepEqual(playFull(4243).history, a.history);
+});
+
+test('a 1 pp EURIBOR rise on EUR 2bn floating debt costs about EUR 5m a quarter', () => {
+    const debt = airline.exposures.find(e => e.id === 'floating-debt');
+    assert.equal(debt.quarterlyNotional, 2e9);
+    const impact = exposureCashImpact(debt, 0.03, 0.04, debt.quarterlyNotional);
+    near(impact, -5e6, 'impact');
 });
 
 test('mood is clamped to 0..100 and a low mood fires', () => {
@@ -208,12 +255,14 @@ test('IR realised notional equals forecast at q>=6 regardless of seed', () => {
         let run = createRun({ industry: airline, seed, startedAt: 1, market: marketEngine });
         while (run.quarter < 8) {
             const before = run.quarter;
+            const startRates = run.rates;
             const r = simulateQuarter(run, decide(hedgesAt(run, run.mandate.min)), marketEngine, content);
             run = r.run;
             if (before >= 6) {
                 const debt = r.summary.lines.find(l => l.exposureId === 'floating-debt');
                 assert.ok(debt, `seed ${seed}: floating-debt active from quarter index 6`);
                 assert.equal(debt.realisedNotional, debt.forecastNotional);
+                near(debt.movePct, (run.rates.EURIBOR - startRates.EURIBOR) * 100, 'ir movePct (pp)');
                 const fuel = r.summary.lines.find(l => l.exposureId === 'fuel');
                 assert.notEqual(fuel.realisedNotional, fuel.forecastNotional);
             }

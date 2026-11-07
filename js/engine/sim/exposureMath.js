@@ -5,8 +5,8 @@ const OPTION_PREMIUM_PCT = 0.015;
 
 export function exposureCashImpact(exp, startRate, endRate, notional) {
     if (exp.type === 'ir') {
-        // Floating-rate payer: rates are in percent, one quarter of interest.
-        return -((endRate - startRate) / 100) * notional * IR_QUARTER;
+        // Floating-rate payer: rates are decimals (0.0347 = 3.47%), one quarter of interest.
+        return -(endRate - startRate) * notional * IR_QUARTER;
     }
     const ratio = (endRate - startRate) / startRate;
     let impact = exp.direction === 'buy' ? -ratio * notional : ratio * notional;

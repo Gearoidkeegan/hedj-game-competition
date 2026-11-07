@@ -124,6 +124,7 @@ export function simulateQuarter(run, decisions, market, content) {
     let playerMarket = 0;
     let benchmarkMarket = 0;
     let premiums = 0;
+    // Vacuously in mandate when no active exposure has a non-zero notional (every current industry has one from Q1).
     let inMandate = true;
     const lines = [];
     for (const exp of activeExposures(next)) {
@@ -142,8 +143,8 @@ export function simulateQuarter(run, decisions, market, content) {
         let exposureImpact = 0;
         let hedgeImpact = 0;
         if (moved) {
-            // IR rates are already in percent: report the move in percentage points.
-            movePct = exp.type === 'ir' ? endRate - startRate : ((endRate - startRate) / startRate) * 100;
+            // IR rates are decimals: report the move in percentage points ((end − start) × 100).
+            movePct = exp.type === 'ir' ? (endRate - startRate) * 100 : ((endRate - startRate) / startRate) * 100;
             // `+ 0` turns -0 into 0 so the run stays deep-equal after a JSON round trip.
             exposureImpact = exposureCashImpact(exp, startRate, endRate, realised) + 0;
             hedgeImpact = hedgeCashImpact(exp, startRate, endRate, hedged, product) + 0;

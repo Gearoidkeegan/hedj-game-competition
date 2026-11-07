@@ -8,7 +8,7 @@ const cases = {
     fuel: { exp: { type: 'commodity', underlying: 'JETNWE', direction: 'buy', unit: 'mT' }, start: 100, end: 110, n: 100, want: -10 },
     eurUsdRevenueEurFirm: { exp: { type: 'fx', underlying: 'EURUSD', direction: 'sell', unit: 'USD' }, start: 100, end: 110, n: 100, want: -10 },
     eurRevenueUsdFirm: { exp: { type: 'fx', underlying: 'EURUSD', direction: 'sell', unit: 'EUR' }, start: 100, end: 110, n: 100, want: 10 },
-    ir: { exp: { type: 'ir', underlying: 'EURIBOR', direction: 'buy', unit: 'EUR' }, start: 3.0, end: 4.0, n: 400, want: -1 },
+    ir: { exp: { type: 'ir', underlying: 'EURIBOR', direction: 'buy', unit: 'EUR' }, start: 0.03, end: 0.04, n: 400, want: -1 },
 };
 
 for (const [name, c] of Object.entries(cases)) {
