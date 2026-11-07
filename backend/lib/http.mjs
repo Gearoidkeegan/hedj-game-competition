@@ -34,7 +34,7 @@ export function parseBody(event, maxBytes = 4096) {
     return parsed;
 }
 
-function headerValue(event, name) {
+export function headerValue(event, name) {
     const headers = event?.headers || {};
     for (const key of Object.keys(headers)) {
         if (key.toLowerCase() === name) return headers[key];
@@ -56,8 +56,8 @@ export function requireAdmin(event, env) {
     if (!isAdmin(event, env)) throw new HttpError(401, 'Unauthorized');
 }
 
-// Brief regex /^[\p{L}\p{N} .'_-]{1,20}$/u cannot match the required emoji example, so \p{Extended_Pictographic} is added.
-const NAME_RE = /^[\p{L}\p{N}\p{Extended_Pictographic} .'_-]{1,20}$/u;
+// Letters, digits, space, . ' _ - and emoji (incl. variation selector, ZWJ and skin-tone modifiers); 1-20 code points.
+const NAME_RE = /^[\p{L}\p{N}\p{Extended_Pictographic}\p{Emoji_Modifier}\u200D\uFE0F .'_-]{1,20}$/u;
 export function validName(s) {
     return typeof s === 'string' && NAME_RE.test(s);
 }

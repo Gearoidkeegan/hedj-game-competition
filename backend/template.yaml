@@ -145,9 +145,12 @@ Resources:
         AllowHeaders:
           - Content-Type
           - x-admin-key
+          - x-player-email
+          - x-game-token
         AllowMethods:
           - GET
           - POST
+          - PUT
           - OPTIONS
 
   # ─── Lambda Functions ─────────────────────────────────────────────────────
@@ -245,6 +248,29 @@ Resources:
             Method: GET
       Policies:
         - DynamoDBReadPolicy:
+            TableName: !Ref HCompPlayers
+
+  ProgressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/progress.handler
+      Description: Read and merge a player's cross-device progress
+      Events:
+        GetProgress:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /progress
+            Method: GET
+        PutProgress:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /progress
+            Method: PUT
+      Policies:
+        - DynamoDBCrudPolicy:
             TableName: !Ref HCompPlayers
 
 Outputs:

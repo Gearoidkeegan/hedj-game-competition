@@ -1,132 +1,129 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { randomUUID } from 'node:crypto';
-import { json, parseBody, errorResponse } from '../lib/http.mjs';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { json, parseBody, errorResponse, validName } from '../lib/http.mjs';
+import { loadPlayer } from '../lib/auth.mjs';
+import { validCompany } from './register.mjs';
 
-const LEADERBOARD_PARTITION = 'all';
+const SCORE_MAX = 10000;
+const MIN_RUN_MS = 60000;
+const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+const MODES = ['simple', 'pro'];
+
+export function dublinDate(ms) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Dublin', year: 'numeric', month: '2-digit', day: '2-digit' })
+        .format(new Date(ms));
+}
 
 export function createHandler(deps) {
-    const { ddb, env, now, uuid } = deps;
-    const PLAYERS_TABLE = env.PLAYERS_TABLE;
-    const SCORES_TABLE = env.SCORES_TABLE;
+    const { ddb, env, now } = deps;
+    const eventId = env.EVENT_ID || 'test';
 
-    async function getRank(score) {
+    async function rankOf(board, score) {
+        const result = await ddb.send(new QueryCommand({
+            TableName: env.BEST_TABLE,
+            IndexName: 'ByScore',
+            KeyConditionExpression: '#b = :b AND #s > :s',
+            ExpressionAttributeNames: { '#b': 'board', '#s': 'score' },
+            ExpressionAttributeValues: { ':b': board, ':s': score },
+            Select: 'COUNT'
+        }));
+        return (result.Count || 0) + 1;
+    }
+
+    // Writes the player's row on a board only when the new score is higher. Returns true if written.
+    async function putIfHigher(board, item) {
         try {
-            const result = await ddb.send(new QueryCommand({
-                TableName: SCORES_TABLE,
-                IndexName: 'GlobalLeaderboard',
-                KeyConditionExpression: '#lb = :lb AND #sc > :score',
-                ExpressionAttributeNames: {
-                    '#lb': 'leaderboard',
-                    '#sc': 'score'
-                },
-                ExpressionAttributeValues: {
-                    ':lb': LEADERBOARD_PARTITION,
-                    ':score': score
-                },
-                Select: 'COUNT'
+            await ddb.send(new PutCommand({
+                TableName: env.BEST_TABLE,
+                Item: { board, ...item },
+                ConditionExpression: 'attribute_not_exists(score) OR score < :s',
+                ExpressionAttributeValues: { ':s': item.score }
             }));
-            return (result.Count || 0) + 1;
-        } catch {
-            return null;
+            return true;
+        } catch (err) {
+            if (err?.name === 'ConditionalCheckFailedException') return false;
+            throw err;
         }
     }
 
     return async function handler(event) {
-        let body;
         try {
-            body = parseBody(event);
+            const body = parseBody(event);
+            const { gameToken, gameId, email, mode, score, quartersPlayed, startedAt, industryId, playerName, company } = body;
+            const nowMs = now();
+
+            if (typeof gameId !== 'string' || !gameId || gameId.length > 64 || typeof email !== 'string') {
+                return json(400, { error: 'gameToken, gameId and email are required' });
+            }
+            if (!MODES.includes(mode)) return json(400, { error: 'mode must be simple or pro' });
+            if (!Number.isInteger(score) || score < 0 || score > SCORE_MAX) {
+                return json(400, { error: `score must be an integer between 0 and ${SCORE_MAX}` });
+            }
+            if (!Number.isInteger(quartersPlayed) || quartersPlayed < 1 || quartersPlayed > 8) {
+                return json(400, { error: 'quartersPlayed must be between 1 and 8' });
+            }
+            if (!Number.isFinite(startedAt) || nowMs - startedAt < MIN_RUN_MS) {
+                return json(400, { error: 'Run too short' });
+            }
+            if (typeof playerName !== 'string' || !validName(playerName.trim())) {
+                return json(400, { error: 'Invalid player name' });
+            }
+            if (company !== undefined && !validCompany(company)) {
+                return json(400, { error: 'Invalid company name' });
+            }
+
+            const player = await loadPlayer(ddb, env.PLAYERS_TABLE, email, gameToken, nowMs);
+
+            const name = playerName.trim();
+            const comp = (company !== undefined ? company : player.company || '').trim();
+            const industry = typeof industryId === 'string' ? industryId.slice(0, 40) : '';
+            const submittedAt = new Date(nowMs).toISOString();
+            const endMs = Date.parse(env.EVENT_END_ISO || '');
+
+            const scoreItem = {
+                scoreId: gameId, email: player.email, eventId, mode, score, quartersPlayed,
+                startedAt, industryId: industry, playerName: name, company: comp, submittedAt
+            };
+            if (Number.isFinite(endMs)) scoreItem.ttl = Math.floor((endMs + RETENTION_MS) / 1000);
+
+            try {
+                await ddb.send(new PutCommand({
+                    TableName: env.SCORES_TABLE,
+                    Item: scoreItem,
+                    ConditionExpression: 'attribute_not_exists(scoreId)'
+                }));
+            } catch (err) {
+                if (err?.name === 'ConditionalCheckFailedException') return json(200, { duplicate: true });
+                throw err;
+            }
+
+            const day = dublinDate(nowMs);
+            const bestItem = { email: player.email, score, playerName: name, company: comp, industryId: industry, submittedAt };
+            const allBoard = `${eventId}#${mode}#all`;
+            const isBest = await putIfHigher(allBoard, bestItem);
+            await putIfHigher(`${eventId}#${mode}#${day}`, bestItem);
+
+            await ddb.send(new UpdateCommand({
+                TableName: env.PLAYERS_TABLE,
+                Key: { email: player.email },
+                UpdateExpression: 'ADD playCount :one, playDays :d',
+                ExpressionAttributeValues: { ':one': 1, ':d': new Set([day]) }
+            }));
+
+            let best = score;
+            if (!isBest) {
+                const row = await ddb.send(new GetCommand({ TableName: env.BEST_TABLE, Key: { board: allBoard, email: player.email } }));
+                best = row.Item?.score ?? score;
+            }
+            return json(200, { rank: await rankOf(allBoard, best), best, isBest });
         } catch (err) {
             return errorResponse(err);
         }
-
-        const { gameToken, gameId, email, playerName, company, industry, industryId,
-                score, grade, quartersPlayed, seed, cumulativePnL } = body;
-
-        if (!gameToken || !gameId || !email || typeof email !== 'string') {
-            return json(400, { error: 'gameToken, gameId and email are required' });
-        }
-        if (typeof score !== 'number' || score < 0 || score > 100) {
-            return json(400, { error: 'score must be a number between 0 and 100' });
-        }
-        if (typeof quartersPlayed !== 'number' || quartersPlayed < 1 || quartersPlayed > 16) {
-            return json(400, { error: 'quartersPlayed must be between 1 and 16' });
-        }
-
-        const playerEmail = email.toLowerCase().trim();
-        const playerResult = await ddb.send(new GetCommand({
-            TableName: PLAYERS_TABLE,
-            Key: { email: playerEmail }
-        }));
-
-        if (!playerResult.Item) {
-            return json(401, { error: 'Player not registered' });
-        }
-
-        const player = playerResult.Item;
-        if (player.gameToken !== gameToken) {
-            return json(401, { error: 'Invalid game token' });
-        }
-        if (now() > player.gameTokenExpiry) {
-            return json(401, { error: 'Game token expired — please register again' });
-        }
-
-        // Idempotency: check if this gameId was already submitted by this player
-        const existing = await ddb.send(new QueryCommand({
-            TableName: SCORES_TABLE,
-            IndexName: 'GlobalLeaderboard',
-            KeyConditionExpression: '#lb = :lb',
-            FilterExpression: '#gameId = :gameId AND #playerEmail = :email',
-            ExpressionAttributeNames: {
-                '#lb': 'leaderboard',
-                '#gameId': 'gameId',
-                '#playerEmail': 'playerEmail'
-            },
-            ExpressionAttributeValues: {
-                ':lb': LEADERBOARD_PARTITION,
-                ':gameId': gameId,
-                ':email': playerEmail
-            },
-            Select: 'COUNT'
-        }));
-
-        if (existing.Count > 0) {
-            const rank = await getRank(score);
-            return json(200, { rank, duplicate: true });
-        }
-
-        const submittedAt = new Date(now()).toISOString();
-        const roundedScore = Math.round(score * 10) / 10;
-
-        await ddb.send(new PutCommand({
-            TableName: SCORES_TABLE,
-            Item: {
-                scoreId: uuid(),
-                leaderboard: LEADERBOARD_PARTITION,
-                score: roundedScore,
-                email: playerEmail,
-                playerEmail,
-                playerName: (playerName || player.playerName || '').trim(),
-                company: (company || player.company || '').trim(),
-                industry: industry || '',
-                industryId: industryId || '',
-                grade: grade || '',
-                quartersPlayed,
-                seed: seed || 0,
-                gameId,
-                submittedAt,
-                cumulativePnL: typeof cumulativePnL === 'number' ? cumulativePnL : 0
-            }
-        }));
-
-        const rank = await getRank(roundedScore);
-        return json(200, { rank });
     };
 }
 
 export const handler = createHandler({
     ddb: DynamoDBDocumentClient.from(new DynamoDBClient({})),
     env: process.env,
-    now: () => Date.now(),
-    uuid: () => randomUUID()
+    now: () => Date.now()
 });

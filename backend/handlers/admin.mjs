@@ -21,7 +21,7 @@ export function createHandler(deps) {
 
         const format = event.queryStringParameters?.format;
         if (format === 'csv') {
-            const csvEscape = v => `"${(v || '').replace(/"/g, '""')}"`;
+            const csvEscape = v => `"${(typeof v === 'string' ? v : String(v ?? '')).replace(/"/g, '""')}"`;
             const rows = [
                 'Name,Email,Company,Registered At,Marketing Consent',
                 ...players.map(p =>

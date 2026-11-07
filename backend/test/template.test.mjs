@@ -39,3 +39,14 @@ test('score function has CRUD on players, scores and best', () => {
     const block = yaml.split('ScoreFunction:')[1].split('LeaderboardFunction:')[0];
     for (const t of ['HCompPlayers', 'HCompScores', 'HCompBest']) assert.ok(block.includes(`!Ref ${t}`), t);
 });
+
+test('progress function has GET and PUT routes and CRUD on players only', () => {
+    const block = yaml.split('ProgressFunction:')[1].split('Outputs:')[0];
+    assert.ok(block.includes('Path: /progress') && block.includes('Method: GET') && block.includes('Method: PUT'));
+    assert.ok(block.includes('!Ref HCompPlayers'));
+    assert.ok(!block.includes('HCompScores') && !block.includes('HCompBest'));
+});
+
+test('CORS allows the player auth headers and PUT', () => {
+    for (const needle of ['x-player-email', 'x-game-token', '- PUT']) assert.ok(yaml.includes(needle), needle);
+});

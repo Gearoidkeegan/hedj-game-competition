@@ -1,13 +1,19 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'node:crypto';
-import { json, parseBody, errorResponse } from '../lib/http.mjs';
+import { json, parseBody, errorResponse, validName } from '../lib/http.mjs';
 
-const TOKEN_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours (E1-2 switches to TOKEN_TTL_HOURS)
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DEFAULT_TOKEN_TTL_HOURS = 120;
+const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+export function validCompany(s) {
+    return typeof s === 'string' && s.trim().length > 0 && s.trim().length <= 60 && !/[<>]/.test(s);
+}
 
 export function createHandler(deps) {
     const { ddb, env, now, uuid } = deps;
+    const ttlHours = Number(env.TOKEN_TTL_HOURS) > 0 ? Number(env.TOKEN_TTL_HOURS) : DEFAULT_TOKEN_TTL_HOURS;
 
     return async function handler(event) {
         let body;
@@ -19,14 +25,14 @@ export function createHandler(deps) {
 
         const { playerName, email, company, consentGiven, marketingConsent } = body;
 
-        if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
-            return json(400, { error: 'Player name is required' });
+        if (typeof playerName !== 'string' || !validName(playerName.trim())) {
+            return json(400, { error: "Player name must be 1-20 letters, numbers, emoji or . ' _ -" });
         }
         if (!email || typeof email !== 'string' || !EMAIL_RE.test(email)) {
             return json(400, { error: 'Valid email is required' });
         }
-        if (!company || typeof company !== 'string' || !company.trim()) {
-            return json(400, { error: 'Company name is required' });
+        if (!validCompany(company)) {
+            return json(400, { error: 'Company name is required (max 60 characters, no < or >)' });
         }
         if (consentGiven !== true) {
             return json(400, { error: 'Consent is required to register' });
@@ -34,21 +40,38 @@ export function createHandler(deps) {
 
         const gameToken = uuid();
         const nowMs = now();
-        const gameTokenExpiry = nowMs + TOKEN_TTL_MS;
-        const registeredAt = new Date(nowMs).toISOString();
+        const gameTokenExpiry = nowMs + ttlHours * 60 * 60 * 1000;
 
-        await ddb.send(new PutCommand({
+        const names = {};
+        const values = {
+            ':pn': playerName.trim(),
+            ':co': company.trim(),
+            ':t': true,
+            ':ra': new Date(nowMs).toISOString(),
+            ':mc': marketingConsent === true,
+            ':gt': gameToken,
+            ':ge': gameTokenExpiry
+        };
+        const sets = [
+            'playerName = :pn', 'company = :co', 'consentGiven = :t',
+            'registeredAt = if_not_exists(registeredAt, :ra)',
+            // true when sent true, otherwise keep what is stored (default false)
+            marketingConsent === true ? 'marketingConsent = :mc' : 'marketingConsent = if_not_exists(marketingConsent, :mc)',
+            'gameToken = :gt', 'gameTokenExpiry = :ge'
+        ];
+        const endMs = Date.parse(env.EVENT_END_ISO || '');
+        if (Number.isFinite(endMs)) {
+            names['#ttl'] = 'ttl';
+            values[':ttl'] = Math.floor((endMs + RETENTION_MS) / 1000);
+            sets.push('#ttl = :ttl');
+        }
+
+        await ddb.send(new UpdateCommand({
             TableName: env.PLAYERS_TABLE,
-            Item: {
-                email: email.toLowerCase().trim(),
-                playerName: playerName.trim(),
-                company: company.trim(),
-                registeredAt,
-                consentGiven: true,
-                marketingConsent: marketingConsent === true,
-                gameToken,
-                gameTokenExpiry
-            }
+            Key: { email: email.toLowerCase().trim() },
+            UpdateExpression: `SET ${sets.join(', ')}`,
+            ...(Object.keys(names).length ? { ExpressionAttributeNames: names } : {}),
+            ExpressionAttributeValues: values
         }));
 
         return json(200, { gameToken, expiresAt: gameTokenExpiry });
