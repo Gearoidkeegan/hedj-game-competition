@@ -72,8 +72,11 @@ async function refresh() {
 
 // Self-rescheduling loop: the next refresh starts only after the previous one finishes. Paused while hidden.
 async function loop() {
-    if (!document.hidden) await refresh();
-    setTimeout(loop, REFRESH_MS);
+    try {
+        if (!document.hidden) await refresh();
+    } finally {
+        setTimeout(loop, REFRESH_MS);
+    }
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 loop();
