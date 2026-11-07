@@ -74,6 +74,14 @@ export function createRun({ industry, seed, startedAt, market, crisisId = null, 
     };
 }
 
+// Off mandate: 'lucky' if the market result made money, 'loss' if it lost. A loss of at least
+// BALANCE.severeBreachLossPct of starting cash is severe (fires at once).
+export function classifyBreach({ inMandate, marketResult, startingCash }) {
+    if (inMandate) return { breach: 'none', severe: false };
+    if (marketResult >= 0) return { breach: 'lucky', severe: false };
+    return { breach: 'loss', severe: marketResult <= -BALANCE.severeBreachLossPct * startingCash };
+}
+
 function usableRate(r) {
     return typeof r === 'number' && Number.isFinite(r);
 }
@@ -163,7 +171,7 @@ export function simulateQuarter(run, decisions, market, content) {
 
     // 6. Mandate and breach
     const marketResult = playerMarket - premiums;
-    const breach = inMandate ? 'none' : (marketResult >= 0 ? 'lucky' : 'loss');
+    const { breach, severe } = classifyBreach({ inMandate, marketResult, startingCash: next.startingCash });
     const playerDelta = next.cash - run.cash;
     const benchmarkDelta = next.benchmarkCash - run.benchmarkCash;
 
@@ -184,6 +192,7 @@ export function simulateQuarter(run, decisions, market, content) {
         benchmarkDelta,
         marketResult,
         breach,
+        severe,
         cashAfter: next.cash,
         benchmarkCashAfter: next.benchmarkCash,
         redLine: next.redLine,
@@ -197,6 +206,7 @@ export function simulateQuarter(run, decisions, market, content) {
     // 8. Status
     const losses = next.history.filter(s => s.breach === 'loss').length;
     if (next.cash <= 0) next.status = 'bankrupt';
+    else if (severe) next.status = 'fired';
     else if (losses >= BALANCE.breachLossesToFire) next.status = 'fired';
     else if (next.boardMood <= BALANCE.fireThreshold) next.status = 'fired';
     else if (next.quarter >= next.maxQuarters) next.status = 'complete';
