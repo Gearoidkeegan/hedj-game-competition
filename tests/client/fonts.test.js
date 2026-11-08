@@ -20,13 +20,17 @@ test('no shipped file references fonts.googleapis or fonts.gstatic', () => {
     assert.deepEqual(bad.map(f => path.relative(root, f)), []);
 });
 
-test('fonts.css declares both faces with font-display: swap from assets/fonts', () => {
+const FONT_FILES = ['PressStart2P-Regular', 'PressStart2P-LatinExt', 'VT323-Regular', 'VT323-LatinExt'];
+
+test('fonts.css declares latin + latin-ext faces for both families, swap, from assets/fonts', () => {
     const css = fs.readFileSync(path.join(root, 'css/fonts.css'), 'utf8');
-    for (const [fam, file] of [['Press Start 2P', 'PressStart2P-Regular'], ['VT323', 'VT323-Regular']]) {
-        assert.ok(css.includes(`font-family: '${fam}'`));
-        assert.ok(css.includes(`../assets/fonts/${file}.woff2`));
-    }
-    assert.equal((css.match(/font-display: swap/g) || []).length, 2);
+    for (const fam of ['Press Start 2P', 'VT323']) assert.ok(css.includes(`font-family: '${fam}'`));
+    for (const file of FONT_FILES) assert.ok(css.includes(`../assets/fonts/${file}.woff2`), file);
+    const faces = (css.match(/@font-face/g) || []).length;
+    assert.equal(faces, 4);
+    assert.equal((css.match(/font-display: swap/g) || []).length, faces);
+    assert.equal((css.match(/unicode-range:/g) || []).length, faces);
+    assert.ok(css.includes('U+20AC'), 'latin subset carries the euro sign');
 });
 
 test('every page that uses the pixel fonts links css/fonts.css', () => {
@@ -35,8 +39,11 @@ test('every page that uses the pixel fonts links css/fonts.css', () => {
     }
 });
 
-test('woff2 files are real woff2', { skip: !fs.existsSync(path.join(root, 'assets/fonts/VT323-Regular.woff2')) && 'woff2 files not yet added (download blocked)' }, () => {
-    for (const f of ['PressStart2P-Regular.woff2', 'VT323-Regular.woff2']) {
-        assert.equal(fs.readFileSync(path.join(root, 'assets/fonts', f)).subarray(0, 4).toString('latin1'), 'wOF2');
+test('woff2 files are real woff2 and the OFL licence covers both families', () => {
+    for (const f of FONT_FILES) {
+        assert.equal(fs.readFileSync(path.join(root, 'assets/fonts', `${f}.woff2`)).subarray(0, 4).toString('latin1'), 'wOF2', f);
     }
+    const ofl = fs.readFileSync(path.join(root, 'assets/fonts/OFL.txt'), 'utf8');
+    assert.equal((ofl.match(/SIL Open Font License, Version 1\.1/g) || []).length >= 2, true);
+    assert.ok(ofl.includes('Press Start 2P') && ofl.includes('VT323'));
 });
