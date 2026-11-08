@@ -71,8 +71,10 @@ export async function submitScore(payload) {
     });
 }
 
+// no-store: the server sends max-age=30, and a player who has just submitted must see their own entry.
 export async function fetchLeaderboard({ mode = 'simple', period = 'event', limit = 20 } = {}) {
-    const data = await apiFetch(`/leaderboard?mode=${encodeURIComponent(mode)}&period=${encodeURIComponent(period)}&limit=${limit}`);
+    const data = await apiFetch(`/leaderboard?mode=${encodeURIComponent(mode)}&period=${encodeURIComponent(period)}&limit=${limit}`,
+        { cache: 'no-store' });
     return data?.entries || [];
 }
 
