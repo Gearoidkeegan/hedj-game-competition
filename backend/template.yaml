@@ -34,7 +34,7 @@ Globals:
         EVENT_ID: !Ref EventId
         EVENT_END_ISO: !Ref EventEndIso
         TOKEN_TTL_HOURS: !Ref TokenTtlHours
-        ADMIN_KEY: !Ref AdminKey
+        # The admin key is set only on AnalyticsFunction and AdminFunction, the two that check it (M6).
 
 Resources:
 
@@ -236,6 +236,9 @@ Resources:
       CodeUri: ./
       Handler: handlers/analytics.handler
       Description: Track site visits and plays; admin read endpoint
+      Environment:
+        Variables:
+          ADMIN_KEY: !Ref AdminKey
       Events:
         TrackEvent:
           Type: HttpApi
@@ -259,6 +262,9 @@ Resources:
       CodeUri: ./
       Handler: handlers/admin.handler
       Description: Admin endpoints — list players, engagement metrics, prize export
+      Environment:
+        Variables:
+          ADMIN_KEY: !Ref AdminKey
       Events:
         GetPlayers:
           Type: HttpApi
