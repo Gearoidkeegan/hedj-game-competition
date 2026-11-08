@@ -603,7 +603,7 @@ export class StressFace {
         // Label above the graphic, same style as "BOARD SATISFACTION"
         const label = document.createElement('div');
         label.className = 'pixel-text';
-        label.style.cssText = 'font-size:8px;color:var(--text-secondary);text-align:center;';
+        label.style.cssText = 'font-size:12px;color:var(--text-secondary);text-align:center;';
         label.textContent = 'STRESS LEVELS';
         wrapper.appendChild(label);
 

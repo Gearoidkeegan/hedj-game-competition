@@ -11,13 +11,14 @@ import { tmsEngine } from '../engine/TMSEngine.js';
 import { GAME_CONFIG } from '../utils/constants.js';
 import { formatCurrency, formatRate, formatPercent, formatQuarter, formatPnL, pnlClass } from '../utils/formatters.js';
 import { EraPopup } from '../ui/EraPopup.js';
-import { IsometricScene } from '../ui/IsometricScene.js';
+import { SceneLoop } from '../ui/pixel/Scene.js';
+import { CashMeter } from '../ui/CashMeter.js';
 import { BloombergTerminal } from '../ui/BloombergTerminal.js';
 import { HedgeLadder } from '../ui/HedgeLadder.js';
 import { StressFace } from '../ui/StressFace.js';
 import { soundFX } from '../ui/SoundFX.js';
 import { trackEvent } from '../utils/api.js';
-import { proSceneState } from '../engine/sim/proAdapter.js';
+import { proSceneState, proCashMeterInput } from '../engine/sim/proAdapter.js';
 
 // Format exposure size using physical units (mT, bbl) when defined, otherwise currency
 function formatExposureNotional(exp, notionalUSD) {
@@ -60,6 +61,7 @@ export class DashboardScreen {
         this.selectedProductId = null;
         this.selectedBankId = null;
         this.isoScene = null;
+        this.cashMeter = null;
         this.bloombergTerminal = null;
         this.hedgeLadder = null;
         this.stressFace = null;
@@ -88,10 +90,7 @@ export class DashboardScreen {
                     <div class="quarter-pips" id="quarter-pips"></div>
                 </div>
                 <div class="qbar-row2">
-                    <span class="qbar-stat">
-                        <span class="pixel-text" style="font-size:8px;color:var(--text-secondary)">CASH</span>
-                        <span class="pixel-text" style="font-size:9px;color:${state.cashBalance >= state.startingCash * 0.2 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'}">${formatCurrency(state.cashBalance, state.industry?.baseCurrency, true)}</span>
-                    </span>
+                    <span class="qbar-stat pro-cash" id="pro-cash-meter"></span>
                     <span class="qbar-stat">
                         <span class="pixel-text" style="font-size:8px;color:var(--text-secondary)">P&L</span>
                         <span class="pixel-text ${pnlClass(state.cumulativePnL)}" style="font-size:9px">${formatPnL(state.cumulativePnL, state.industry?.baseCurrency)}</span>
@@ -240,6 +239,7 @@ export class DashboardScreen {
         this.renderPolicy();
         this.drawIsometricScene();
         this.updateTradeCountBadge();
+        this.updateCashMeter();
 
         // Tab switching (with mobile HEDGING tab support)
         this.el.querySelectorAll('.tab').forEach(tab => {
@@ -312,6 +312,7 @@ export class DashboardScreen {
             this._exposureUnlockHandler = null;
         }
         if (this.isoScene) { this.isoScene.stop(); this.isoScene = null; }
+        if (this.cashMeter) { this.cashMeter.destroy(); this.cashMeter = null; }
         if (this.bloombergTerminal) { this.bloombergTerminal.stop(); this.bloombergTerminal = null; }
         if (this.mobileBloomberg) { this.mobileBloomberg.stop(); this.mobileBloomberg = null; }
         if (this.stressFace) { this.stressFace.stop(); this.stressFace = null; }
@@ -991,7 +992,21 @@ export class DashboardScreen {
         this.selectExposure(exp.underlying);
     }
 
+    // The v3 cash meter in the quarter bar, fed with the dashboard's own cash numbers (not the economic cash that scores).
+    updateCashMeter() {
+        const host = this.el?.querySelector('#pro-cash-meter');
+        if (!host) return;
+        const state = gameState.get();
+        if (!this.cashMeter) {
+            this.cashMeter = new CashMeter(host, { currency: state.industry?.baseCurrency || 'EUR' });
+            this.cashMeter.set(proCashMeterInput(state), 0);
+        } else {
+            this.cashMeter.set(proCashMeterInput(state), 600);
+        }
+    }
+
     updateQuarterBarSatisfaction() {
+        this.updateCashMeter();
         const state = gameState.get();
         const el = this.el.querySelector('#qbar-satisfaction');
         if (!el) return;
@@ -1953,8 +1968,14 @@ export class DashboardScreen {
         if (!canvas) return;
         const state = gameState.get();
         if (this.isoScene) this.isoScene.stop();
-        this.isoScene = new IsometricScene(canvas);
-        this.isoScene.start(state.industry?.scene || 'airport', state.currentYearOffset, state.currentQuarter, proSceneState(state));
+        // SceneLoop sizes the canvas to its parent, which has a definite CSS height (.isometric-viewport).
+        // The state is read on every frame, so the mood follows the last resolved quarter.
+        canvas.style.imageRendering = 'pixelated';
+        this.isoScene = new SceneLoop(canvas, () => {
+            const st = gameState.get();
+            return { industryId: st.industry?.scene || st.industry?.id || 'airport', sceneState: proSceneState(st) };
+        });
+        this.isoScene.start();
     }
 
     startBloombergForExposure(exposure) {

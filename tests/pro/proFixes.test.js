@@ -245,7 +245,7 @@ test('toQuarterSummary benchmarkDelta equals sum of exposure details', () => {
     assert.equal(summary.q, 1);
     assert.equal(summary.inMandate, result.inMandate);
     assert.equal(summary.redLine, 0.2 * s.startingCash);
-    assert.equal(summary.lines.length, exposureDetails.length);
+    assert.equal(summary.lines.filter(l => l.exposureId !== 'other').length, exposureDetails.length);
     near(summary.cashAfter, s.startingCash + summary.playerDelta);
     near(summary.benchmarkCashAfter, s.startingCash + summary.benchmarkDelta);
     const expected = classifyBreach({ inMandate: summary.inMandate, marketResult: summary.marketResult, startingCash: s.startingCash });

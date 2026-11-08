@@ -4,27 +4,49 @@ import { gameState } from '../engine/GameState.js';
 import { gameLoop } from '../engine/GameLoop.js';
 import { boardAI } from '../engine/BoardAI.js';
 import { formatPnL, formatQuarter, pnlClass } from '../utils/formatters.js';
+import { toQuarterSummary } from '../engine/sim/proAdapter.js';
+import { boardLineKey, expressionFor, cosmeticRng } from './simple/RunController.js';
+import { typewrite } from '../ui/typewriter.js';
 
-const CEO_EMOJIS = {
-    'jameson': '📰',
-    'musk': '🚀',
-    'oleary': '✈️',
-    'dimon': '🏦',
-    'buffett': '🍦',
-    'jobs': '🍎',
-    'dorsey': '🧘',
-    'ackman': '📝'
-};
 import { StressFace } from '../ui/StressFace.js';
 import { soundFX } from '../ui/SoundFX.js';
-import { drawSprite, spriteIdForMember } from '../ui/pixel/sprites.js';
+import { drawSprite, spriteIdForMember, CHAIRMAN_SPRITES } from '../ui/pixel/sprites.js';
+
+// Salt for the board-review quips, clear of the Simple screens' cosmetic salts.
+const QUIP_SALT = 400;
+
+/**
+ * D1 quips for the regular board members, chosen by the board-line precedence in contract.md.
+ * Returns { key, expression } and swaps each member's lines for one quip; members whose personality has no
+ * quip for the key keep BoardAI's own lines. Never throws: on any failure the BoardAI lines stand.
+ */
+export function applyBoardQuips(feedback, quips, state, lastResult, moodBefore) {
+    try {
+        const summary = toQuarterSummary(state, lastResult);
+        const key = boardLineKey(summary, moodBefore);
+        const expression = expressionFor(key);
+        if (!quips?.board) return { key, expression };
+        const rng = cosmeticRng(state.seed || 0, QUIP_SALT + (lastResult?.quarter || 0));
+        for (const f of feedback) {
+            if (f.member.personality === 'ceo') continue;
+            const pool = quips.board[f.member.personality]?.[key];
+            const line = Array.isArray(pool) && pool.length ? rng.pick(pool) : '';
+            if (line) f.lines = [line];
+        }
+        return { key, expression };
+    } catch (err) {
+        console.error('Board quips unavailable, using BoardAI lines', err);
+        return { key: null, expression: null };
+    }
+}
 
 export class BoardScreen {
     constructor(app) {
         this.app = app;
         this.el = null;
-        this.typewriterTimers = [];
+        this.typing = null;
         this.stressFace = null;
+        this.expression = null;
         this.currentMemberIndex = 0;
         this._allMembers = [];
     }
@@ -38,6 +60,7 @@ export class BoardScreen {
 
         // Get BoardAI feedback (rich dialogue + CEO appearance)
         const feedback = boardAI.generateFeedback();
+        const moodBefore = state.boardSatisfaction;
 
         // Calculate total satisfaction change
         const totalDelta = feedback.reduce((sum, f) => sum + f.satisfactionDelta, 0);
@@ -46,13 +69,16 @@ export class BoardScreen {
         const clampedDelta = Math.round(Math.max(-15, Math.min(5, totalDelta)));
         gameState.adjustSatisfaction(clampedDelta);
 
+        // v3 voice: D1 quips by board-line precedence, and the sprite expression that goes with them.
+        this.expression = applyBoardQuips(feedback, this.app?.content?.quips, gameState.get(), lastResult, moodBefore).expression;
+
         // Also apply event-based satisfaction if there was a recent event
         const eventResult = state.lastEventResult;
         let eventNote = '';
         if (eventResult) {
             if (eventResult.type === 'part2_resolved' && eventResult.boardReactions?.length > 0) {
                 eventNote = eventResult.boardReactions.map(r =>
-                    `<div style="font-style:italic;color:${r.type.includes('praise') ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};font-size:14px;margin-top:4px;">"${r.text}"</div>`
+                    `<div style="font-style:italic;color:${r.type.includes('praise') ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};font-size:18px;margin-top:4px;">"${r.text}"</div>`
                 ).join('');
             }
         }
@@ -67,8 +93,8 @@ export class BoardScreen {
                 <span class="quarter-label">BOARD REVIEW — ${formatQuarter(state.currentYearOffset, state.currentQuarter)}</span>
                 <span id="board-stress-face"></span>
                 <span>
-                    <span class="pixel-text" style="font-size:8px;color:var(--text-secondary)">QUARTERLY P&L</span>
-                    <span class="pixel-text ${pnlClass(lastResult?.netPnL || 0)}" style="font-size:10px">${formatPnL(lastResult?.netPnL || 0)}</span>
+                    <span class="pixel-text" style="font-size:12px;color:var(--text-secondary)">QUARTERLY P&L</span>
+                    <span class="pixel-text ${pnlClass(lastResult?.netPnL || 0)}" style="font-size:12px">${formatPnL(lastResult?.netPnL || 0)}</span>
                 </span>
             </div>
 
@@ -76,13 +102,13 @@ export class BoardScreen {
                 <!-- Satisfaction change — shown first so it's always visible -->
                 <div style="text-align:center;margin-bottom:12px;">
                     <div class="panel" style="display:inline-block;min-width:280px;max-width:95vw;">
-                        <div style="font-family:var(--font-pixel);font-size:9px;color:var(--text-secondary);margin-bottom:8px;">BOARD SATISFACTION</div>
+                        <div style="font-family:var(--font-readable);font-size:18px;color:var(--text-secondary);margin-bottom:8px;">BOARD SATISFACTION</div>
                         <div class="gauge" style="width:100%;height:24px;">
                             <div class="gauge-fill ${state.boardSatisfaction >= 50 ? 'high' : state.boardSatisfaction >= 25 ? 'mid' : 'low'}"
                                  style="width:${state.boardSatisfaction}%"></div>
                             <div class="gauge-label">${state.boardSatisfaction}%</div>
                         </div>
-                        <div style="font-family:var(--font-pixel);font-size:9px;margin-top:6px;color:${clampedDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'}">
+                        <div style="font-family:var(--font-readable);font-size:20px;margin-top:6px;color:${clampedDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'}">
                             ${clampedDelta >= 0 ? '+' : ''}${clampedDelta}
                         </div>
                     </div>
@@ -98,14 +124,14 @@ export class BoardScreen {
 
                 ${eventNote ? `
                     <div class="panel" id="event-note-panel" style="margin-top:12px;border-color:var(--gold-dark);display:none;">
-                        <div class="pixel-text" style="font-size:7px;color:var(--gold);margin-bottom:4px;">RE: RECENT EVENT</div>
+                        <div class="pixel-text" style="font-size:12px;color:var(--gold);margin-bottom:4px;">RE: RECENT EVENT</div>
                         ${eventNote}
                     </div>
                 ` : ''}
             </div>
 
             <div class="dashboard-footer">
-                <div class="pixel-text" id="member-counter" style="font-size:7px;color:var(--text-muted);align-self:center;padding-left:8px;"></div>
+                <div class="pixel-text" id="member-counter" style="font-size:14px;color:var(--text-muted);align-self:center;padding-left:8px;"></div>
                 <button class="btn btn-primary" id="btn-board-advance">NEXT →</button>
             </div>
         `;
@@ -146,16 +172,13 @@ export class BoardScreen {
     }
 
     unmount() {
-        this.typewriterTimers.forEach(t => clearTimeout(t));
-        this.typewriterTimers = [];
+        if (this.typing) { this.typing.cancel(); this.typing = null; }
         if (this.stressFace) { this.stressFace.stop(); this.stressFace = null; }
         this.currentMemberIndex = 0;
     }
 
     showMember(index) {
-        // Clear any running typewriters
-        this.typewriterTimers.forEach(t => clearTimeout(t));
-        this.typewriterTimers = [];
+        if (this.typing) { this.typing.cancel(); this.typing = null; }
 
         const fb = this._allMembers[index];
         const isLast = index === this._allMembers.length - 1;
@@ -188,12 +211,12 @@ export class BoardScreen {
                 <div class="ceo-appearance">
                     <div class="panel" style="border-color:var(--gold);background:rgba(255,204,0,0.05);">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="font-size:28px;">${CEO_EMOJIS[boardAI.ceoPersona] || '👑'}</span>
+                            <canvas class="ceo-portrait" width="128" height="128" style="width:64px;height:64px;image-rendering:pixelated;"></canvas>
                             <div>
-                                <div class="pixel-text" style="font-size:9px;color:var(--gold);">${fb.member.name}</div>
-                                <div style="font-family:var(--font-pixel);font-size:7px;color:var(--text-muted);">CHAIRMAN OF THE BOARD</div>
+                                <div class="pixel-text" style="font-size:12px;color:var(--gold);">${fb.member.name}</div>
+                                <div style="font-family:var(--font-readable);font-size:16px;color:var(--text-muted);">CHAIRMAN OF THE BOARD</div>
                             </div>
-                            <div class="board-member-delta" style="font-family:var(--font-pixel);font-size:7px;color:${fb.satisfactionDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};">
+                            <div class="board-member-delta" style="font-family:var(--font-readable);font-size:18px;color:${fb.satisfactionDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};">
                                 ${fb.satisfactionDelta >= 0 ? '+' : ''}${Math.round(fb.satisfactionDelta)}
                             </div>
                         </div>
@@ -209,7 +232,7 @@ export class BoardScreen {
                     <div class="board-member-portrait"><canvas width="128" height="128" style="width:64px;height:64px;image-rendering:pixelated;"></canvas></div>
                     <div class="board-member-name">${fb.member.name}</div>
                     <div class="board-member-role">${fb.member.role}</div>
-                    <div class="board-member-delta" style="font-family:var(--font-pixel);font-size:7px;color:${fb.satisfactionDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};">
+                    <div class="board-member-delta" style="font-family:var(--font-readable);font-size:18px;color:${fb.satisfactionDelta >= 0 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'};">
                         ${fb.satisfactionDelta >= 0 ? '+' : ''}${Math.round(fb.satisfactionDelta)}
                     </div>
                     <div class="board-speech" id="current-speech">
@@ -219,43 +242,28 @@ export class BoardScreen {
             `;
         }
 
+        const expression = this.expression || (fb.satisfactionDelta > 0 ? 'happy' : fb.satisfactionDelta < 0 ? 'angry' : 'neutral');
         const portrait = memberSlot.querySelector('.board-member-portrait canvas');
         if (portrait) {
-            const expression = fb.satisfactionDelta > 0 ? 'happy' : fb.satisfactionDelta < 0 ? 'angry' : 'neutral';
             drawSprite(portrait.getContext('2d'), spriteIdForMember(fb.member, index), expression, 0, 0, 4);
         }
+        const ceoPortrait = memberSlot.querySelector('.ceo-portrait');
+        if (ceoPortrait) {
+            const id = CHAIRMAN_SPRITES[boardAI.ceoPersona] ? boardAI.ceoPersona : 'jameson';
+            drawSprite(ceoPortrait.getContext('2d'), id, 'neutral', 0, 0, 4);
+        }
 
-        // Start typewriter for this member
+        // Typewriter for this member: 8 ms per character, and a tap on the speech completes it.
         const text = fb.lines.join(' ');
-        this.typewriteText('current-speech', text, 150);
-    }
-
-    typewriteText(elementId, text, delay = 0) {
-        const container = this.el.querySelector(`#${elementId}`);
-        if (!container) return;
-
-        const textSpan = container.querySelector('.speech-text');
-        const cursor = container.querySelector('.blink');
-        if (!textSpan) return;
-
-        let index = 0;
-        // Adaptive speed: longer text types faster so players don't wait forever
-        const speed = text.length > 200 ? 12 : text.length > 100 ? 20 : 30;
-
-        const timer = setTimeout(() => {
-            const typeTimer = setInterval(() => {
-                if (index < text.length) {
-                    textSpan.textContent += text[index];
-                    index++;
-                } else {
-                    clearInterval(typeTimer);
-                    if (cursor) cursor.style.display = 'none';
-                }
-            }, speed);
-
-            this.typewriterTimers.push(typeTimer);
-        }, delay);
-
-        this.typewriterTimers.push(timer);
+        const speech = memberSlot.querySelector('#current-speech');
+        if (speech) {
+            const typing = typewrite({
+                textEl: speech.querySelector('.speech-text'),
+                cursorEl: speech.querySelector('.blink'),
+                text
+            });
+            this.typing = typing;
+            speech.addEventListener('click', () => typing.complete());
+        }
     }
 }

@@ -65,6 +65,17 @@ export function toQuarterSummary(state, quarterResult) {
 
     const ev = (state.eventHistory || []).find(e => e.quarter === quarterResult.quarter);
 
+    // Hedges whose underlying has no exposure detail, plus trading costs and premiums, go on an "other" line so
+    // that the sum of (exposureImpact + hedgeImpact) over the lines equals marketResult exactly.
+    const attributed = lines.reduce((s, l) => s + l.hedgeImpact, 0);
+    const otherHedge = num(quarterResult.hedgePnL) - attributed - num(quarterResult.tradingCosts) - num(quarterResult.premiums);
+    if (Math.abs(otherHedge) > 1e-9) {
+        lines.push({
+            exposureId: 'other', movePct: 0, exposureImpact: 0, hedgeImpact: otherHedge,
+            realisedNotional: 0, forecastNotional: 0
+        });
+    }
+
     return {
         q: num(quarterResult.quarter) + 1,
         policy,
@@ -81,6 +92,15 @@ export function toQuarterSummary(state, quarterResult) {
         lines,
         event: ev ? { id: ev.eventId, choice: ev.choiceId ?? null } : null,
         powerUp: null
+    };
+}
+
+// Input for the CashMeter on the Pro dashboard: the dashboard's own cash balance, with the 20% red line.
+export function proCashMeterInput(state) {
+    return {
+        cash: num(state.cashBalance),
+        startingCash: num(state.startingCash),
+        redLine: BALANCE.redLinePct * num(state.startingCash)
     };
 }
 
