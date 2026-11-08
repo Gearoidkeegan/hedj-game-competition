@@ -5,6 +5,7 @@ import { fetchLeaderboard, fetchPlayCount } from '../utils/api.js';
 import { CONFIG } from '../config.js';
 import { careerEngine } from '../engine/CareerEngine.js';
 import { soundFX } from '../ui/SoundFX.js';
+import { escapeHtml } from '../utils/escape.js';
 
 export class TitleScreen {
     constructor(app) {
@@ -116,8 +117,8 @@ export class TitleScreen {
         });
 
         // Pre-fetch global leaderboard for attract mode display
-        fetchLeaderboard(5).then(data => {
-            this.cachedGlobalBoard = data?.entries || null;
+        fetchLeaderboard({ limit: 5 }).then(entries => {
+            this.cachedGlobalBoard = entries || null;
         }).catch(() => {});
 
         // Show registered player name with option to switch
@@ -125,7 +126,7 @@ export class TitleScreen {
         if (reg && reg.playerName && reg.gameTokenExpiry > Date.now()) {
             const switcher = this.el.querySelector('#player-switcher');
             if (switcher) {
-                switcher.innerHTML = `Playing as ${reg.playerName} &bull; <a href="#" id="btn-switch-player" style="color:var(--cyan);text-decoration:underline;">Not you?</a>`;
+                switcher.innerHTML = `Playing as ${escapeHtml(reg.playerName)} &bull; <a href="#" id="btn-switch-player" style="color:var(--cyan);text-decoration:underline;">Not you?</a>`;
                 switcher.style.display = 'block';
                 switcher.querySelector('#btn-switch-player').addEventListener('click', (e) => {
                     e.preventDefault();
@@ -335,7 +336,7 @@ export class TitleScreen {
         const rows = top5.map((e) => `
             <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(136,170,204,0.15);">
                 <span class="pixel-text" style="font-size:8px;color:${e.rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'};">${e.rank}.</span>
-                <span class="pixel-text" style="font-size:8px;color:var(--text-primary);flex:1;margin-left:6px;">${e.playerName}</span>
+                <span class="pixel-text" style="font-size:8px;color:var(--text-primary);flex:1;margin-left:6px;">${escapeHtml(e.playerName)}</span>
                 <span class="pixel-text" style="font-size:8px;color:var(--cyan);">${e.score}</span>
                 <span class="pixel-text" style="font-size:8px;color:var(--gold);margin-left:6px;">${e.grade}</span>
             </div>
@@ -396,7 +397,7 @@ export class TitleScreen {
 
         const body = overlay.querySelector('#lb-body');
         try {
-            const { entries } = await fetchLeaderboard(20);
+            const entries = await fetchLeaderboard({ limit: 20 });
             this.cachedGlobalBoard = entries;
             body.innerHTML = this.buildLeaderboardTable(entries, false);
         } catch {
@@ -419,7 +420,7 @@ export class TitleScreen {
         const rows = entries.map(e => `
             <tr>
                 <td style="color:${e.rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'}">${e.rank}</td>
-                <td>${e.playerName}</td>
+                <td>${escapeHtml(e.playerName)}</td>
                 <td style="color:var(--text-muted)">${e.industry || ''}</td>
                 <td style="color:var(--cyan)">${e.score}</td>
                 <td style="color:var(--gold)">${e.grade}</td>

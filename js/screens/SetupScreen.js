@@ -11,6 +11,7 @@ import { HEDGING_POLICY_TYPES } from '../utils/constants.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { SeededRandom, generateSeed } from '../utils/random.js';
 import { getRegistration } from '../utils/storage.js';
+import { escapeHtml } from '../utils/escape.js';
 
 export class SetupScreen {
     constructor(app) {
@@ -62,7 +63,7 @@ export class SetupScreen {
                 <div class="setup-fields">
                     <div class="setup-field">
                         <label>YOUR NAME</label>
-                        <input type="text" id="player-name" placeholder="Treasury Manager" maxlength="20" value="${prefillName}">
+                        <input type="text" id="player-name" placeholder="Treasury Manager" maxlength="20" value="${escapeHtml(prefillName)}">
                     </div>
                     <div class="setup-field">
                         <label>CHARACTER</label>

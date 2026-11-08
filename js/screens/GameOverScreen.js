@@ -7,6 +7,7 @@ import { formatPnL, formatPercent, formatCurrency } from '../utils/formatters.js
 import { addLeaderboardEntry, getLeaderboard, getRegistration, savePendingScore, clearPendingScore } from '../utils/storage.js';
 import { submitScore, fetchLeaderboard } from '../utils/api.js';
 import { soundFX } from '../ui/SoundFX.js';
+import { escapeHtml } from '../utils/escape.js';
 
 export class GameOverScreen {
     constructor(app) {
@@ -154,7 +155,7 @@ export class GameOverScreen {
             <div class="panel" style="max-width:500px;width:100%;margin-bottom:16px;text-align:center;">
                 <div class="panel-title">SHARE YOUR SCORE</div>
                 <div class="readable-text" style="font-size:14px;color:var(--text-secondary);margin-bottom:8px;user-select:all;" id="share-text">
-                    I scored ${Math.round(finalScore)} (${gradeInfo.grade}) as Treasury Manager of ${state.industry?.name || 'a company'}! Can you beat me? 🎮💰 #TreasuryManagerSimulator
+                    I scored ${Math.round(finalScore)} (${gradeInfo.grade}) as Treasury Manager of ${escapeHtml(state.industry?.name || 'a company')}! Can you beat me? 🎮💰 #TreasuryManagerSimulator
                 </div>
                 <button class="btn" id="btn-copy-score" style="font-size:14px;min-height:28px;padding:4px 12px;">📋 Copy Score</button>
             </div>
@@ -368,7 +369,7 @@ export class GameOverScreen {
         overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
         try {
-            const { entries } = await fetchLeaderboard(20);
+            const entries = await fetchLeaderboard({ limit: 20 });
             this.renderLeaderboardTable(overlay.querySelector('#leaderboard-body'), entries, false);
         } catch {
             const local = getLeaderboard();
@@ -401,7 +402,7 @@ export class GameOverScreen {
                     ${entries.map(e => `
                         <tr>
                             <td style="color:${e.rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'}">${e.rank}</td>
-                            <td>${e.playerName}</td>
+                            <td>${escapeHtml(e.playerName)}</td>
                             <td style="color:var(--text-muted)">${e.industry}</td>
                             <td style="color:var(--cyan)">${e.score}</td>
                             <td style="color:var(--gold)">${e.grade}</td>

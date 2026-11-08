@@ -6,6 +6,7 @@ import { gameLoop } from '../engine/GameLoop.js';
 import { formatPnL, formatQuarter } from '../utils/formatters.js';
 import { EraPopup } from '../ui/EraPopup.js';
 import { soundFX } from '../ui/SoundFX.js';
+import { escapeHtml } from '../utils/escape.js';
 
 export class EventScreen {
     constructor(app) {
@@ -41,7 +42,7 @@ export class EventScreen {
                     <div class="pixel-text" style="font-size:8px;color:var(--highlight);margin-bottom:6px;">
                         ${event.materialised ? 'OUTCOME' : 'RESULT'}
                     </div>
-                    <p style="font-size:11px;color:var(--text-primary);">${event.outcome.description}</p>
+                    <p style="font-size:11px;color:var(--text-primary);">${escapeHtml(event.outcome.description)}</p>
                     ${event.outcome.board_reactions ? this.renderBoardReactions(event.outcome.board_reactions) : ''}
                 </div>
             ` : ''}
@@ -79,7 +80,7 @@ export class EventScreen {
                         ` : event.choices.map(choice => `
                             <button class="btn event-choice-btn" data-choice="${choice.id}">
                                 <div class="choice-label">${choice.label}</div>
-                                <div class="choice-desc">${choice.description}</div>
+                                <div class="choice-desc">${escapeHtml(choice.description)}</div>
                             </button>
                         `).join('')}
                     </div>

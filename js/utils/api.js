@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js';
-import { getRegistration } from './storage.js';
+import { getRegistration, getQueuedScores, removeQueuedScore } from './storage.js';
 
 const TIMEOUT_MS = 10000;
 
@@ -43,18 +43,86 @@ export async function register(playerName, email, company, marketingConsent = fa
     return data; // { gameToken, expiresAt }
 }
 
-export async function submitScore(payload) {
+// Registration with a token that has not expired, or null.
+function validRegistration() {
     const reg = getRegistration();
-    if (!reg?.gameToken) throw new ApiError('Not registered', 401);
-    const data = await apiFetch('/score', {
-        method: 'POST',
-        body: JSON.stringify({ ...payload, gameToken: reg.gameToken, email: reg.email })
-    });
-    return data; // { rank }
+    if (!reg?.gameToken || !reg.email) return null;
+    if (reg.gameTokenExpiry && reg.gameTokenExpiry <= Date.now()) return null;
+    return reg;
 }
 
-export async function fetchLeaderboard(limit = 20) {
-    return apiFetch(`/leaderboard?limit=${limit}`);
+function authHeaders(reg) {
+    return { 'x-player-email': reg.email, 'x-game-token': reg.gameToken };
+}
+
+// Returns { rank, best, isBest }, or { duplicate: true } when the gameId was already submitted.
+export async function submitScore(payload) {
+    const reg = validRegistration();
+    if (!reg) throw new ApiError('Not registered', 401);
+    return apiFetch('/score', {
+        method: 'POST',
+        body: JSON.stringify({
+            ...payload,
+            playerName: payload.playerName || reg.playerName,
+            email: payload.email || reg.email,
+            gameToken: reg.gameToken
+        })
+    });
+}
+
+export async function fetchLeaderboard({ mode = 'simple', period = 'event', limit = 20 } = {}) {
+    const data = await apiFetch(`/leaderboard?mode=${encodeURIComponent(mode)}&period=${encodeURIComponent(period)}&limit=${limit}`);
+    return data?.entries || [];
+}
+
+export async function getRemoteProgress() {
+    const reg = validRegistration();
+    if (!reg) return null;
+    const data = await apiFetch('/progress', { headers: authHeaders(reg) });
+    return data?.progress || null;
+}
+
+export async function putRemoteProgress(progress) {
+    const reg = validRegistration();
+    if (!reg) throw new ApiError('Not registered', 401);
+    const data = await apiFetch('/progress', {
+        method: 'PUT',
+        headers: authHeaders(reg),
+        body: JSON.stringify({ progress })
+    });
+    return data?.progress || null;
+}
+
+let flushing = null;
+
+// Sends queued scores. Keeps an item on a network failure or 401 (and stops, to retry later), drops it on any other 4xx (401, 408, 429 and 5xx are kept).
+// Returns how many were sent. Only sends a player's scores while that same player is registered on this device.
+export function flushScoreQueue() {
+    if (!flushing) {
+        flushing = doFlush().finally(() => { flushing = null; });
+    }
+    return flushing;
+}
+
+async function doFlush() {
+    let sent = 0;
+    for (const item of getQueuedScores()) {
+        const reg = validRegistration();
+        if (!reg) break;
+        if (item.email && String(item.email).toLowerCase() !== reg.email.toLowerCase()) continue;
+        try {
+            await submitScore(item);
+            removeQueuedScore(item.gameId);
+            sent++;
+        } catch (err) {
+            if (err.status >= 400 && err.status < 500 && ![401, 408, 429].includes(err.status)) {
+                removeQueuedScore(item.gameId);
+                continue;
+            }
+            break;
+        }
+    }
+    return sent;
 }
 
 export async function fetchPlayCount() {

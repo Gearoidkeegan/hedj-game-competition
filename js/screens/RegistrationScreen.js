@@ -2,6 +2,7 @@
 // Shown before SetupScreen when no valid game token is stored
 
 import { register } from '../utils/api.js';
+import { escapeHtml } from '../utils/escape.js';
 import { saveRegistration, getRegistration, clearRegistration } from '../utils/storage.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -177,12 +178,4 @@ export class RegistrationScreen {
             el.textContent = msg;
         }
     }
-}
-
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
 }

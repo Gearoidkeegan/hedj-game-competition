@@ -39,19 +39,28 @@ function union(a, b) {
 }
 
 const num = v => (Number.isFinite(v) ? v : 0);
-// Stored lists that are not arrays (corrupt or foreign data) count as empty rather than being spread.
-const list = v => (Array.isArray(v) ? v : []);
 
-// Tolerates missing or partial (older) stored progress. The result is always version 3.
+// Normalisation mirrors backend/lib/progress.mjs (the authority): ids must match the sync pattern,
+// arrays are de-duplicated and capped at 50, runs is a floored count, bests are rounded and clamped to 0..10000.
+const SCORE_MAX = 10000;
+const MAX_ARRAY_LEN = 50;
+const MAX_RUNS = 1_000_000;
+const ID_RE = /^[a-z0-9:_-]{1,40}$/i;
+const count = v => (Number.isFinite(v) && v > 0 ? Math.min(Math.floor(v), MAX_RUNS) : 0);
+const bestScore = v => (Number.isFinite(v) && v > 0 ? Math.min(Math.round(v), SCORE_MAX) : 0);
+const ids = v => (Array.isArray(v) ? [...new Set(v.filter(x => typeof x === 'string' && ID_RE.test(x)))].slice(0, MAX_ARRAY_LEN) : []);
+
+// Tolerates missing, partial or malformed stored progress. The result is always version 3.
 function normalise(p) {
-    const src = p && typeof p === 'object' ? p : {};
+    const src = p && typeof p === 'object' && !Array.isArray(p) ? p : {};
+    const best = src.best && typeof src.best === 'object' ? src.best : {};
     return {
         version: 3,
-        runs: num(src.runs),
-        best: { simple: num(src.best?.simple), pro: num(src.best?.pro) },
-        unlocked: union(list(src.unlocked), []),
-        chairmenMet: union(list(src.chairmenMet), []),
-        crisisBadges: union(list(src.crisisBadges), [])
+        runs: count(src.runs),
+        best: { simple: bestScore(best.simple), pro: bestScore(best.pro) },
+        unlocked: ids(src.unlocked),
+        chairmenMet: ids(src.chairmenMet),
+        crisisBadges: ids(src.crisisBadges)
     };
 }
 
@@ -92,9 +101,9 @@ export function mergeProgress(a, b) {
         version: 3,
         runs: Math.max(x.runs, y.runs),
         best: { simple: Math.max(x.best.simple, y.best.simple), pro: Math.max(x.best.pro, y.best.pro) },
-        unlocked: union(x.unlocked, y.unlocked),
-        chairmenMet: union(x.chairmenMet, y.chairmenMet),
-        crisisBadges: union(x.crisisBadges, y.crisisBadges)
+        unlocked: union(x.unlocked, y.unlocked).slice(0, MAX_ARRAY_LEN),
+        chairmenMet: union(x.chairmenMet, y.chairmenMet).slice(0, MAX_ARRAY_LEN),
+        crisisBadges: union(x.crisisBadges, y.crisisBadges).slice(0, MAX_ARRAY_LEN)
     };
 }
 
