@@ -14,7 +14,7 @@ function make(opts = {}) {
     const dial = new HedgeDial(host, { onChange: v => changes.push(v), ...opts });
     const steps = () => host.querySelectorAll('[data-step]');
     const step = v => host.querySelector(`[data-step="${v}"]`);
-    const slider = host.querySelector('[role="slider"]');
+    const slider = host.querySelector('[role="radiogroup"]');
     return { host, dial, changes, steps, step, slider };
 }
 
@@ -28,12 +28,13 @@ test('five detents at 0/25/50/75/100, rendered as buttons', () => {
 });
 
 test('the initial value snaps to the nearest detent and is shown as pressed', () => {
-    const { dial, step, slider } = make({ value: 0.6 });
+    const { dial, step, slider, steps } = make({ value: 0.6 });
     assert.equal(dial.value, 0.5);
-    assert.equal(step(0.5).getAttribute('aria-pressed'), 'true');
-    assert.equal(step(0.25).getAttribute('aria-pressed'), 'false');
-    assert.equal(slider.getAttribute('aria-valuenow'), '50');
-    assert.equal(slider.getAttribute('aria-valuetext'), '50% hedged');
+    assert.equal(step(0.5).getAttribute('aria-checked'), 'true');
+    assert.equal(step(0.25).getAttribute('aria-checked'), 'false');
+    assert.equal(slider.getAttribute('role'), 'radiogroup');
+    assert.ok(!slider.getAttribute('aria-valuemax'), 'no slider-only attributes on a radiogroup');
+    assert.ok(steps().every(b => b.getAttribute('role') === 'radio'));
 });
 
 test('tapping a detent sets the value and calls onChange once', () => {
@@ -63,7 +64,7 @@ test('steps above the cap are locked: disabled, marked, and unreachable by tap',
 
 test('arrow keys move one detent, stay inside 0..cap, and Home/End jump to the ends', () => {
     const { dial, changes, slider } = make({ value: 0.25, max: 0.75 });
-    assert.equal(slider.getAttribute('tabindex'), '0');
+    assert.equal(slider.getAttribute('tabindex'), null, 'the group itself is not a tab stop');
     let e = key(slider, 'ArrowRight');
     assert.equal(dial.value, 0.5);
     assert.equal(e.defaultPrevented, true);
@@ -148,4 +149,23 @@ test('destroy empties the host and removes the key listener', () => {
     dial.destroy();
     assert.equal(slider.listenerCount('keydown'), 0);
     assert.equal(host.children.length, 0);
+});
+
+test('roving tabindex: the checked radio is the one tab stop and arrows move focus, skipping capped steps', () => {
+    const { dial, host, steps, slider, step } = make({ value: 0.25, max: 0.5 });
+    const tabs = () => steps().filter(b => b.getAttribute('tabindex') === '0').map(b => b.getAttribute('data-step'));
+    assert.deepEqual(tabs(), ['0.25']);
+    key(slider, 'ArrowRight');
+    assert.deepEqual(tabs(), ['0.5']);
+    assert.equal(dom.document.activeElement, step(0.5), 'focus follows the selection');
+    key(slider, 'ArrowRight');   // 0.75 is capped: stays on the cap
+    assert.equal(dial.value, 0.5);
+    assert.deepEqual(tabs(), ['0.5']);
+    assert.equal(dom.document.activeElement, step(0.5));
+    key(slider, 'Home');
+    assert.deepEqual(tabs(), ['0']);
+    assert.equal(dom.document.activeElement, step(0));
+    key(slider, 'End');
+    assert.equal(dom.document.activeElement, step(0.5));
+    assert.ok(host);
 });

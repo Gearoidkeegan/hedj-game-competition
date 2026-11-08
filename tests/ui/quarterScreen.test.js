@@ -19,6 +19,7 @@ class FakeStorage {
 
 const content = {
     industries: loadIndustries(),
+    eventsLoaded: true,
     events: loadJson('data/simple-events.json').events,
     quips: loadJson('data/quips.json'),
     powerups: loadJson('data/powerups.json')
@@ -104,7 +105,7 @@ test('RUN sends the dials as decisions and goes to the result screen (2 taps)', 
 test('the dials start at the RunController defaults', () => {
     const { rc, card } = setup(SEED.band2550);
     const d = rc.currentDecisionsDefaults();
-    const pressed = id => card(id).querySelector('[aria-pressed="true"]').getAttribute('data-step');
+    const pressed = id => card(id).querySelector('[aria-checked="true"]').getAttribute('data-step');
     assert.equal(pressed('usd-revenue'), String(d.hedges['usd-revenue']));
     assert.equal(pressed('fuel'), '0');
 });
@@ -285,8 +286,8 @@ test('offPolicyExposures mirrors the engine: clamps to the cap, skips unhedgeabl
 
 test('keyboard: arrow keys on a dial change the decision', () => {
     const { card, run, played } = setup(SEED.band2550);
-    const slider = card('usd-revenue').querySelector('[role="slider"]');
-    key(slider, 'ArrowLeft');
+    const radiogroup = card('usd-revenue').querySelector('[role="radiogroup"]');
+    key(radiogroup, 'ArrowLeft');
     run.click();
     assert.equal(played[0].hedges['usd-revenue'], 0.25);
 });
@@ -322,4 +323,129 @@ test('unmount stops the scene loop and is safe to call twice', () => {
     screen.unmount();
     assert.equal(screen.scene, null);
     screen.unmount();
+});
+
+// ── B4 follow-ups (B2 review minors) ─────────────────────────────────────
+
+test('Q8 on a no-policy board: no propose control and no nudge either', () => {
+    const { q, qa } = setup(SEED.none, { patch: { quarter: 7 } });
+    assert.equal(q('.q-propose'), null);
+    assert.equal(qa('.q-board-line').filter(l => NUDGES.has(l.textContent)).length, 0);
+});
+
+test('a noHedge board at the default dials gets no confirm: RUN plays at once', () => {
+    const { q, run, played } = setup(SEED.noHedge);
+    run.click();
+    assert.equal(q('.q-confirm').hidden, true);
+    assert.equal(played.length, 1);
+});
+
+test('R51: facilities is shown greyed out, with the reason, when the board needs it and cash is short', () => {
+    const { qa, q, rc } = setup(SEED.band75100, { patch: { cash: 100 } });
+    const fac = q('[data-powerup="facilities"]');
+    assert.ok(fac, 'still shown');
+    assert.equal(qa('[data-powerup]')[0], fac, 'and first');
+    assert.equal(fac.getAttribute('aria-disabled'), 'true', 'aria-disabled keeps the reason readable');
+    assert.ok(fac.classList.contains('is-unaffordable'));
+    assert.match(fac.querySelector('.pu-reason').textContent, /^Can't afford it yet: you have /);
+    fac.click();
+    assert.equal(rc.run.powerUps.owned.includes('facilities'), false);
+});
+
+test('a pending event missing from the content is dropped, so the run cannot lock', () => {
+    const { q, run, played } = setup(SEED.band2550, { patch: { pendingEvent: 'gone_from_events_json' } });
+    assert.equal(q('.q-event'), null);
+    assert.equal(run.disabled, false);
+    run.click();
+    assert.ok(played.length >= 1, 'the engine accepted the quarter');
+});
+
+test('the screen reads the run through the controller accessor, not rc.run', () => {
+    const { rc } = setup(SEED.band2550);
+    const seen = [];
+    const app = { runController: { currentRun: () => { seen.push('currentRun'); return null; },
+        get run() { throw new Error('rc.run must not be read directly'); } }, content, showScreen() {} };
+    const el = new QuarterScreen(app).render();
+    assert.ok(seen.length >= 1);
+    assert.ok(el.querySelector('.q-back'), 'the empty state offers a way back');
+    assert.ok(rc);
+});
+
+test('unmount really stops the scene loop and removes its visibility listener', () => {
+    const { screen } = setup(SEED.band2550);
+    const loop = screen.scene;
+    assert.ok(loop);
+    assert.equal(loop.running, true);
+    assert.equal(dom.document.listeners.get('visibilitychange')?.length || 0, 1);
+    screen.unmount();
+    assert.equal(loop.running, false, 'stop() was called');
+    assert.equal(dom.document.listeners.get('visibilitychange')?.length || 0, 0);
+});
+
+// ── Fix round 1: a failed content load must not destroy or lock a pending event ──
+
+test('events failed to load: the pending event is kept, nothing is saved, RUN is blocked with a retry', () => {
+    const ev = content.events.find(e => e.id === 'big_export_order');
+    const failed = { ...content, events: [], eventsLoaded: false };
+    const rc = new RunController({ storage, market: marketEngine, content: failed, now: () => 1_700_000_000_000 });
+    rc.start('airline', { seed: SEED.band2550 });
+    rc.run = { ...structuredClone(rc.run), pendingEvent: ev.id };
+    const saves = [];
+    const realSave = storage.saveRun;
+    rc._save = () => saves.push('save');
+    const app = { runController: rc, content: failed, shown: [], toasts: [],
+        showScreen(id) { this.shown.push(id); }, showToast(m, t) { this.toasts.push([m, t]); },
+        reloadEvents: async () => { failed.events = content.events; failed.eventsLoaded = true; return true; } };
+    const screen = new QuarterScreen(app);
+    const el = screen.render();
+    dom.document.body.appendChild(el);
+    assert.equal(rc.run.pendingEvent, ev.id, 'kept');
+    assert.deepEqual(saves, [], 'nothing persisted');
+    assert.ok(el.querySelector('.q-event-error'));
+    assert.match(el.querySelector('.q-event-error').textContent, /Couldn't load this event/);
+    const runBtn = el.querySelector('.q-run');
+    assert.equal(runBtn.disabled, true);
+    assert.equal(el.querySelector('.q-status').textContent, "Couldn't load this event");
+    runBtn.click();
+    assert.deepEqual(saves, []);
+    assert.ok(realSave);
+    return el.querySelector('.q-retry').click(), new Promise(r => setTimeout(r, 0)).then(() => {
+        assert.deepEqual(app.shown, ['quarter'], 'a successful retry rebuilds the quarter screen');
+        const again = new QuarterScreen(app).render();
+        assert.ok(again.querySelector('.q-event [data-choice]'), 'the event card is now shown');
+    });
+});
+
+test('a failed retry toasts and stays put', async () => {
+    const ev = content.events.find(e => e.id === 'big_export_order');
+    const failed = { ...content, events: [], eventsLoaded: false };
+    const rc = new RunController({ storage, market: marketEngine, content: failed, now: () => 1_700_000_000_000 });
+    rc.start('airline', { seed: SEED.band2550 });
+    rc.run = { ...structuredClone(rc.run), pendingEvent: ev.id };
+    const app = { runController: rc, content: failed, shown: [], toasts: [],
+        showScreen(id) { this.shown.push(id); }, showToast(m, t) { this.toasts.push([m, t]); }, reloadEvents: async () => false };
+    const el = new QuarterScreen(app).render();
+    el.querySelector('.q-retry').click();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(app.shown, []);
+    assert.equal(app.toasts.length, 1);
+});
+
+test('controller: content loaded but the id is unknown drops the event and saves; not loaded keeps it', () => {
+    const mk = loaded => {
+        const c = { ...content, eventsLoaded: loaded, events: loaded ? content.events : [] };
+        const rc = new RunController({ storage, market: marketEngine, content: c, now: () => 1_700_000_000_000 });
+        rc.start('airline', { seed: SEED.band2550 });
+        rc.run = { ...structuredClone(rc.run), pendingEvent: 'nope' };
+        return rc;
+    };
+    const warn = console.warn; console.warn = () => {};
+    try {
+        const loaded = mk(true);
+        assert.equal(loaded.currentRun().pendingEvent, null);
+        assert.equal(loaded.eventMissing(), false);
+        const failed = mk(false);
+        assert.equal(failed.currentRun().pendingEvent, 'nope');
+        assert.equal(failed.eventMissing(), true);
+    } finally { console.warn = warn; }
 });

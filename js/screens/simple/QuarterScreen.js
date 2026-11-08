@@ -91,7 +91,7 @@ export class QuarterScreen {
     render() {
         this._teardown();
         this.el = h('div', { class: 'screen active v3 quarter-screen' });
-        const run = this.rc?.run;
+        const run = this.rc?.currentRun?.();
         if (!run || isRunOver(run)) {
             this.run = null;
             this.el.append(h('div', { class: 'v3-empty' },
@@ -106,6 +106,7 @@ export class QuarterScreen {
         this.decisions = { hedges: { ...defaults.hedges }, buyPowerUp: null, eventChoice: null, proposePolicy: null };
         this.confirming = false;
         this.busy = false;
+        this.eventBlocked = false;
         this.event = run.pendingEvent
             ? (this.app.content?.events || []).find(e => e.id === run.pendingEvent) || null
             : null;
@@ -126,7 +127,7 @@ export class QuarterScreen {
             h('div', { class: 'q-scene' }, this.sceneCanvas),
             this._boardCard(run),
             h('p', { class: 'q-policy', text: policyText(run) }),
-            this.event ? this._eventCard(this.event) : null,
+            this.event ? this._eventCard(this.event) : this.rc.eventMissing() ? this._eventErrorCard() : null,
             this.canPropose ? this._proposeCard() : null,
             h('div', { class: 'q-exposures' }, activeExposures(run).map(e => this._exposureCard(run, e))),
             this._powerUpSlot(run));
@@ -194,7 +195,7 @@ export class QuarterScreen {
             speaker = { spriteId: id, name: CHAIRMAN_SPRITES[id]?.label || 'The Chairman', role: 'Chairman' };
             lines.push(this.rc.boardIntro().line);
         }
-        if (run.mandate === null) {
+        if (run.mandate === null && this.canPropose) {   // no nudge where the proposal can't be made (Q8)
             if (!speaker && member) {
                 speaker = { spriteId: spriteIdForMember(member, index), name: member.name, role: member.title };
             }
@@ -222,6 +223,22 @@ export class QuarterScreen {
             h('h2', { text: event.title }),
             h('p', { class: 'q-event-text', text: event.text }),
             h('div', { class: 'q-choices' }, this.choiceBtns));
+    }
+
+    // The content didn't load, so the pending event can't be shown. Never lock the run: offer a retry.
+    _eventErrorCard() {
+        this.eventBlocked = true;
+        return h('section', { class: 'q-event q-event-error', role: 'group', 'aria-label': 'Event' },
+            h('h2', { text: 'Event' }),
+            h('p', { class: 'q-event-text', text: "Couldn't load this event. Check your connection." }),
+            h('button', { class: 'btn q-retry', type: 'button', text: 'RETRY', on: { click: () => this._retryEvents() } }));
+    }
+
+    async _retryEvents() {
+        let ok = false;
+        try { ok = !!(await this.app.reloadEvents?.()); } catch { ok = false; }
+        if (ok) this.app.showScreen('quarter');   // rebuilds the screen with the event
+        else this.app.showToast?.("Still can't load the event. Try again.", 'error');
     }
 
     _proposeCard() {
@@ -266,6 +283,9 @@ export class QuarterScreen {
         const info = this.app.content?.powerups || {};
         let ids = POWER_UP_IDS.filter(id => this.rc.canBuy(id));
         if (this.capConflict && ids.includes('facilities')) ids = ['facilities', ...ids.filter(id => id !== 'facilities')];
+        // R51: facilities is the fix but can't be afforded: show it greyed out, with the reason.
+        const poor = this.capConflict && !ids.includes('facilities') && this._facilitiesUnaffordable(run);
+        if (poor) ids = ['facilities', ...ids];
         if (!ids.length) return null;
         this.powerBtns = ids.map(id => {
             const card = info[id] || {};
@@ -273,20 +293,28 @@ export class QuarterScreen {
                 ? card.levels[run.forecastLevel] ?? card.blurb
                 : card.blurb;
             const urgent = this.capConflict && id === 'facilities';
+            const cantAfford = poor && id === 'facilities';
             return h('button', {
-                class: `pu-card${urgent ? ' is-urgent' : ''}`, type: 'button', 'data-powerup': id, 'aria-pressed': 'false',
-                on: { click: () => this._update(d => { d.buyPowerUp = d.buyPowerUp === id ? null : id; }) }
+                class: `pu-card${urgent ? ' is-urgent' : ''}${cantAfford ? ' is-unaffordable' : ''}`, type: 'button',
+                'data-powerup': id, 'aria-pressed': 'false', 'aria-disabled': cantAfford ? 'true' : null,
+                on: { click: () => cantAfford || this._update(d => { d.buyPowerUp = d.buyPowerUp === id ? null : id; }) }
             },
             h('span', { class: 'pu-head' },
                 h('span', { class: 'pu-name', text: card.name || id }),
                 h('span', { class: 'pu-cost', text: formatCash(powerUpCost(run, id), run.baseCurrency) })),
             urgent ? h('span', { class: 'pu-urgent', text: "Your board's policy needs this" }) : null,
+            cantAfford ? h('span', { class: 'pu-reason', text: `Can't afford it yet: you have ${formatCash(run.cash, run.baseCurrency)}` }) : null,
             blurb ? h('span', { class: 'pu-blurb', text: blurb }) : null,
             card.hedjLine ? h('span', { class: 'pu-hedj', text: card.hedjLine }) : null);
         });
         return h('section', { class: 'q-powerups', 'aria-label': 'Power-ups' },
             h('h2', { text: 'Power-up (one per quarter)' }),
             this.powerBtns);
+    }
+
+    _facilitiesUnaffordable(run) {
+        const owned = run.powerUps.owned.includes('facilities') || run.powerUps.used.includes('facilities');
+        return !owned && this.rc.unlockedPowerUps().includes('facilities') && run.cash < powerUpCost(run, 'facilities');
     }
 
     // ── State ─────────────────────────────────────────────────────────────
@@ -320,12 +348,14 @@ export class QuarterScreen {
         for (const b of this.powerBtns || []) b.setAttribute('aria-pressed', String(b.getAttribute('data-powerup') === d.buyPowerUp));
 
         const needsChoice = !!this.event && !d.eventChoice;
+        const blocked = this.eventBlocked;
         const off = offPolicyExposures(run, d, this.app.content?.events || []);
-        this.runBtn.disabled = needsChoice || this.busy;
+        this.runBtn.disabled = needsChoice || blocked || this.busy;
         this.runBtn.hidden = this.confirming;
         this.confirmEl.hidden = !this.confirming;
         let status = '';
-        if (needsChoice) status = EVENT_FIRST;
+        if (blocked) status = "Couldn't load this event";
+        else if (needsChoice) status = EVENT_FIRST;
         else if (off.length) status = `Off policy: ${off.map(exposureTitle).join(', ')}`;
         else if (run.mandate) status = "Inside the board's policy";
         this.statusEl.textContent = status;
@@ -339,7 +369,7 @@ export class QuarterScreen {
     }
 
     _onRun() {
-        if (this.busy || (this.event && !this.decisions.eventChoice)) return;
+        if (this.busy || this.eventBlocked || (this.event && !this.decisions.eventChoice)) return;
         const off = offPolicyExposures(this.run, this.decisions, this.app.content?.events || []);
         if (off.length && !this.confirming) {
             this.confirming = true;
