@@ -6,8 +6,9 @@ import { marketEngine } from '../../js/engine/MarketEngine.js';
 import * as storage from '../../js/utils/storage.js';
 import { RunController, boardLineKey, expressionFor } from '../../js/screens/simple/RunController.js';
 import {
-    ResultScreen, RESULT_MS, resultLine, moveText, impactText, unitMovePct
+    ResultScreen, resultLine, moveText, impactText, unitMovePct
 } from '../../js/screens/simple/ResultScreen.js';
+import { TAP_GUARD_MS } from '../../js/ui/tapGuard.js';
 
 marketEngine.loadFromObjects(loadMarketData());
 
@@ -46,7 +47,8 @@ function fakeTimers() {
             }
             now = until;
         },
-        get pending() { return queue.size; }
+        get pending() { return queue.size; },
+        get time() { return now; }
     };
 }
 
@@ -63,11 +65,13 @@ afterEach(() => {
     dom.restore();
 });
 
-function mountResult(app, timers = fakeTimers()) {
-    const screen = new ResultScreen(app, { setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout });
+// settle: move the clock past the tap guard (R53) so taps count at once.
+function mountResult(app, timers = fakeTimers(), { settle = true } = {}) {
+    const screen = new ResultScreen(app, { setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout, now: () => timers.time });
     const el = screen.render();
     dom.document.body.appendChild(el);
     screen.mount();
+    if (settle) timers.advance(TAP_GUARD_MS);
     return { screen, el, timers, q: s => el.querySelector(s), qa: s => el.querySelectorAll(s) };
 }
 
@@ -198,7 +202,7 @@ test('the result reveals itself over time; a tap skips the reveal, NEXT goes to 
     const { rc, result } = playOne();
     const app = appWith(rc, result);
     const { el, q, qa, timers } = mountResult(app);
-    assert.ok(qa('.r-line').every(l => l.hidden), 'lines start hidden');
+    assert.ok(qa('.r-line').every(l => l.hidden), 'lines start hidden (the first shows at 0.9 s)');
     assert.equal(q('.r-board').hidden, true);
     el.querySelector('.r-body').click();
     assert.ok(qa('.r-line').every(l => !l.hidden), 'a tap reveals every line');
@@ -211,21 +215,44 @@ test('the result reveals itself over time; a tap skips the reveal, NEXT goes to 
     assert.equal(timers.pending, 0, 'timers are cleared when leaving');
 });
 
-test('it advances on its own after about 10 s; a tap after the reveal also advances', () => {
+test('R53: it never advances on its own; a tap after the reveal advances', () => {
     const { rc, result } = playOne();
     const app = appWith(rc, result);
-    const { timers, qa } = mountResult(app);
+    const { timers, qa, q } = mountResult(app);
     timers.advance(4000);
-    assert.ok(qa('.r-line').every(l => !l.hidden), 'all lines shown well before the end');
-    assert.deepEqual(app.shown, []);
-    timers.advance(RESULT_MS - 4000);
+    assert.ok(qa('.r-line').every(l => !l.hidden), 'all lines shown');
+    timers.advance(10 * 60 * 1000);
+    assert.deepEqual(app.shown, [], 'still on the result after 10 minutes');
+    assert.equal(timers.pending, 0, 'no advance timer is waiting');
+    q('.r-body').click();
     assert.deepEqual(app.shown, ['quarter']);
+});
 
-    const app2 = appWith(rc, result);
-    const m2 = mountResult(app2);
-    m2.timers.advance(5000);
-    m2.q('.r-body').click();
-    assert.deepEqual(app2.shown, ['quarter']);
+test('R53: NEXT and the body ignore taps in the first 600 ms after mount, then work', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    const { timers, q, qa } = mountResult(app, fakeTimers(), { settle: false });
+    q('.r-next').click();
+    q('.r-body').click();
+    timers.advance(TAP_GUARD_MS - 1);
+    q('.r-next').click();
+    assert.deepEqual(app.shown, [], 'the second tap of a double tap on RUN is dropped');
+    assert.ok(qa('.r-line').every(l => l.hidden), 'and does not skip the reveal');
+    timers.advance(1);
+    q('.r-next').click();
+    assert.deepEqual(app.shown, ['quarter']);
+});
+
+test('a line is toned by its net effect: a hedge that saved money on a losing line is still down', () => {
+    const { rc, result } = playOne();
+    const lines = result.summary.lines.map((l, i) => i === 0
+        ? { ...l, movePct: 10, exposureImpact: -5e6, hedgeImpact: 1e6 }
+        : { ...l, movePct: 1, exposureImpact: -1e6, hedgeImpact: 3e6 });
+    const { qa } = mountResult(appWith(rc, { ...result, summary: { ...result.summary, lines } }));
+    const [first, second] = qa('.r-line');
+    assert.match(first.textContent, /Your hedge saved €1.0m/);
+    assert.ok(first.classList.contains('is-down'), 'net -€4m');
+    assert.ok(second.classList.contains('is-up'), 'net +€2m');
 });
 
 test('on the last quarter NEXT goes to the Simple game over', () => {

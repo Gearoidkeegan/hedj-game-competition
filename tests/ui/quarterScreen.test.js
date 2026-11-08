@@ -6,6 +6,7 @@ import { marketEngine } from '../../js/engine/MarketEngine.js';
 import { POLICY_OPTIONS } from '../../js/engine/sim/SimEngine.js';
 import * as storage from '../../js/utils/storage.js';
 import { RunController } from '../../js/screens/simple/RunController.js';
+import { TAP_GUARD_MS } from '../../js/ui/tapGuard.js';
 import { QuarterScreen, OFF_POLICY_PROMPT, offPolicyExposures } from '../../js/screens/simple/QuarterScreen.js';
 
 marketEngine.loadFromObjects(loadMarketData());
@@ -43,7 +44,7 @@ afterEach(() => {
     dom.restore();
 });
 
-function setup(seed, { industry = 'airline', patch = null } = {}) {
+function setup(seed, { industry = 'airline', patch = null, settle = true } = {}) {
     const rc = new RunController({ storage, market: marketEngine, content, now: () => 1_700_000_000_000 });
     rc.start(industry, { seed });
     if (patch) rc.run = { ...structuredClone(rc.run), ...patch };
@@ -56,16 +57,19 @@ function setup(seed, { industry = 'airline', patch = null } = {}) {
         showScreen(id) { this.shown.push(id); },
         showToast(msg, type) { this.toasts.push([msg, type]); }
     };
-    const screen = new QuarterScreen(app);
+    // The tap guard's clock (R53): taps in the first TAP_GUARD_MS after mount are ignored, so tests move past it.
+    const clock = { t: 0 };
+    const screen = new QuarterScreen(app, { now: () => clock.t });
     const el = screen.render();
     dom.document.body.appendChild(el);
     screen.mount();
+    if (settle) clock.t += TAP_GUARD_MS;
     const q = s => el.querySelector(s);
     const qa = s => el.querySelectorAll(s);
     const card = id => q(`[data-exposure="${id}"]`);
     const step = (id, v) => card(id).querySelector(`[data-step="${v}"]`);
     const run = q('.q-run');
-    return { rc, app, screen, el, q, qa, card, step, run, played };
+    return { rc, app, screen, el, q, qa, card, step, run, played, clock };
 }
 
 test('renders the cash meter, a 120px scene strip, one card per active exposure and RUN', () => {
@@ -448,4 +452,18 @@ test('controller: content loaded but the id is unknown drops the event and saves
         assert.equal(failed.currentRun().pendingEvent, 'nope');
         assert.equal(failed.eventMissing(), true);
     } finally { console.warn = warn; }
+});
+
+test('R53: RUN ignores taps in the first 600 ms after mount (a double tap from NEXT), then works', () => {
+    const { app, run, played, clock, q } = setup(SEED.band2550, { settle: false });
+    run.click();
+    clock.t = TAP_GUARD_MS - 1;
+    run.click();
+    assert.deepEqual(played, [], 'taps inside the guard window are dropped');
+    assert.equal(q('.q-confirm').hidden, true, 'not even the off-policy prompt opens');
+    clock.t = TAP_GUARD_MS;
+    run.click();
+    if (app.shown.length === 0) q('.q-run-anyway').click();
+    assert.equal(played.length, 1);
+    assert.deepEqual(app.shown, ['result']);
 });

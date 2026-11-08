@@ -15,12 +15,15 @@ import {
 import { bandText, chairmanFor, cosmeticRng } from './RunController.js';
 import { exposureTitle, exposureCopy, exposureRisk, lockedReason } from '../../ui/labels.js';
 import { formatCash } from '../../utils/formatters.js';
+import { createTapGuard } from '../../ui/tapGuard.js';
 
 export const OFF_POLICY_PROMPT = "Outside the board's policy — run anyway?";
 const EVENT_FIRST = 'Choose how to respond to the event first';
 const NUDGE_SALT = 20;   // RunController uses cosmetic salts 0..9
 const SPRITE_SCALE = 2;  // 32px sprites drawn at 64px
 const PERSONALITIES = ['aggressive', 'cautious', 'operational'];
+// Board mood below this shows in red (quarter and result screens).
+export const LOW_MOOD = 30;
 
 const pct = v => `${Math.round(v * 100)}%`;
 const clamp01 = v => Math.min(1, Math.max(0, v));
@@ -75,8 +78,10 @@ function policyText(run) {
 }
 
 export class QuarterScreen {
-    constructor(app) {
+    // env (tests): now, the clock for the tap guard (R53).
+    constructor(app, env = {}) {
         this.app = app;
+        this.tapGuard = createTapGuard({ now: env.now });
         this.el = null;
         this.scene = null;
         this.meter = null;
@@ -118,7 +123,7 @@ export class QuarterScreen {
         const head = h('header', { class: 'q-head' },
             h('div', { class: 'q-head-row' },
                 h('h1', { class: 'q-quarter', text: `Quarter ${run.quarter + 1} of ${run.maxQuarters}` }),
-                h('span', { class: `q-mood${run.boardMood < 30 ? ' is-low' : ''}`, text: `Board mood ${Math.round(run.boardMood)}` })),
+                h('span', { class: `q-mood${run.boardMood < LOW_MOOD ? ' is-low' : ''}`, text: `Board mood ${Math.round(run.boardMood)}` })),
             this.industry ? h('p', { class: 'q-company', text: this.industry.name }) : null,
             this.meterHost);
 
@@ -134,13 +139,13 @@ export class QuarterScreen {
 
         this.statusEl = h('p', { class: 'q-status', 'aria-live': 'polite' });
         this.runBtn = h('button', { class: 'btn btn-gold q-run', type: 'button', text: 'RUN THE QUARTER',
-            on: { click: () => this._onRun() } });
+            on: { click: this.tapGuard.wrap(() => this._onRun()) } });
         this.confirmEl = h('div', { class: 'q-confirm', role: 'alertdialog', 'aria-label': 'Off policy', hidden: true },
             h('p', { text: OFF_POLICY_PROMPT }),
             h('div', { class: 'q-confirm-row' },
-                h('button', { class: 'btn q-adjust', type: 'button', text: 'ADJUST', on: { click: () => this._cancelConfirm() } }),
+                h('button', { class: 'btn q-adjust', type: 'button', text: 'ADJUST', on: { click: this.tapGuard.wrap(() => this._cancelConfirm()) } }),
                 h('button', { class: 'btn btn-gold q-run-anyway', type: 'button', text: 'RUN ANYWAY',
-                    on: { click: () => this._play() } })));
+                    on: { click: this.tapGuard.wrap(() => this._play()) } })));
         const footer = h('footer', { class: 'q-footer' }, this.statusEl, this.confirmEl, this.runBtn);
 
         this.el.append(head, body, footer);
@@ -149,6 +154,7 @@ export class QuarterScreen {
     }
 
     mount() {
+        this.tapGuard.arm();
         if (!this.run) return;
         this.meter = new CashMeter(this.meterHost, { currency: this.run.baseCurrency });
         this.meter.set({ cash: this.run.cash, startingCash: this.run.startingCash, redLine: this.run.redLine });

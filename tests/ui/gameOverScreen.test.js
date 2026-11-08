@@ -9,6 +9,7 @@ import * as storage from '../../js/utils/storage.js';
 import { RunController, cosmeticRng } from '../../js/screens/simple/RunController.js';
 import { ResultScreen } from '../../js/screens/simple/ResultScreen.js';
 import { GameOverScreen, endingFor, endingQuip, rankText, COUNT_MS } from '../../js/screens/GameOverScreen.js';
+import { TAP_GUARD_MS } from '../../js/ui/tapGuard.js';
 
 marketEngine.loadFromObjects(loadMarketData());
 
@@ -82,7 +83,9 @@ function makeApp(rc, mode = 'simple') {
     };
 }
 
-function mountGameOver(app, extra = {}) {
+// settle: move the tap guard's clock (R53) past its window after mount, so taps count at once.
+function mountGameOver(app, extra = {}, { settle = true } = {}) {
+    const clock = { t: 0 };
     const cuts = [];
     const sounds = [];
     const copied = [];
@@ -93,14 +96,15 @@ function mountGameOver(app, extra = {}) {
         clipboard: { writeText: async (t) => { copied.push(t); } },
         api: fakeApi(),
         storage,
-        env: REDUCED,
+        env: { ...REDUCED, now: () => clock.t },
         ...extra
     };
     const screen = new GameOverScreen(app, deps);
     const el = screen.render();
     dom.document.body.appendChild(el);
     screen.mount();
-    return { screen, el, cuts, sounds, copied, deps, q: s => el.querySelector(s), qa: s => el.querySelectorAll(s) };
+    if (settle) clock.t += TAP_GUARD_MS;
+    return { screen, el, cuts, sounds, copied, deps, clock, q: s => el.querySelector(s), qa: s => el.querySelectorAll(s) };
 }
 
 // ── Endings ───────────────────────────────────────────────────────────────
@@ -307,7 +311,7 @@ function proState({ status, severe = false, legacy = {} }) {
     const history = [{ ...summary, q: 1, breach: 'none', policy: 'in', inMandate: true, marketResult: 1e6, playerDelta: 1e6 },
         { ...summary, q: 2, breach: 'none', policy: 'in', inMandate: true, marketResult: 1e6, playerDelta: 1e6 }, summary];
     gameState.update({
-        gameId: 'game_99', seed: 99, startedAt: 1_700_000_000_000, industryId: 'pharma',
+        gameId: 'game_99', seed: 99, startedAt: 1_700_000_000_000, industryId: 'pharma', contactEmail: 'ann@x.com',
         industry: content.industries.find(i => i.id === 'pharma'), startYear: 2008, startingCash: 100e6,
         boardSatisfaction: 8, quarterSummaries: history, runStatus: status,
         firedByBoard: false, burnedOut: false, ...legacy
@@ -388,9 +392,11 @@ test('forced bankruptcy: result -> game over shows BANKRUPT and the score is sti
     rc.run = { ...structuredClone(rc.run), cash: -1e12 };
     const app = makeApp(rc, null);
     app.lastQuarter = rc.playQuarter(rc.currentDecisionsDefaults());
-    const result = new ResultScreen(app, { setTimeout: () => 0, clearTimeout() {} });
+    let t = 0;
+    const result = new ResultScreen(app, { setTimeout: () => 0, clearTimeout() {}, now: () => t });
     result.render();
     result.mount();
+    t = TAP_GUARD_MS;
     result.nextBtn.click();
     assert.deepEqual(app.shown, ['gameover']);
     assert.equal(app.gameOverMode, 'simple');
@@ -411,4 +417,73 @@ test('no finished run: BACK TO TITLE', () => {
     const { q } = mountGameOver(app);
     q('.q-back').click();
     assert.deepEqual(app.shown, ['title']);
+});
+
+// ── Fix round 1: R53 tap guard and review minors ─────────────────────────
+
+test('R53: PLAY AGAIN, SHARE and TITLE ignore taps in the first 600 ms after mount, then work', async () => {
+    const rc = stubRc({ status: 'complete' });
+    const app = makeApp(rc);
+    const { q, clock, copied } = mountGameOver(app, {}, { settle: false });
+    q('.go-again').click();
+    q('.go-home').click();
+    q('.go-share').click();
+    clock.t = TAP_GUARD_MS - 1;
+    q('.go-home').click();
+    await flush();
+    assert.deepEqual(rc.started, [], 'the second tap of a double tap on NEXT does not start a run');
+    assert.deepEqual(app.shown, [], 'nor skip the game over');
+    assert.deepEqual(copied, []);
+    clock.t = TAP_GUARD_MS;
+    q('.go-again').click();
+    await flush();
+    assert.deepEqual(rc.started, [['airline', {}]]);
+    assert.deepEqual(app.shown, ['quarter']);
+});
+
+test('#2: PLAY AGAIN with an expired token goes through the registration gate, not straight into a run', async () => {
+    storage.saveRegistration({ playerName: 'Ann', email: 'ann@x.com', company: 'X', gameToken: 't', gameTokenExpiry: Date.now() - 1 });
+    const rc = stubRc({ status: 'bankrupt' });
+    const app = makeApp(rc);
+    mountGameOver(app).q('.go-again').click();
+    await flush();
+    assert.deepEqual(rc.started, []);
+    assert.deepEqual(app.shown, ['industry'], "showScreen('industry') redirects to registration in the app");
+});
+
+test('#6: TITLE while PLAY AGAIN is starting the run wins; the late start does not pull the player back', async () => {
+    const rc = stubRc({ status: 'complete' });
+    const app = makeApp(rc);
+    let release;
+    app.marketReady = new Promise(r => { release = r; });
+    const { q } = mountGameOver(app);
+    q('.go-again').click();
+    q('.go-home').click();
+    q('.go-again').click();
+    release();
+    await flush();
+    assert.deepEqual(app.shown, ['title']);
+});
+
+test('#3: a Pro run is credited only to its owner, and only while the owner is registered', async () => {
+    const state = proState({ status: 'complete' });
+    gameState.update({ contactEmail: 'bob@x.com' });
+    const api = fakeApi();
+    const { q } = mountGameOver(makeApp(null, 'pro'), { api });
+    await flush();
+    await flush();
+    assert.deepEqual(api.calls, [], 'not submitted under Ann');
+    assert.deepEqual(storage.getQueuedScores(), []);
+    assert.equal(storage.getProgress('ann@x.com').runs, 0, "not counted in Ann's progress");
+    assert.equal(q('.go-headline').textContent, 'RUN COMPLETE');
+    assert.ok(state.proResult);
+});
+
+test("#5: a crisis run whose progress couldn't be saved says so", async () => {
+    const rc = stubRc({ status: 'complete', crisisId: 'gfc2008', outcome: { ranked: false, queued: false, storageFailed: true } });
+    const { q } = mountGameOver(makeApp(rc));
+    rc.resolve();
+    await flush();
+    assert.match(q('.go-rank').textContent, /^Crisis badge earned: .+\. Your score couldn't be saved on this device$/);
+    assert.doesNotMatch(q('.go-rank').textContent, /Rank|Queued|Submitting/);
 });

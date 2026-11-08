@@ -74,7 +74,6 @@ hedj-game-competition/
 │   ├── engine/                    # Game simulation logic
 │   │   ├── GameState.js           # Central state store
 │   │   ├── GameLoop.js            # Quarterly cycle, phase transitions
-│   │   ├── ScoreEngine.js         # Final score calculation (penalties/bonuses)
 │   │   ├── MarketEngine.js        # Rate generation, budget rates
 │   │   ├── HedgingEngine.js       # Derivative pricing, hedge book
 │   │   ├── EventEngine.js         # Random quarterly market events
@@ -93,8 +92,8 @@ hedj-game-competition/
 │   │
 │   └── utils/
 │       ├── api.js                 # API wrappers (register, score, leaderboard)
-│       ├── storage.js             # localStorage (saves, registration, pending scores)
-│       ├── constants.js           # Game balance (grades, policies, phases)
+│       ├── storage.js             # localStorage (registration, per-player runs and progress, score queue)
+│       ├── constants.js           # Game balance (policies, phases)
 │       ├── formatters.js          # Currency & P&L formatting
 │       └── random.js              # Seeded RNG for reproducible games
 │
@@ -153,7 +152,7 @@ Each quarter runs through the following phases:
 3. **Event Phase** — A random market event may trigger (currency crisis, commodity spike, etc.).
 4. **Board Phase** — The AI board evaluates performance and updates satisfaction.
 5. **Summary Phase** — Quarterly results are reviewed.
-6. **Game Over** — Final score, grade, and leaderboard submission.
+6. **Game Over** — Final score, title, and leaderboard submission.
 
 ### Hedging Instruments
 
@@ -184,33 +183,14 @@ Six hedging policy templates control the rules the player must operate within:
 
 ### Scoring System
 
-Final score is out of 100, weighted across five components:
+Simple and Pro share one score (`js/engine/sim/score.js`), measured against an unhedged benchmark and capped at 10,000:
 
-| Component | Weight | Description |
-|---|---|---|
-| P&L vs Budget | 30% | Actual costs vs. board-set budget rates |
-| Board Satisfaction | 25% | AI satisfaction score (10–100) |
-| Cash Management | 20% | Penalises margin calls, low cash, negative balances |
-| Policy Compliance | 15% | Quarterly adherence to hedge ratio and tenor rules |
-| Risk-Adjusted Return | 10% | P&L volatility + diversification bonus (up to +10 pts) |
+- **Each quarter:** +100 inside the board's policy, +25 off policy but lucky, −300 off policy with a loss, +50 above the red line, +100 for getting a policy adopted, and up to +100 for steady cash flow.
+- **Outperformance:** 12 points per 1% of starting cash ahead of the unhedged benchmark at the end.
+- **Survival:** +500 for finishing all 8 quarters.
+- **Board mood:** the total is multiplied by 0.8–1.2 from the final board mood.
 
-**Modifiers:**
-- Trading cost penalty: −2 pts per trade above 3 avg/quarter
-- Diversification bonus: up to +10 pts for spreading trades across banks
-- Direction penalty: −5 pts per board-advised direction error
-- Perfect compliance bonus: +10 pts for zero violations
-- Fired/burnout cap: Score capped at 45 (grade F) if player is terminated
-
-**Grades:**
-
-| Grade | Score | Description |
-|---|---|---|
-| A+ | 90+ | Chief Risk Officer Material |
-| A | 80–89 | Contract Extended |
-| B | 70–79 | Solid Treasury Management |
-| C | 60–69 | Adequate Performance |
-| D | 50–59 | Under Review |
-| F | <50 | Looking for Work |
+The game-over title comes from `gameOverTitles` in `data/quips.json`.
 
 ### Board Dynamics
 
@@ -239,7 +219,7 @@ On successful registration the backend returns a `gameToken` (valid for `TokenTt
 - Scores are submitted automatically at game over if the player is registered and the token is valid.
 - If submission fails (network error) the score is queued in localStorage and retried on the next visit.
 - Submission is idempotent — re-submitting the same `gameId` returns the existing rank without creating a duplicate.
-- The leaderboard shows: player name, company, industry, score, grade, number of quarters played, and submission time. Email addresses are intentionally excluded from the public leaderboard.
+- The leaderboard shows: player name, company, industry, score, number of quarters played, and submission time. Email addresses are intentionally excluded from the public leaderboard.
 - Leaderboard responses are cached for 30 seconds; limited to 50 entries.
 
 ### Admin Dashboard

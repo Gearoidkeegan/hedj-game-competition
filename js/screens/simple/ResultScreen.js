@@ -1,11 +1,12 @@
 // ResultScreen: what happened in the quarter just played (Simple mode). It reads app.lastQuarter (the
-// RunController.playQuarter result) and lasts about 10 s:
+// RunController.playQuarter result):
 //   - the cash meter counts from last quarter's cash to the new figure;
 //   - the scene strip plays in the mood of this quarter's result;
 //   - one line per exposure, "Dollar +6%. Your hedge saved €1.2m", revealed one by one;
 //   - one board member (or the chairman) with the expression and line RunController picked, plus the result quip.
-// A tap on the screen skips the reveal; once everything is shown, a tap moves on. NEXT always moves on, and the
-// screen moves on by itself after RESULT_MS. After the last quarter it goes to the Simple game over.
+// A tap on the screen skips the reveal; once everything is shown, a tap moves on. NEXT always moves on. The screen
+// never moves on by itself (R53), and taps in the first TAP_GUARD_MS after mount are ignored, so the second tap of
+// a double tap on RUN can't land on NEXT. After the last quarter it goes to the Simple game over.
 // No innerHTML: the DOM is built node by node with textContent (R7).
 
 import { h } from '../../ui/dom.js';
@@ -16,9 +17,9 @@ import { isRunOver } from '../../engine/sim/SimEngine.js';
 import { BALANCE } from '../../engine/sim/balance.js';
 import { moveLabel } from '../../ui/labels.js';
 import { formatCash } from '../../utils/formatters.js';
-import { sceneStateFor } from './QuarterScreen.js';
+import { createTapGuard } from '../../ui/tapGuard.js';
+import { sceneStateFor, LOW_MOOD } from './QuarterScreen.js';
 
-export const RESULT_MS = 10000;     // the screen moves on by itself after this
 export const METER_MS = 1200;       // cash count-up
 const LINE_START_MS = 900;          // first exposure line
 const LINE_STEP_MS = 450;           // between lines
@@ -76,11 +77,12 @@ function speakerName(reaction) {
 }
 
 export class ResultScreen {
-    // env (tests): setTimeout, clearTimeout, plus requestAnimationFrame/cancelAnimationFrame/now/matchMedia
-    // for the cash meter and the scene.
+    // env (tests): setTimeout, clearTimeout, now (also the tap guard's clock), plus
+    // requestAnimationFrame/cancelAnimationFrame/matchMedia for the cash meter and the scene.
     constructor(app, env = {}) {
         this.app = app;
         this.env = env;
+        this.tapGuard = createTapGuard({ now: env.now });
         this.el = null;
         this.timers = [];
         this.meter = null;
@@ -116,15 +118,16 @@ export class ResultScreen {
         const head = h('header', { class: 'q-head' },
             h('div', { class: 'q-head-row' },
                 h('h1', { class: 'q-quarter', text: `Quarter ${summary.q} results` }),
-                h('span', { class: `q-mood r-mood${run.boardMood < 30 ? ' is-low' : ''}`,
+                h('span', { class: `q-mood r-mood${run.boardMood < LOW_MOOD ? ' is-low' : ''}`,
                     text: `Board mood ${Math.round(run.boardMood)} (${moodDelta >= 0 ? '+' : ''}${moodDelta})` })),
             this.meterHost);
 
         this.sceneCanvas = h('canvas', { class: 'q-scene-canvas', 'aria-hidden': 'true' });
         this.lineEls = (summary.lines || []).map(l => {
             const exposure = run.exposures.find(e => e.id === l.exposureId);
-            const tone = l.hedgeImpact >= NOISE || (l.hedgeImpact > -NOISE && l.exposureImpact >= NOISE) ? 'is-up'
-                : l.hedgeImpact <= -NOISE || l.exposureImpact <= -NOISE ? 'is-down' : '';
+            // The tone follows the net effect of the line (exposure plus hedge), not the hedge alone.
+            const net = (Number.isFinite(l.exposureImpact) ? l.exposureImpact : 0) + (Number.isFinite(l.hedgeImpact) ? l.hedgeImpact : 0);
+            const tone = net >= NOISE ? 'is-up' : net <= -NOISE ? 'is-down' : '';
             return h('li', { class: `r-line ${tone}`.trim(), 'data-exposure': l.exposureId, hidden: true,
                 text: resultLine(exposure, l, run.baseCurrency) });
         });
@@ -142,19 +145,20 @@ export class ResultScreen {
             h('p', { class: 'q-board-name r-board-name', text: speakerName(reaction) }),
             reaction.line ? h('p', { class: 'q-board-line r-board-line', text: reaction.line }) : null));
 
-        this.body = h('div', { class: 'q-body r-body', on: { click: (e) => this._onTap(e) } },
+        this.body = h('div', { class: 'q-body r-body', on: { click: this.tapGuard.wrap((e) => this._onTap(e)) } },
             h('div', { class: 'q-scene r-scene' }, this.sceneCanvas),
             quip?.text ? h('p', { class: 'r-quip', text: quip.text }) : null,
             h('ul', { class: 'r-lines', 'aria-live': 'polite' }, this.lineEls),
             this.boardEl);
 
         this.nextBtn = h('button', { class: 'btn btn-gold q-run r-next', type: 'button', text: 'NEXT',
-            on: { click: () => this._advance() } });
+            on: { click: this.tapGuard.wrap(() => this._advance()) } });
         this.el.append(head, this.body, h('footer', { class: 'q-footer' }, this.nextBtn));
         return this.el;
     }
 
     mount() {
+        this.tapGuard.arm();
         if (!this.data) return;
         const { run } = this.data;
         const env = this.env;
@@ -177,7 +181,6 @@ export class ResultScreen {
         this.lineEls.forEach((el, i) => this._after(LINE_START_MS + i * LINE_STEP_MS, () => { el.hidden = false; }));
         const boardAt = LINE_START_MS + Math.max(0, this.lineEls.length - 1) * LINE_STEP_MS + BOARD_AFTER_MS;
         this._after(boardAt, () => this._revealAll());
-        this._after(RESULT_MS, () => this._advance());
     }
 
     unmount() {

@@ -20,6 +20,7 @@ import { playCutscene as realPlayCutscene } from '../ui/pixel/Cutscene.js';
 import { soundFX } from '../ui/SoundFX.js';
 import { cosmeticRng } from './simple/RunController.js';
 import { startRun } from './simple/IndustryScreen.js';
+import { createTapGuard } from '../ui/tapGuard.js';
 import * as realApi from '../utils/api.js';
 import * as realStorage from '../utils/storage.js';
 
@@ -28,6 +29,8 @@ const ENDING_SALT = 30;                 // cosmetic RNG salt for the ending quip
 const SHARE_URL = 'https://competition.hedj.eu';
 
 const fmt = n => Math.round(n).toLocaleString('en-GB');
+const sameEmail = (a, b) => !!a && !!b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+const STORAGE_FAILED = "Your score couldn't be saved on this device";
 
 // How the run ended. Bankrupt: out of cash. Fired: the board's confidence collapsed, or one severe off-policy loss.
 export function endingFor(status, severe = false) {
@@ -64,16 +67,17 @@ export function rankText(o) {
     else if (o.queued) parts.push('Queued, will submit when online');
     else if (o.notRegistered) parts.push('Register to get on the leaderboard');
     else if (!o.storageFailed) parts.push('Score submitted');
-    if (o.storageFailed) parts.push("Your score couldn't be saved on this device");
+    if (o.storageFailed) parts.push(STORAGE_FAILED);
     return parts.join('. ');
 }
 
-// Crisis runs are unranked (R31): a badge line only.
+// Crisis runs are unranked (R31): a badge line only, plus the storage warning if the progress didn't save.
 function crisisText(view) {
     const label = badgeLabel(view.crisisId);
-    return view.status === 'complete'
+    const badge = view.status === 'complete'
         ? `Crisis badge earned: ${label}`
         : `Crisis runs aren't ranked. Survive all 8 quarters of ${label} to earn its badge`;
+    return view.outcome?.storageFailed ? `${badge}. ${STORAGE_FAILED}` : badge;
 }
 
 export class GameOverScreen {
@@ -88,7 +92,9 @@ export class GameOverScreen {
         this.proRecords = new Map();   // gameId -> record: a Pro run is recorded and submitted once
         this.token = null;
         this.countHandle = null;
-        this.busy = false;
+        this.busy = false;        // PLAY AGAIN is starting a run
+        this.navigated = false;   // PLAY AGAIN or TITLE has been chosen; the other is then ignored
+        this.tapGuard = createTapGuard({ now: this.env.now });
     }
 
     get api() { return this.deps.api || realApi; }
@@ -111,6 +117,7 @@ export class GameOverScreen {
     render() {
         this._stop();
         this.busy = false;
+        this.navigated = false;
         this.view = this._buildView();
         this.el = h('div', { class: 'screen active v3 go-screen' });
         if (!this.view) {
@@ -159,12 +166,12 @@ export class GameOverScreen {
                 : null);
 
         this.againBtn = h('button', { class: 'btn btn-gold q-run go-again', type: 'button', text: 'PLAY AGAIN',
-            on: { click: () => this._playAgain() } });
+            on: { click: this.tapGuard.wrap(() => this._playAgain()) } });
         const footer = h('footer', { class: 'q-footer go-footer' },
             this.againBtn,
             h('div', { class: 'go-row' },
-                h('button', { class: 'btn go-share', type: 'button', text: 'SHARE', on: { click: () => this._share() } }),
-                h('button', { class: 'btn go-home', type: 'button', text: 'TITLE', on: { click: () => this._home() } })));
+                h('button', { class: 'btn go-share', type: 'button', text: 'SHARE', on: { click: this.tapGuard.wrap(() => this._share()) } }),
+                h('button', { class: 'btn go-home', type: 'button', text: 'TITLE', on: { click: this.tapGuard.wrap(() => this._home()) } })));
 
         this.el.append(this.cutsceneEl, body, footer);
         this._paintRank();
@@ -172,6 +179,7 @@ export class GameOverScreen {
     }
 
     mount() {
+        this.tapGuard.arm();
         if (!this.view) return;
         const v = this.view;
         const token = this.token = {};
@@ -252,13 +260,15 @@ export class GameOverScreen {
     }
 
     // Pro: apply progress, queue the score and submit it, once per game. The pending promise never rejects.
+    // The run is credited to its owner (state.contactEmail, set at Pro setup), and only while that owner is the
+    // registered player, so a run is never recorded or submitted under someone else's registration.
     _recordPro(state, pr, total) {
         const key = state.gameId || `pro-${state.startedAt}`;
         if (this.proRecords.has(key)) return this.proRecords.get(key);
         const storage = this.storage;
         const api = this.api;
         const reg = storage.getRegistration();
-        const email = reg?.email || null;
+        const email = sameEmail(state.contactEmail, reg?.email) ? reg.email : null;
         const record = { isPersonalBest: false, newlyUnlocked: [], outcome: null, pending: null, settled: false };
         this.proRecords.set(key, record);
         if (!email) {
@@ -296,8 +306,7 @@ export class GameOverScreen {
             }
             Promise.resolve().then(() => api.flushScoreQueue?.()).catch(() => {});
             // Only while the same player is registered, so the progress is never sent with someone else's token.
-            const current = storage.getRegistration()?.email;
-            if (current && current.toLowerCase() === email.toLowerCase()) {
+            if (sameEmail(storage.getRegistration()?.email, email)) {
                 Promise.resolve().then(() => api.putRemoteProgress?.(progress)).catch(() => {});
             }
             record.outcome = result;
@@ -387,29 +396,47 @@ export class GameOverScreen {
     }
 
     // Simple: a new run of the same industry (the same crisis for a crisis run), straight to its first quarter.
-    // Pro: back to the Pro setup.
+    // An expired or missing token goes through showScreen('industry'), whose gate sends the player to register.
+    // Pro: back to the Pro setup (showScreen applies the same gate).
     _playAgain() {
-        if (this.busy || !this.view) return;
-        this.busy = true;
+        if (this.busy || this.navigated || !this.view) return;
         const v = this.view;
         if (v.mode === 'pro') {
+            this.navigated = true;
             gameState.reset();
             this.app.showScreen('setup');
             return;
         }
+        const reg = this.storage.getRegistration();
+        if (!reg || reg.gameTokenExpiry < Date.now()) {   // the same test as main.js showScreen's gate
+            this.navigated = true;
+            this.app.showScreen('industry');
+            return;
+        }
+        this.busy = true;
         this.againBtn.disabled = true;
+        const token = this.token;
         Promise.resolve()
             .then(() => startRun(this.app, v.industryId, v.crisisId ? { crisisId: v.crisisId } : {}))
-            .then(() => this.app.showScreen('quarter'))
+            .then(() => {
+                // TITLE chosen, or the screen left, while the run was starting: don't pull the player back.
+                if (this.navigated || this.token !== token) return;
+                this.navigated = true;
+                this.app.showScreen('quarter');
+            })
             .catch((err) => {
                 console.error('GameOverScreen: could not start a new run', err);
                 this.busy = false;
                 if (this.againBtn) this.againBtn.disabled = false;
-                this.app.showToast?.("Couldn't start a new run. Try again", 'error');
+                if (!this.navigated && this.token === token) {
+                    this.app.showToast?.("Couldn't start a new run. Try again", 'error');
+                }
             });
     }
 
     _home() {
+        if (this.navigated) return;
+        this.navigated = true;
         if (this.view?.mode === 'pro') gameState.reset();
         this.app.showScreen('title');
     }
