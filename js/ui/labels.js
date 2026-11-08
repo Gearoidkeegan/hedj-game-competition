@@ -96,6 +96,13 @@ export function exposureRisk(e) {
     return `Hurts you if the ${single(e.unit)} ${e.direction === 'sell' ? 'weakens' : 'strengthens'}`;
 }
 
+// What moved, for the result screen: "Dollar", "Jet fuel", "Interest rates".
+export function moveLabel(e) {
+    if (e?.type === 'commodity') return titleCase(commodity(e));
+    if (e?.type === 'ir') return 'Interest rates';
+    return titleCase(single(e?.unit || ''));
+}
+
 // Why a dial is stuck at 0 before hedgeAccess. Empty for FX, which is always hedgeable.
 export function lockedReason(e) {
     if (e.type === 'commodity') return "Your bank doesn't offer commodity hedging";

@@ -49,11 +49,6 @@
         flex-wrap: wrap;
         justify-content: center;
     }
-
-    /* Score breakdown */
-    .score-breakdown {
-        max-width: 480px;
-    }
 }
 
 /* ============================================
@@ -467,15 +462,6 @@
         width: 100%;
     }
 
-    .gameover-buttons {
-        flex-direction: column;
-        width: 100%;
-    }
-
-    .gameover-buttons .btn {
-        width: 100%;
-    }
-
     /* Reduce font sizes for mobile */
     h1 { font-size: 14px; }
     h2 { font-size: 12px; }
@@ -526,21 +512,6 @@
     .modal-body {
         max-height: 70vh !important;
         overflow-y: auto;
-    }
-
-    /* Score breakdown rows */
-    .score-row {
-        gap: 4px;
-    }
-
-    .score-label {
-        font-size: 12px !important;
-        min-width: 80px;
-    }
-
-    /* Share text — smaller */
-    #share-text {
-        font-size: 12px !important;
     }
 
     /* Attract mode */
@@ -741,12 +712,6 @@
         user-select: none;
     }
 
-    /* Allow selection on share text */
-    #share-text {
-        -webkit-user-select: all;
-        user-select: all;
-    }
-
     /* Disable hover effects on touch */
     .btn:hover {
         transform: none;
@@ -775,10 +740,6 @@
 
     .summary-screen {
         padding-top: 4px;
-    }
-
-    .gameover-grade {
-        font-size: 32px;
     }
 
     /* Compact isometric scene in landscape phone */

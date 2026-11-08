@@ -1,5 +1,5 @@
-/* ============================================
-   v3 Simple mode: title, industry pick, quarter screen, CashMeter, HedgeDial.
+/* =====================================
+   v3 Simple mode: title, industry pick, quarter, result and game-over screens, CashMeter, HedgeDial.
    Phone first (360–414px). Retro pixel, made readable: VT323 for body text,
    Press Start 2P for headings and the main call to action only.
    No visible text below 12px; touch targets at least 44px.
@@ -454,6 +454,88 @@
 @media (prefers-reduced-motion: reduce) {
     .ind-card:active:not([disabled]) { transform: none; }
 }
+
+/* =====================================
+   Result screen (after each quarter) and game over. Reuses the quarter screen's head, body, scene, board card
+   and footer.
+   ============================================ */
+
+.result-screen, .go-screen { display: flex; flex-direction: column; }
+.r-body { cursor: pointer; }
+.r-quip {
+    font-size: 22px;
+    color: var(--v3-gold);
+    text-align: center;
+}
+.r-lines {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+}
+.r-line {
+    font-size: 20px;
+    padding: 6px 10px;
+    background: var(--v3-panel);
+    border-left: 4px solid var(--v3-line);
+}
+.r-line.is-up { border-left-color: var(--v3-green); }
+.r-line.is-down { border-left-color: var(--v3-red); }
+.r-board.is-angry { border-color: var(--v3-red); }
+.r-board.is-happy { border-color: var(--v3-green); }
+
+/* Game over. The cutscene overlay covers the screen, so it has a definite size for playCutscene. */
+.go-cutscene {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: #0d0d1e;
+}
+.go-body {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+    padding-top: 12px;
+    text-align: center;
+}
+.go-ending h1 { font-size: 16px; }
+.go-ending.is-bankrupt h1, .go-ending.is-fired h1 { color: var(--v3-red); }
+.go-sub { font-size: 20px; margin-top: 6px; }
+.go-quip { font-size: 18px; color: var(--v3-muted); font-style: italic; margin-top: 6px; }
+.go-scorebox {
+    padding: 10px 12px;
+    background: var(--v3-panel);
+    border: 2px solid var(--v3-gold);
+    display: grid;
+    gap: 4px;
+}
+.go-company { font-size: 18px; color: var(--v3-muted); }
+.go-score {
+    font-family: var(--font-pixel);
+    font-size: 28px;
+    color: var(--v3-gold);
+    line-height: 1.4;
+}
+.go-title { font-family: var(--font-pixel); font-size: 12px; line-height: 1.5; }
+.go-title-line { font-size: 18px; color: var(--v3-muted); }
+.go-pb { font-family: var(--font-pixel); font-size: 12px; color: var(--v3-green); line-height: 1.5; }
+.go-rank { font-size: 20px; color: var(--v3-cyan); }
+.go-unlocks, .go-year {
+    padding: 8px 12px;
+    background: var(--v3-panel);
+    border: 2px solid var(--v3-line);
+    display: grid;
+    gap: 4px;
+}
+.go-unlocks ul { list-style: none; margin: 0; padding: 0; font-size: 20px; }
+.go-year-title { color: var(--v3-gold); }
+.go-year-headline { font-size: 20px; color: var(--v3-cyan); }
+.go-year-fact { font-size: 18px; }
+.go-year-note { font-size: 16px; color: var(--v3-muted); }
+.go-hedj { font-size: 18px; color: var(--v3-muted); }
+.go-hedj a { color: var(--v3-cyan); }
+.go-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
 /* ---------- How to Play: three swipe cards ---------- */
 .v3.howtoplay-screen { align-items: stretch; justify-content: flex-start; padding: 0; overflow: hidden; background: var(--v3-bg); }
