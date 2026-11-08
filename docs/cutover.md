@@ -87,7 +87,15 @@ Names used below:
       frontend)". Open it in the Actions tab.
 - [ ] **C2. Watch the backend job.** Its log should show `Deploying EventId=test EventEndIso=<empty> TokenTtlHours=120`.
       CloudFormation then adds the `HCompBest` table with its `ByScore` index, the progress function and the admin
-      routes. The existing tables are not replaced.
+      routes. The existing tables are not replaced; they only gain `DeletionPolicy: Retain` and
+      `UpdateReplacePolicy: Retain` (a metadata change), so from now on no stack change can delete their data.
+      **If this deploy fails and CloudFormation rolls back,** the new `HCompBest-hedj-competition-backend` table may be
+      left behind outside the stack (it is Retain too). It is empty: delete it before you retry, or the retry fails with
+      "already exists":
+      ```sh
+      aws dynamodb describe-table --region eu-north-1 --table-name HCompBest-hedj-competition-backend --query Table.ItemCount
+      aws dynamodb delete-table --region eu-north-1 --table-name HCompBest-hedj-competition-backend
+      ```
 - [ ] **C3. Check the API URL** in the job summary. It should be the same API as the CloudFront `/api/*` origin (same
       stack, so the URL should not change). If it differs, update the origin.
 - [ ] **C4. Smoke-test the API:**
@@ -286,7 +294,8 @@ back **both** halves. During the dry run (before H), fixing forward is usually q
 
 - [ ] **J1. Detach the security headers policy first** (`docs/cloudfront-security-headers.md`, "Removing it"). The v2
       pages load Google Fonts and have an inline admin script, which the policy blocks.
-- [ ] **J2. If you want to keep v3 best scores, export them.** The rollback deletes this table:
+- [ ] **J2. Export the v3 best scores.** The rollback keeps the table (it is Retain), but you will have to delete it
+      before v3 can be deployed again (J6), so take a copy now:
       ```sh
       aws dynamodb scan --region eu-north-1 --table-name HCompBest-hedj-competition-backend --output json > backup-HCompBest.json
       ```
@@ -296,8 +305,10 @@ back **both** halves. During the dry run (before H), fixing forward is usually q
       git revert -m 1 <merge commit sha> && git push     # for a squash merge: git revert <squash commit sha>
       ```
       The revert brings back the old two workflows, which redeploy the v2 backend and frontend. The v2 template has no
-      `HCompBest` table or progress function, so CloudFormation deletes them. `HCompPlayers`, `HCompScores` and
-      `HCompAnalytics` are kept.
+      `HCompBest` table or progress function. CloudFormation deletes the progress function, but only removes the
+      `HCompBest` table from the stack: the table itself is retained, with its data, outside the stack.
+      `HCompPlayers`, `HCompScores` and `HCompAnalytics` are kept as before (the v2 template drops their Retain
+      policy again, which is a metadata change only).
 - [ ] **J4. If GitHub Actions is unavailable,** restore by hand from the backups in A3 and A4:
       ```sh
       aws s3 sync ./comp-bucket-backup-<date>/ s3://hedj-comp-assets-eu-north-1/ --delete --region eu-north-1
@@ -312,6 +323,16 @@ back **both** halves. During the dry run (before H), fixing forward is usually q
       ```
 - [ ] **J5. After a rollback,** the old frontend workflow syncs `docs/` and the two root files again, so repeat
       section E.
+- [ ] **J6. Before deploying v3 again after a rollback,** remove the orphaned best table. The table names are fixed
+      (`HCompBest-<stack name>`), so CloudFormation can't create it while the retained copy exists, and the deploy
+      fails with "already exists". DynamoDB can't rename a table: export it first (J2), then delete it:
+      ```sh
+      aws dynamodb delete-table --region eu-north-1 --table-name HCompBest-hedj-competition-backend
+      aws dynamodb wait table-not-exists --region eu-north-1 --table-name HCompBest-hedj-competition-backend
+      ```
+      To keep the old rows under another name instead, take an on-demand backup (`aws dynamodb create-backup`) and
+      restore it to a new table name (`aws dynamodb restore-table-from-backup`) before deleting. The same applies to any
+      other table if the whole stack is ever deleted: all four are retained.
 
 ## K. Open product questions for the user
 

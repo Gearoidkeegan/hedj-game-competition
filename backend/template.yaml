@@ -39,9 +39,14 @@ Globals:
 Resources:
 
   # ─── DynamoDB Tables ───────────────────────────────────────────────────────
+  # Every table is Retain: a stack delete, a rollback to a template without it, or a replacement keeps the data.
+  # The TableNames are fixed, so a retained orphan must be deleted or renamed before a stack can create it again
+  # (docs/cutover.md, section J).
 
   HCompPlayers:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub 'HCompPlayers-${AWS::StackName}'
       BillingMode: PAY_PER_REQUEST
@@ -57,6 +62,8 @@ Resources:
 
   HCompScores:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub 'HCompScores-${AWS::StackName}'
       BillingMode: PAY_PER_REQUEST
@@ -85,6 +92,8 @@ Resources:
 
   HCompBest:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub 'HCompBest-${AWS::StackName}'
       BillingMode: PAY_PER_REQUEST
@@ -115,6 +124,8 @@ Resources:
 
   HCompAnalytics:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub 'HCompAnalytics-${AWS::StackName}'
       BillingMode: PAY_PER_REQUEST
