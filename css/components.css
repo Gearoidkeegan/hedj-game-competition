@@ -268,13 +268,6 @@
     background: var(--bg-dark);
 }
 
-/* Isometric scene uses pre-rendered PNG backdrops — render smoothly,
-   not pixelated, so the Hedj brand illustrations look clean. */
-#iso-canvas {
-    image-rendering: auto;
-    image-rendering: -webkit-optimize-contrast;
-}
-
 .stress-face-label {
     font-size: 6px;
     color: var(--text-muted);
