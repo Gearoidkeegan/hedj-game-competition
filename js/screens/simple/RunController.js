@@ -167,6 +167,12 @@ export class RunController {
         this.run = run;
         this.email = email;
         this._save();
+        // The admin PLAYS counter (M4): one play per new run, as Pro sends at its start. Fire-and-forget.
+        try {
+            if (typeof this.api?.trackEvent === 'function') this.api.trackEvent('play');
+        } catch {
+            // analytics never blocks a run
+        }
         return this.run;
     }
 

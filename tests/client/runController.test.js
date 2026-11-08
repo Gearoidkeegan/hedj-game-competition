@@ -519,3 +519,23 @@ test('a throw inside finish() does not lose the last quarter\'s result', () => {
         console.error = err;
     }
 });
+
+test('starting a Simple run sends one play event, so the admin PLAYS counter counts Simple runs (M4)', () => {
+    const api = fakeApi();
+    api.events = [];
+    api.trackEvent = e => api.events.push(e);
+    const rc = controller(api);
+    rc.start('airline', { seed: COMPLETE_SEED });
+    assert.deepEqual(api.events, ['play']);
+    rc.resume();
+    assert.deepEqual(api.events, ['play'], 'resuming a saved run is not a new play');
+    rc.start('airline', { seed: COMPLETE_SEED + 1 });
+    assert.deepEqual(api.events, ['play', 'play']);
+});
+
+test('a play event that throws never breaks starting a run', () => {
+    const api = fakeApi();
+    api.trackEvent = () => { throw new Error('boom'); };
+    const rc = controller(api);
+    assert.ok(rc.start('airline', { seed: COMPLETE_SEED }));
+});
