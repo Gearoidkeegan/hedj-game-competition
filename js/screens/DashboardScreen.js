@@ -17,6 +17,7 @@ import { HedgeLadder } from '../ui/HedgeLadder.js';
 import { StressFace } from '../ui/StressFace.js';
 import { soundFX } from '../ui/SoundFX.js';
 import { trackEvent } from '../utils/api.js';
+import { proSceneState } from '../engine/sim/proAdapter.js';
 
 // Format exposure size using physical units (mT, bbl) when defined, otherwise currency
 function formatExposureNotional(exp, notionalUSD) {
@@ -26,6 +27,16 @@ function formatExposureNotional(exp, notionalUSD) {
         return `${scaled.toLocaleString()} ${exp.physicalUnit}`;
     }
     return formatCurrency(n, '', true);
+}
+
+// Rate vs budget: percentage points for interest rates (decimals, 0.035 = 3.50%), percent change otherwise
+function formatVsBudget(exp, rate, budget) {
+    if (!(budget > 0)) return '0.00%';
+    if (exp.type === 'ir') {
+        const pp = (rate - budget) * 100;
+        return `${pp >= 0 ? '+' : ''}${pp.toFixed(2)}pp`;
+    }
+    return `${(((rate - budget) / budget) * 100).toFixed(2)}%`;
 }
 
 export class DashboardScreen {
@@ -42,8 +53,6 @@ export class DashboardScreen {
 
         // Quarter state
         this.quarterStarted = false;     // Has BEGIN QUARTER been pressed?
-        this.tradesThisQuarter = 0;      // Trading cost tracker
-        this.tradingCostsThisQuarter = 0;
         this.tradeDirectionConfirmed = false; // Has user passed the direction test?
 
         // Rate state for end-of-quarter resolution
@@ -194,8 +203,6 @@ export class DashboardScreen {
     mount() {
         // Reset quarter state
         this.quarterStarted = false;
-        this.tradesThisQuarter = 0;
-        this.tradingCostsThisQuarter = 0;
         this.tradeDirectionConfirmed = false;
         this.endOfQuarterRates = null;
         this.selectedExposure = null;
@@ -392,7 +399,7 @@ export class DashboardScreen {
                         const budget = state.budgetRates[underlying] || 0;
                         const diff = budget > 0 ? (livePrice - budget) / budget : 0;
                         cells[1].textContent = formatRate(livePrice, decimals, exp.type);
-                        cells[3].textContent = `${(diff * 100).toFixed(2)}%`;
+                        cells[3].textContent = formatVsBudget(exp, livePrice, budget);
                         cells[3].className = diff >= 0 ? 'pnl-positive' : 'pnl-negative';
                     }
                 }
@@ -463,12 +470,10 @@ export class DashboardScreen {
         const state = gameState.get();
         const previousRates = { ...state.currentRates };
 
-        // Store trading costs in state for scoring
+        // Trading costs and premiums are already recorded in state by gameLoop.bookHedge
         gameState.update({
             previousRates,
-            currentRates: this.endOfQuarterRates,
-            tradesThisQuarter: this.tradesThisQuarter,
-            tradingCostsThisQuarter: this.tradingCostsThisQuarter
+            currentRates: this.endOfQuarterRates
         });
 
         // Trigger the game loop resolution
@@ -915,25 +920,17 @@ export class DashboardScreen {
                 bankId
             });
 
-            if (hedge.premiumPaid > 0) {
-                const cashNow = gameState.get().cashBalance;
-                if (hedge.premiumPaid > cashNow) {
-                    this.app.showToast(`Insufficient cash for premium on Q+${tenor}`, 'error');
-                    break;
-                }
-                gameState.update({ cashBalance: cashNow - hedge.premiumPaid });
-                totalPremium += hedge.premiumPaid;
+            if (hedge.premiumPaid > gameState.get().cashBalance) {
+                this.app.showToast(`Insufficient cash for premium on Q+${tenor}`, 'error');
+                break;
             }
 
-            const tradingCost = hedgingEngine.getTradingCost(hedge.productType, notional);
-            this.tradesThisQuarter++;
-            this.tradingCostsThisQuarter += tradingCost;
-
-            if (creditUsage > 0) {
-                bankEngine.allocateTrade(bankId, hedge.id, creditUsage);
+            // Allocates bank credit, pays the premium and records the trading cost
+            if (!gameLoop.bookHedge(hedge, creditUsage)) {
+                this.app.showToast(`${offer.bank.shortName}: insufficient credit`, 'warning');
+                break;
             }
-
-            gameState.addHedge(hedge);
+            totalPremium += hedge.premiumPaid || 0;
             totalNotionalBooked += notional;
             tradesBooked++;
         }
@@ -967,7 +964,7 @@ export class DashboardScreen {
                 this.app.showToast(`${offer.bank.shortName}: ${formatCurrency(totalNotionalBooked, '', true)} booked${premNote}`, 'success');
             }
 
-            if (this.tradesThisQuarter > 3) {
+            if (gameState.get().tradesThisQuarter > 3) {
                 this.app.showToast('Excessive trading! Costs are mounting.', 'warning');
             }
         }
@@ -1022,10 +1019,11 @@ export class DashboardScreen {
     updateTradeCountBadge() {
         const badge = this.el.querySelector('#trade-count-badge');
         if (badge) {
-            if (this.tradesThisQuarter > 0) {
-                const color = this.tradesThisQuarter > 3 ? 'var(--pnl-negative)' : 'var(--text-muted)';
+            const trades = gameState.get().tradesThisQuarter;
+            if (trades > 0) {
+                const color = trades > 3 ? 'var(--pnl-negative)' : 'var(--text-muted)';
                 badge.style.color = color;
-                badge.textContent = `TRADES: ${this.tradesThisQuarter}`;
+                badge.textContent = `TRADES: ${trades}`;
             } else {
                 badge.textContent = '';
             }
@@ -1076,7 +1074,9 @@ export class DashboardScreen {
             // Rate colour: green if move is favourable, red if adverse.
             // FX EUR-cross: inverted relationship (higher rate = stronger EUR = bad for sell/good for buy).
             let rateClass = '';
-            if (hasBudget) {
+            if (hasBudget && exp.type === 'ir') {
+                rateClass = currentRate <= budgetRate ? 'pnl-positive' : 'pnl-negative';
+            } else if (hasBudget) {
                 const isFx = exp.type === 'fx';
                 if (exp.direction === 'buy') {
                     rateClass = isFx
@@ -1378,7 +1378,7 @@ export class DashboardScreen {
                 <td><span class="exposure-type-badge ${exp.type}" style="margin-right:4px">${exp.type}</span>${exp.underlying}</td>
                 <td>${formatRate(current, decimals, exp.type)}</td>
                 <td style="color:var(--text-muted)">${formatRate(budget, decimals, exp.type)}</td>
-                <td class="${diff >= 0 ? 'pnl-positive' : 'pnl-negative'}">${(diff * 100).toFixed(2)}%</td>
+                <td class="${diff >= 0 ? 'pnl-positive' : 'pnl-negative'}">${formatVsBudget(exp, current, budget)}</td>
             </tr>`;
         }
         html += '</tbody></table>';
@@ -1941,7 +1941,7 @@ export class DashboardScreen {
         const state = gameState.get();
         if (this.isoScene) this.isoScene.stop();
         this.isoScene = new IsometricScene(canvas);
-        this.isoScene.start(state.industry?.scene || 'airport', state.currentYearOffset, state.currentQuarter);
+        this.isoScene.start(state.industry?.scene || 'airport', state.currentYearOffset, state.currentQuarter, proSceneState(state));
     }
 
     startBloombergForExposure(exposure) {

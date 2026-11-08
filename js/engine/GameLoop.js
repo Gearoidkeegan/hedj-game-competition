@@ -2,9 +2,12 @@
 
 import { gameState } from './GameState.js';
 import { eventEngine } from './EventEngine.js';
-import { careerEngine } from './CareerEngine.js';
 import { marketEngine, computeBudgetRate } from './MarketEngine.js';
 import { forecastEngine } from './ForecastEngine.js';
+import { bankEngine } from './BankEngine.js';
+import { hedgingEngine } from './HedgingEngine.js';
+import { exposureCashImpact } from './sim/exposureMath.js';
+import { toQuarterSummary, proStatus, scorePro } from './sim/proAdapter.js';
 import { PHASE, GAME_CONFIG } from '../utils/constants.js';
 
 class GameLoopController {
@@ -32,6 +35,24 @@ class GameLoopController {
         }
     }
 
+    // Book one hedge: allocate bank credit, pay any premium, add it to the portfolio and record its
+    // trading cost. Returns false (nothing booked) if the bank lacks the credit.
+    bookHedge(hedge, creditUsage = 0) {
+        if (creditUsage > 0 && !bankEngine.allocateTrade(hedge.bankId, hedge.id, creditUsage)) return false;
+        const state = gameState.get();
+        const premium = hedge.premiumPaid || 0;
+        const tradingCost = hedgingEngine.getTradingCost(hedge.productType, hedge.notional);
+        gameState.update({
+            cashBalance: state.cashBalance - premium,
+            tradesThisQuarter: state.tradesThisQuarter + 1,
+            tradingCostsThisQuarter: state.tradingCostsThisQuarter + tradingCost,
+            totalTradingCosts: state.totalTradingCosts + tradingCost,
+            premiumsThisQuarter: state.premiumsThisQuarter + premium
+        });
+        gameState.addHedge(hedge);
+        return true;
+    }
+
     // Player has finished making decisions — advance the quarter
     endDecisionPhase() {
         this.setPhase(PHASE.RESOLUTION);
@@ -42,6 +63,13 @@ class GameLoopController {
     // Process quarter resolution: advance rates, calculate P&L, check margins
     resolveQuarter() {
         const state = gameState.get();
+
+        // Policy compliance is judged on the book the player chose for this quarter, before this
+        // quarter's hedges settle (checking after settlement always missed the maturing bucket).
+        const inCompliance = this.checkPolicyCompliance();
+
+        // IR exposures active from the start have no budget yet (computeBudgetRate skips IR)
+        this.ensureIrBudgetRates();
 
         // v2: Generate realized notionals (forecast variance)
         const realized = forecastEngine.generateQuarterRealized(
@@ -55,6 +83,7 @@ class GameLoopController {
         // MarketEngine will have already updated rates before this is called
         // Calculate P&L for this quarter
         const result = this.calculateQuarterlyPnL();
+        result.inMandate = inCompliance;
 
         // Check margin calls
         if (result.marginCallAmount > 0) {
@@ -73,8 +102,6 @@ class GameLoopController {
             cashBalance: gameState.get().cashBalance + result.cashImpact
         });
 
-        // Check policy compliance
-        const inCompliance = this.checkPolicyCompliance();
         if (inCompliance) {
             gameState.update({
                 totalQuartersInCompliance: state.totalQuartersInCompliance + 1
@@ -119,7 +146,8 @@ class GameLoopController {
         let cashImpact = 0;
         const details = [];
 
-        // Exposure P&L: (budget_rate - actual_rate) * notional for each exposure
+        // Exposure P&L against the budget rate for each exposure (exposureCashImpact, A2).
+        // IR exposures use the start-of-game rate as budget: −(rate − budget) × notional × 0.25.
         // v2: Use realized notional (with forecast variance) instead of fixed quarterlyNotional
         const policy = state.hedgingPolicy;
         const hasBudgetRate = policy && policy.budgetRateType !== 'none';
@@ -133,28 +161,8 @@ class GameLoopController {
 
             let expPnL = 0;
             if (hasBudgetRate && budgetRate !== 0) {
-                // Percentage-based P&L normalised relative to the budget rate.
-                const priceMoveRatio = (currentRate - budgetRate) / budgetRate;
-
-                if (exposure.direction === 'buy') {
-                    // Commodity buy: price up → more cost → LOSS
-                    expPnL = -priceMoveRatio * realizedNotional;
-                } else {
-                    // Commodity sell: price up → more revenue → GAIN
-                    expPnL = priceMoveRatio * realizedNotional;
-                }
-
-                // FX inversion only applies when the company's home currency is the
-                // BASE of the pair (pair ends with the unit currency, e.g. EUR-base +
-                // EURUSD with unit=USD). When home is the QUOTE of the pair (e.g.
-                // USD-base + EURUSD with unit=EUR), rate changes map directly to the
-                // unit value in home terms, same as commodity convention.
-                if (exposure.type === 'fx'
-                    && typeof exposure.underlying === 'string'
-                    && typeof exposure.unit === 'string'
-                    && exposure.underlying.endsWith(exposure.unit)) {
-                    expPnL = -expPnL;
-                }
+                // `+ 0` turns -0 into 0
+                expPnL = exposureCashImpact(exposure, budgetRate, currentRate, realizedNotional) + 0;
             }
             exposurePnL += expPnL;
 
@@ -164,10 +172,13 @@ class GameLoopController {
 
             details.push({
                 type: 'exposure',
+                exposureId: exposure.id,
+                exposureType: exposure.type,
                 underlying: exposure.underlying,
                 description: exposure.description,
                 pnl: expPnL,
                 budgetRate,
+                startRate: state.previousRates[exposure.underlying],
                 currentRate,
                 forecastNotional,
                 realizedNotional,
@@ -186,6 +197,7 @@ class GameLoopController {
 
             const currentRate = state.currentRates[hedge.underlying] || hedge.contractRate;
             let mtmChange = 0;
+            let settlesQuarterly = false;
 
             // Hedge MTM uses the same percentage base (budget rate) as exposure P&L so
             // that a 100%-hedged position produces a near-zero net.  The hedge locks in
@@ -205,24 +217,27 @@ class GameLoopController {
                 mtmChange = newMtm - (hedge.currentMtm || 0);
                 hedge.currentMtm = newMtm;
             } else if (hedge.productType === 'option') {
-                // Simplified option: intrinsic value as % of budget rate, then * notional
+                // Simplified option: intrinsic value as % of budget rate, then * notional.
+                // The premium is paid in cash at booking and counted in that quarter's P&L
+                // (premiumsThisQuarter), so it is not netted here as well.
                 const direction = hedge.direction === 'buy' ? 1 : -1;
                 const strike = hedge.strikeRate || hedge.strike || 1;
                 const budgetRate = state.budgetRates[hedge.underlying] || strike;
                 const baseRate = budgetRate !== 0 ? budgetRate : strike;
                 const rawIntrinsic = Math.max(0, (currentRate - strike) * direction);
                 const intrinsic = rawIntrinsic / baseRate;
-                const newMtm = intrinsic * hedge.notional - (hedge.premiumPaid || 0);
+                const newMtm = intrinsic * hedge.notional;
                 mtmChange = newMtm - (hedge.currentMtm || 0);
                 hedge.currentMtm = newMtm;
             } else if (hedge.productType === 'swap') {
-                // IR Swap: (floating - fixed) * notional * 0.25
+                // IR Swap: (floating - fixed) * notional * 0.25, rates are decimals
                 const floatingRate = currentRate;
                 const fixedRate = hedge.contractRate;
                 const quarterPnL = (floatingRate - fixedRate) * hedge.notional * 0.25;
                 mtmChange = quarterPnL;
                 hedge.currentMtm = (hedge.currentMtm || 0) + quarterPnL;
                 cashImpact += quarterPnL; // Swaps settle quarterly
+                settlesQuarterly = true;
             }
 
             hedgePnL += mtmChange;
@@ -235,8 +250,10 @@ class GameLoopController {
             const maturesThisQ = hedge.maturityQuarter <= currentQ;
             if (maturesThisQ) {
                 hedge.status = 'matured';
-                cashImpact += hedge.currentMtm || 0;
+                // Quarterly-settled hedges (swaps) were already paid in cash each quarter
+                if (!settlesQuarterly) cashImpact += hedge.currentMtm || 0;
                 settledHedges.push(hedge);
+                bankEngine.releaseTrade(hedge.bankId, hedge.id);
                 // Settlement cash flow = full accumulated MTM at maturity
                 settledHedgePnL += hedge.currentMtm || 0;
             } else {
@@ -260,6 +277,7 @@ class GameLoopController {
                 productType: hedge.productType,
                 // For settled hedges, show total settlement value; for active, show quarterly MTM change
                 pnl: maturesThisQ ? (hedge.currentMtm || 0) : mtmChange,
+                mtmChange,
                 contractRate: hedge.contractRate,
                 currentRate,
                 status: hedge.status,
@@ -275,7 +293,7 @@ class GameLoopController {
         }
 
         // Compute horizon exposure P&L: total exposure value change across
-        // the full hedge horizon (quarterlyNotional * horizon * rate move %)
+        // the full hedge horizon (quarterlyNotional * horizon * rate move)
         const policyHorizon = (policy && policy.hedgeHorizon) || 4;
         const remainingQ = Math.max(1, state.maxQuarters - state.totalQuartersPlayed);
         const horizon = Math.min(remainingQ, policyHorizon);
@@ -285,23 +303,15 @@ class GameLoopController {
                 const budgetRate = state.budgetRates[exposure.underlying] || 0;
                 const currentRate = state.currentRates[exposure.underlying] || budgetRate;
                 if (budgetRate === 0) continue;
-                const priceMoveRatio = (currentRate - budgetRate) / budgetRate;
                 const horizonNotional = (exposure.quarterlyNotional || 0) * horizon;
-                let pnl = exposure.direction === 'buy'
-                    ? -priceMoveRatio * horizonNotional
-                    : priceMoveRatio * horizonNotional;
-                // FX inversion only when home=base of pair (see exposurePnL notes).
-                if (exposure.type === 'fx'
-                    && typeof exposure.underlying === 'string'
-                    && typeof exposure.unit === 'string'
-                    && exposure.underlying.endsWith(exposure.unit)) {
-                    pnl = -pnl;
-                }
-                horizonExposurePnL += pnl;
+                horizonExposurePnL += exposureCashImpact(exposure, budgetRate, currentRate, horizonNotional);
             }
         }
 
-        const netPnL = exposurePnL + hedgePnL;
+        // Trading costs and premiums of the trades booked this quarter
+        const tradingCosts = state.tradingCostsThisQuarter || 0;
+        const premiums = state.premiumsThisQuarter || 0;
+        const netPnL = exposurePnL + hedgePnL - tradingCosts - premiums;
 
         return {
             quarter: state.totalQuartersPlayed,
@@ -314,6 +324,8 @@ class GameLoopController {
             horizonExposurePnL,
             totalHedgeMtm,
             horizon,
+            tradingCosts,
+            premiums,
             netPnL,
             cashImpact,
             marginCallAmount,
@@ -387,7 +399,11 @@ class GameLoopController {
 
     // Event phase complete — player has chosen, move to summary
     completeEvent(event, choiceId) {
-        const result = eventEngine.processChoice(event, choiceId);
+        const result = event ? eventEngine.processChoice(event, choiceId) : null;
+        // Events can unwind hedges: free the bank credit of anything no longer in the book
+        bankEngine.releaseClosedTrades(gameState.get().hedgePortfolio
+            .filter(h => h.status === 'active')
+            .map(h => h.id));
         // Store the event result for the board to reference
         gameState.update({
             activeEvents: [],
@@ -401,8 +417,10 @@ class GameLoopController {
         this.setPhase(PHASE.BOARD);
     }
 
-    // Board review phase complete — advance or end game
+    // Board review phase complete — record the v3 QuarterSummary, then advance or end the game
     completeBoardReview() {
+        const status = this.recordQuarterSummary();
+
         // Clear event result now that board has seen it
         gameState.update({ lastEventResult: null });
         gameState.advanceQuarter();
@@ -413,35 +431,40 @@ class GameLoopController {
         // v2: Check if budget rates need resetting for this quarter
         this.checkBudgetRateReset();
 
-        const state = gameState.get();
-
-        if (state.firedByBoard || state.burnedOut) {
-            if (state.careerMode) {
-                this.setPhase(PHASE.LEVEL_COMPLETE);
-            } else {
-                this.setPhase(PHASE.GAMEOVER);
-            }
-        } else if (state.totalQuartersPlayed >= state.maxQuarters) {
-            if (state.careerMode) {
-                this.setPhase(PHASE.LEVEL_COMPLETE);
-            } else if (gameState.canExtend()) {
-                this.setPhase(PHASE.EXTEND);
-            } else {
-                this.setPhase(PHASE.GAMEOVER);
-            }
-        } else {
+        if (status === 'playing') {
             this.setPhase(PHASE.DECISION);
+        } else {
+            this.finishGame(status);
         }
     }
 
-    // Player chose to extend
-    extendGame() {
-        gameState.extendGame();
-        this.setPhase(PHASE.DECISION);
+    // Append this quarter's QuarterSummary (v3 contract) and return the run status
+    recordQuarterSummary() {
+        const state = gameState.get();
+        const result = state.quarterlyResults[state.quarterlyResults.length - 1];
+        const quarterSummaries = [...state.quarterSummaries, toQuarterSummary(state, result)];
+        const runStatus = proStatus(quarterSummaries, {
+            boardMood: state.boardSatisfaction,
+            maxQuarters: state.maxQuarters,
+            walkedOut: state.firedByBoard || state.burnedOut
+        });
+        gameState.update({ quarterSummaries, runStatus });
+        return runStatus;
     }
 
-    // Player chose not to extend
-    endGame() {
+    // Pro end of game: score on v3 and hand over to the game-over screen.
+    // GameOverScreen (B3) reads gameState.get().proResult = { mode: 'pro', status, score, history }.
+    finishGame(status) {
+        gameState.update({ runStatus: status });
+        const state = gameState.get();
+        gameState.update({
+            proResult: {
+                mode: 'pro',
+                status,
+                score: scorePro(state),
+                history: state.quarterSummaries
+            }
+        });
         this.setPhase(PHASE.GAMEOVER);
     }
 
@@ -457,7 +480,7 @@ class GameLoopController {
             'EURJPY': 155, 'USDJPY': 140, 'GBPUSD': 1.27,
             'BRENT': 75, 'JETNWE': 75 * 1.8 * 7.4, 'NATGAS': 3.0, 'COPPER': 4.0, 'STEEL': 600,
             'DAIRY': 18, 'WHEAT': 6.0, 'CORN': 4.5, 'GOLD': 1900, 'COFFEE': 150,
-            'EURIBOR': 0.035, 'SOFR': 0.05, 'SONIA': 0.05
+            'EURIBOR': 0.035
         };
 
         const currentRates = { ...state.currentRates };
@@ -490,6 +513,24 @@ class GameLoopController {
         if (changed) {
             gameState.update({ currentRates, previousRates, budgetRates });
         }
+        this.ensureIrBudgetRates();
+    }
+
+    // IR exposures budget at the start-of-game rate (the first quarter of the hidden start year).
+    // Without market data, the rate at the start of the quarter the exposure is first priced.
+    ensureIrBudgetRates() {
+        const state = gameState.get();
+        const budgetRates = { ...state.budgetRates };
+        let changed = false;
+        for (const exp of state.exposures) {
+            if (exp.type !== 'ir' || budgetRates[exp.underlying]) continue;
+            let start = marketEngine.isLoaded() ? marketEngine.getRate(exp.underlying, state.startYear, 1) : null;
+            if (!start) start = state.previousRates[exp.underlying] || state.currentRates[exp.underlying];
+            if (!start) continue;
+            budgetRates[exp.underlying] = start;
+            changed = true;
+        }
+        if (changed) gameState.update({ budgetRates });
     }
 
     // v2: Check and apply budget rate reset based on policy budgetRateType
@@ -497,7 +538,8 @@ class GameLoopController {
         const state = gameState.get();
         const newRates = marketEngine.resetBudgetRates(state);
         if (newRates !== null) {
-            // Merge new rates with existing (preserves rates for underlyings not in current exposures)
+            // Merge new rates with existing (preserves rates for underlyings not in current exposures,
+            // and IR budgets, which stay at the start-of-game rate)
             const merged = { ...state.budgetRates, ...newRates };
             gameState.update({ budgetRates: merged });
         }

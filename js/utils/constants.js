@@ -1,9 +1,7 @@
 // Game balance constants and configuration
 
 export const GAME_CONFIG = {
-    DEFAULT_QUARTERS: 8,        // 2 years = ~5 minute game
-    EXTENSION_QUARTERS: 4,      // Each extension adds 1 year
-    MAX_EXTENSIONS: 2,          // Up to 16 quarters total
+    MAX_QUARTERS: 8,            // 2 years; v3 has no extensions
     QUARTERS_PER_YEAR: 4,
 
     // Board satisfaction

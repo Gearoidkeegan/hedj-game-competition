@@ -6,7 +6,6 @@ import { marketEngine, computeBudgetRate } from '../engine/MarketEngine.js';
 import { bankEngine } from '../engine/BankEngine.js';
 import { eventEngine } from '../engine/EventEngine.js';
 import { boardAI } from '../engine/BoardAI.js';
-import { careerEngine } from '../engine/CareerEngine.js';
 import { HEDGING_POLICY_TYPES } from '../utils/constants.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { SeededRandom, generateSeed } from '../utils/random.js';
@@ -30,19 +29,7 @@ export class SetupScreen {
         const reg = getRegistration();
         const prefillName = reg?.playerName || '';
 
-        // Career mode header
-        const isCareer = this.app.gameMode === 'career' && careerEngine.careerActive;
-        const careerLevel = isCareer ? careerEngine.getCurrentLevel() : null;
-        const careerHeader = careerLevel ? `
-            <div class="panel" style="margin-bottom:8px;text-align:center;border-color:var(--gold-dark);">
-                <span style="font-size:16px;margin-right:6px;">${careerLevel.icon}</span>
-                <span class="pixel-text" style="font-size:9px;color:var(--gold);">CAREER LEVEL ${careerLevel.level}: ${careerLevel.name.toUpperCase()}</span>
-                <div class="readable-text" style="font-size:14px;color:var(--text-secondary);margin-top:4px;">${careerLevel.flavourText?.intro || careerLevel.description}</div>
-            </div>
-        ` : '';
-
         this.el.innerHTML = `
-            ${careerHeader}
             <h2 class="pixel-text">CHOOSE YOUR INDUSTRY</h2>
 
             <div class="industry-grid" id="industry-grid">
@@ -220,12 +207,6 @@ export class SetupScreen {
 
         const rng = new SeededRandom(seed + 1);
 
-        // Career mode: apply level parameters to the industry
-        const isCareer = this.app.gameMode === 'career' && careerEngine.careerActive;
-        if (isCareer) {
-            industry = careerEngine.applyLevelParameters(industry, rng);
-        }
-
         // Assign random hedging policy
         const hedgingPolicy = rng.pick(HEDGING_POLICY_TYPES);
 
@@ -236,12 +217,10 @@ export class SetupScreen {
         // Reset all engines BEFORE the dashboard mounts to avoid carrying
         // state (banks, hedges, events) from a previous playthrough.
         gameState.reset();
-        if (!isCareer) {
-            const numBanks = rng.intRange(1, 3);
-            const creditLimit = Math.round(industry.annualRevenue * 0.15);
-            bankEngine.init(numBanks, creditLimit, rng);
-            eventEngine.reset();
-        }
+        const numBanks = rng.intRange(1, 3);
+        const creditLimit = Math.round(industry.annualRevenue * 0.15);
+        bankEngine.init(numBanks, creditLimit, rng);
+        eventEngine.reset();
 
         // Initialize game state (exposures, startYear, etc.) WITHOUT triggering
         // the dashboard screen transition yet — we need to set market rates first.
@@ -255,11 +234,7 @@ export class SetupScreen {
             contactEmail
         });
 
-        if (isCareer) {
-            careerEngine.initLevel(industry, rng);
-        } else {
-            boardAI.assignCEOPersona(gameState.getRng());
-        }
+        boardAI.assignCEOPersona(gameState.getRng());
 
         // Set market rates BEFORE the dashboard renders so rates are visible immediately
         this.setMarketRates(industry, rng);
