@@ -6,7 +6,7 @@ import { assertLengths } from '../helpers/copy.js';
 const POOLS = ['business', 'conference'];
 const EFFECT_KEYS = ['cashPct', 'mood', 'varianceMult', 'notionalMult'];
 const CONFERENCE_IDS = ['keynote_overran', 'lanyard_mixup', 'coffee_queue', 'cfo_at_the_bar', 'phone_at_3pct'];
-const POWER_UP_IDS = ['forecasting', 'visibility', 'options'];
+const POWER_UP_IDS = ['facilities', 'forecasting', 'hedgeAccess', 'visibility'];
 // The synthetic SOFR/SONIA floating-debt exposures are being removed from tech, energy and retail, so events
 // must not depend on them even while industries.json in this tree still lists them.
 const DROPPED_UNDERLYINGS = ['SOFR', 'SONIA'];
@@ -141,9 +141,12 @@ test('powerups.json has a card for each power-up with a real-world Hedj line', (
     assert.deepEqual(Object.keys(cards).sort(), [...POWER_UP_IDS].sort());
     for (const id of POWER_UP_IDS) {
         const card = cards[id];
-        assert.deepEqual(Object.keys(card).sort(), ['blurb', 'hedjLine', 'name'], `${id} card keys`);
+        const expectedKeys = id === 'forecasting' ? ['blurb', 'hedjLine', 'levels', 'name'] : ['blurb', 'hedjLine', 'name'];
+        assert.deepEqual(Object.keys(card).sort(), expectedKeys, `${id} card keys`);
         assert.ok(card.hedjLine.startsWith('In real life, Hedj '), `${id} hedjLine starts "In real life, Hedj "`);
     }
+    assert.equal('options' in cards, false, 'the Options Desk card is gone');
+    assert.equal(cards.forecasting.levels.length, 3, 'forecasting has one line per module');
     assertLengths(cards, 'powerups.json');
 });
 
