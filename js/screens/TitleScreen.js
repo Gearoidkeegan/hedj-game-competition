@@ -35,7 +35,8 @@ export class TitleScreen {
     render() {
         const rc = this.app.runController;
         this.reg = validRegistration();
-        this.progress = rc ? rc.progress() : null;
+        // Unlocks and stats only for a valid registration: an expired one shows the first-time view (PRO/CRISES locked).
+        this.progress = this.reg && rc ? rc.progress() : null;
         // resume() only ever returns the registered player's run, and resets the controller otherwise.
         this.resumeRun = this.reg && rc ? rc.resume() : null;
         this.crisisOpen = false;
@@ -53,7 +54,8 @@ export class TitleScreen {
                 this._teaser(),
                 this._more()),
             h('footer', { class: 't-footer' },
-                h('button', { class: 'btn t-sound', type: 'button', 'aria-label': 'Sound on', text: 'SOUND ON',
+                h('button', { class: 'btn t-sound', type: 'button', 'aria-label': soundFX.enabled ? 'Sound on' : 'Sound off',
+                    text: soundFX.enabled ? 'SOUND ON' : 'SOUND OFF',
                     on: { click: e => this._toggleSound(e.currentTarget) } }),
                 h('a', { href: 'https://www.hedj.eu', target: '_blank', rel: 'noopener', text: 'Powered by Hedj' })));
         return this.el;
@@ -75,6 +77,7 @@ export class TitleScreen {
 
     unmount() {
         this.mountId++;
+        this._closeLeaderboard();
     }
 
     // ── Sections ──────────────────────────────────────────────────────────
@@ -208,11 +211,12 @@ export class TitleScreen {
 
     async startCrisis(crisisId) {
         const crisis = CRISES.find(c => c.id === crisisId);
-        if (!crisis || this.starting) return;
+        if (!crisis || this.starting || !this.reg) return;   // a crisis needs a valid registration
+        const id = this.mountId;
         this.starting = true;
         try {
             await startRun(this.app, crisis.industryId, { crisisId });
-            this.app.showScreen('quarter');
+            if (id === this.mountId) this.app.showScreen('quarter');   // not if the player left meanwhile
         } catch (err) {
             console.error('TitleScreen: could not start the crisis', err);
             this.app.showToast?.("Couldn't start the crisis. Check your connection and try again.", 'error');
@@ -228,18 +232,32 @@ export class TitleScreen {
         if (on) soundFX.click();
     }
 
+    _closeLeaderboard() {
+        const m = this._modal;
+        if (!m) return;
+        this._modal = null;
+        globalThis.document.removeEventListener('keydown', m.onKey);
+        m.overlay.remove();
+        m.opener?.focus?.();
+    }
+
     async showLeaderboard() {
+        this._closeLeaderboard();
         const body = h('div', { class: 'lb-body' }, h('p', { text: 'Loading scores…' }));
         const close = h('button', { class: 'btn lb-close', type: 'button', text: 'CLOSE' });
         const overlay = h('div', { class: 'v3-modal', role: 'dialog', 'aria-label': 'Leaderboard' },
             h('div', { class: 'v3-modal-box' }, h('h2', { text: 'Leaderboard' }), body, close));
         const doc = globalThis.document;
+        const onKey = e => { if (e.key === 'Escape') this._closeLeaderboard(); };
+        this._modal = { overlay, onKey, opener: doc.activeElement };
         (doc.getElementById('game-viewport') || doc.body).appendChild(overlay);
-        close.addEventListener('click', () => overlay.remove());
-        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        close.addEventListener('click', () => this._closeLeaderboard());
+        overlay.addEventListener('click', e => { if (e.target === overlay) this._closeLeaderboard(); });
+        doc.addEventListener('keydown', onKey);
         close.focus?.();
         try {
             const entries = await this.api.fetchLeaderboard({ mode: 'simple', period: 'event', limit: 20 });
+            if (this._modal?.overlay !== overlay) return;
             body.replaceChildren(entries.length
                 ? h('ol', { class: 'lb-list' }, entries.map(e => h('li', {},
                     h('span', { class: 'lb-rank', text: `${e.rank}.` }),

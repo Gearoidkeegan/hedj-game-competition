@@ -2,6 +2,8 @@
 
 An interactive, web-based educational game where players manage treasury operations for companies across different industries. The **Competition Edition** extends the base game with a registration gate, global persistent leaderboard, admin analytics dashboard, and GDPR-compliant data handling — designed for live events, conferences, and online competitions.
 
+**v3 (conference edition):** phone-first, seven industries, and a run of 8 quarters that takes about 3 minutes. Two modes: **Simple** (the default: one dial per exposure, a board with a hedging policy, power-ups) and **Pro** (the full instrument-by-instrument game, unlocked by finishing a Simple run). Career mode has been removed.
+
 Built and branded for **[Hedj — Treasury Risk Management Solutions](https://www.hedj.eu)**.
 
 ---
@@ -34,7 +36,7 @@ Built and branded for **[Hedj — Treasury Risk Management Solutions](https://ww
 
 ## Overview
 
-Players take the role of a Corporate Treasury Manager, responsible for hedging FX, commodity, and interest rate exposures for a company. Each quarter they must decide how much of their exposure to hedge, which instruments to use, and which counterparty banks to trade with — all within the constraints of a board-mandated hedging policy.
+Players take the role of a Corporate Treasury Manager, responsible for hedging FX, commodity, and interest rate exposures for a company. In Simple mode, each quarter the player sets one dial per exposure (0, 25, 50, 75 or 100% hedged), answers any event, optionally buys one power-up, and runs the quarter. The board may have a hedging policy (a band such as 50–75%), may have a policy of not hedging at all, or may have no policy yet, in which case the player should propose one. In Pro mode they also choose instruments and counterparty banks.
 
 The game simulates realistic market dynamics (using historical rate data from 1994–2024), random market events (currency crises, commodity shocks), and an AI-driven board that evaluates performance and can fire the player if satisfaction falls too low.
 
@@ -77,7 +79,6 @@ hedj-game-competition/
 │   │   ├── HedgingEngine.js       # Derivative pricing, hedge book
 │   │   ├── EventEngine.js         # Random quarterly market events
 │   │   ├── BoardAI.js             # AI board feedback & satisfaction
-│   │   ├── CareerEngine.js        # Career mode progression
 │   │   ├── BankEngine.js          # Counterparty management
 │   │   └── ForecastEngine.js      # Notional variance (forecast uncertainty)
 │   │
@@ -108,7 +109,9 @@ hedj-game-competition/
 │   ├── industries.json            # Industry definitions (10+ industries)
 │   ├── products.json              # Hedging instruments (forwards, options, swaps)
 │   ├── events.json                # Market shock event definitions
-│   ├── career-levels.json         # 5 career progression levels
+│   ├── simple-events.json         # Simple-mode events (two choices each)
+│   ├── powerups.json              # Power-up cards
+│   ├── quips.json                 # Board and chairman quips
 │   ├── board-dialogue.json        # AI board feedback templates
 │   ├── year-facts.json            # Historical trivia revealed at game end
 │   └── market/                    # Historical market rates (1994–2024)
@@ -136,8 +139,10 @@ hedj-game-competition/
 
 | Mode | Duration | Description |
 |---|---|---|
-| **Quick Play** | ~5 min | 8 quarters, single industry, no progression. Good for events/demos. |
-| **Career Mode** | ~25 min | 5 levels from Startup to PE-Backed company, with increasing complexity and score gates between levels. |
+| **Simple** | ~3 min | 8 quarters, one industry, a dial per exposure. The conference mode and the default. Three industries are open at the start; the rest, Pro mode and the crisis scenarios unlock as you play. |
+| **Pro** | longer | The full instrument-by-instrument game. Unlocked by finishing a Simple run. |
+
+There is no career mode and no extension past 8 quarters.
 
 ### Core Gameplay Loop
 
@@ -148,8 +153,7 @@ Each quarter runs through the following phases:
 3. **Event Phase** — A random market event may trigger (currency crisis, commodity spike, etc.).
 4. **Board Phase** — The AI board evaluates performance and updates satisfaction.
 5. **Summary Phase** — Quarterly results are reviewed.
-6. **Extend Phase** *(end of game)* — Option to extend by 4 more quarters (maximum 2 extensions).
-7. **Game Over** — Final score, grade, and leaderboard submission.
+6. **Game Over** — Final score, grade, and leaderboard submission.
 
 ### Hedging Instruments
 
@@ -161,9 +165,9 @@ Each quarter runs through the following phases:
 
 ### Industries
 
-Ten base industries are available, each with multiple exposure types (FX, commodity, interest rate), scaled revenue and cash, and distinct board personalities:
+Seven industries are available, each with its own exposure types (FX, commodity, interest rate), scaled revenue and cash, and distinct board personalities:
 
-Airline, Bank, Manufacturing, Pharma, Food & Beverage, Energy, Retailer, Technology, Agriculture, Fintech.
+SkyBridge Airlines, Roasters Plc, NexGen Electronics, MedGlobal Labs, Momentum Construction, TerraEnergy and MainStreet Retail.
 
 ### Policies
 
@@ -213,7 +217,8 @@ Final score is out of 100, weighted across five components:
 - Board satisfaction starts at 55–60 and ranges from 10–100.
 - Satisfaction increases for policy compliance, decreases for over-hedging, over-trading, large losses, and policy violations.
 - If satisfaction drops below 10 the player is fired; cumulative stress above 100 triggers burnout.
-- Career Mode requires a minimum score of 55–60 to unlock the next level.
+- In Simple mode the board is one of three kinds: a hedging band (stay inside it), a "policy is not to hedge" board, or a board with no policy that judges each hedge on its own profit until the player proposes one.
+- Bank lines cap hedging at 50% until the player buys Bigger Bank Facilities, which also adds a borrowing cushion. Rate & Commodity Hedging is a power-up too.
 
 ---
 
@@ -227,7 +232,7 @@ Before playing for the competition leaderboard, players complete a registration 
 - Required consent (data processing + competition contact)
 - Optional marketing consent (follow-up communications)
 
-On successful registration the backend returns a 4-hour `gameToken` stored in localStorage. This token is required to submit a score to the leaderboard. Players on a shared device can use "Play as someone else" to clear the stored registration and register a new player.
+On successful registration the backend returns a `gameToken` (valid for `TokenTtlHours`, 120 hours by default) stored in localStorage. This token is required to submit a score to the leaderboard. Players on a shared device can use "Play as someone else" to clear the stored registration and register a new player.
 
 ### Global Leaderboard
 
@@ -305,6 +310,15 @@ sam build
 sam deploy --guided \
   --parameter-overrides AdminKey=<strong-secret-key>
 ```
+
+Backend parameters (`backend/template.yaml`):
+
+| Parameter | Purpose |
+|---|---|
+| `AdminKey` | Secret for the admin analytics endpoint |
+| `EventId` | The live event; selects the leaderboard partition (default `test`) |
+| `EventEndIso` | Event end (ISO-8601); player and score rows expire 90 days after it |
+| `TokenTtlHours` | Game token lifetime in hours (default 120) |
 
 Follow the prompts. On first deploy use `--guided`; subsequent deploys can omit it.
 

@@ -325,6 +325,18 @@ export class RunController {
         return this.progress().unlocked.filter(id => id.startsWith('powerup:')).map(id => id.slice('powerup:'.length));
     }
 
+    // The run in progress for the registered player, or null (R39: goes through the player check, never reads
+    // `run` raw). A pending event that is no longer in the content (e.g. a resumed save after events.json changed)
+    // is dropped, since the engine could never resolve it and the run would be locked.
+    currentRun() {
+        this._checkPlayer();
+        if (this.run?.pendingEvent && !(this.content.events || []).some(e => e.id === this.run.pendingEvent)) {
+            this.run = { ...this.run, pendingEvent: null };
+            this._save();
+        }
+        return this.run;
+    }
+
     // Whether the current run may buy `id` now: unlocked, not owned or used up, offered, affordable.
     canBuy(id) {
         return canBuyPowerUp(this._requireRun(), id, this.unlockedPowerUps());

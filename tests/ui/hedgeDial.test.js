@@ -14,7 +14,7 @@ function make(opts = {}) {
     const dial = new HedgeDial(host, { onChange: v => changes.push(v), ...opts });
     const steps = () => host.querySelectorAll('[data-step]');
     const step = v => host.querySelector(`[data-step="${v}"]`);
-    const slider = host.querySelector('[role="slider"]');
+    const slider = host.querySelector('[role="radiogroup"]');
     return { host, dial, changes, steps, step, slider };
 }
 
@@ -28,12 +28,13 @@ test('five detents at 0/25/50/75/100, rendered as buttons', () => {
 });
 
 test('the initial value snaps to the nearest detent and is shown as pressed', () => {
-    const { dial, step, slider } = make({ value: 0.6 });
+    const { dial, step, slider, steps } = make({ value: 0.6 });
     assert.equal(dial.value, 0.5);
-    assert.equal(step(0.5).getAttribute('aria-pressed'), 'true');
-    assert.equal(step(0.25).getAttribute('aria-pressed'), 'false');
-    assert.equal(slider.getAttribute('aria-valuenow'), '50');
-    assert.equal(slider.getAttribute('aria-valuetext'), '50% hedged');
+    assert.equal(step(0.5).getAttribute('aria-checked'), 'true');
+    assert.equal(step(0.25).getAttribute('aria-checked'), 'false');
+    assert.equal(slider.getAttribute('role'), 'radiogroup');
+    assert.ok(!slider.getAttribute('aria-valuemax'), 'no slider-only attributes on a radiogroup');
+    assert.ok(steps().every(b => b.getAttribute('role') === 'radio'));
 });
 
 test('tapping a detent sets the value and calls onChange once', () => {

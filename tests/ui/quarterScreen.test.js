@@ -104,7 +104,7 @@ test('RUN sends the dials as decisions and goes to the result screen (2 taps)', 
 test('the dials start at the RunController defaults', () => {
     const { rc, card } = setup(SEED.band2550);
     const d = rc.currentDecisionsDefaults();
-    const pressed = id => card(id).querySelector('[aria-pressed="true"]').getAttribute('data-step');
+    const pressed = id => card(id).querySelector('[aria-checked="true"]').getAttribute('data-step');
     assert.equal(pressed('usd-revenue'), String(d.hedges['usd-revenue']));
     assert.equal(pressed('fuel'), '0');
 });
@@ -285,8 +285,8 @@ test('offPolicyExposures mirrors the engine: clamps to the cap, skips unhedgeabl
 
 test('keyboard: arrow keys on a dial change the decision', () => {
     const { card, run, played } = setup(SEED.band2550);
-    const slider = card('usd-revenue').querySelector('[role="slider"]');
-    key(slider, 'ArrowLeft');
+    const radiogroup = card('usd-revenue').querySelector('[role="radiogroup"]');
+    key(radiogroup, 'ArrowLeft');
     run.click();
     assert.equal(played[0].hedges['usd-revenue'], 0.25);
 });
@@ -322,4 +322,61 @@ test('unmount stops the scene loop and is safe to call twice', () => {
     screen.unmount();
     assert.equal(screen.scene, null);
     screen.unmount();
+});
+
+// ── B4 follow-ups (B2 review minors) ─────────────────────────────────────
+
+test('Q8 on a no-policy board: no propose control and no nudge either', () => {
+    const { q, qa } = setup(SEED.none, { patch: { quarter: 7 } });
+    assert.equal(q('.q-propose'), null);
+    assert.equal(qa('.q-board-line').filter(l => NUDGES.has(l.textContent)).length, 0);
+});
+
+test('a noHedge board at the default dials gets no confirm: RUN plays at once', () => {
+    const { q, run, played } = setup(SEED.noHedge);
+    run.click();
+    assert.equal(q('.q-confirm').hidden, true);
+    assert.equal(played.length, 1);
+});
+
+test('R51: facilities is shown greyed out, with the reason, when the board needs it and cash is short', () => {
+    const { qa, q, rc } = setup(SEED.band75100, { patch: { cash: 100 } });
+    const fac = q('[data-powerup="facilities"]');
+    assert.ok(fac, 'still shown');
+    assert.equal(qa('[data-powerup]')[0], fac, 'and first');
+    assert.equal(fac.disabled, true);
+    assert.ok(fac.classList.contains('is-unaffordable'));
+    assert.match(fac.querySelector('.pu-reason').textContent, /^Can't afford it yet: you have /);
+    fac.click();
+    assert.equal(rc.run.powerUps.owned.includes('facilities'), false);
+});
+
+test('a pending event missing from the content is dropped, so the run cannot lock', () => {
+    const { q, run, played } = setup(SEED.band2550, { patch: { pendingEvent: 'gone_from_events_json' } });
+    assert.equal(q('.q-event'), null);
+    assert.equal(run.disabled, false);
+    run.click();
+    assert.ok(played.length >= 1, 'the engine accepted the quarter');
+});
+
+test('the screen reads the run through the controller accessor, not rc.run', () => {
+    const { rc } = setup(SEED.band2550);
+    const seen = [];
+    const app = { runController: { currentRun: () => { seen.push('currentRun'); return null; },
+        get run() { throw new Error('rc.run must not be read directly'); } }, content, showScreen() {} };
+    const el = new QuarterScreen(app).render();
+    assert.ok(seen.length >= 1);
+    assert.ok(el.querySelector('.q-back'), 'the empty state offers a way back');
+    assert.ok(rc);
+});
+
+test('unmount really stops the scene loop and removes its visibility listener', () => {
+    const { screen } = setup(SEED.band2550);
+    const loop = screen.scene;
+    assert.ok(loop);
+    assert.equal(loop.running, true);
+    assert.equal(dom.document.listeners.get('visibilitychange')?.length || 0, 1);
+    screen.unmount();
+    assert.equal(loop.running, false, 'stop() was called');
+    assert.equal(dom.document.listeners.get('visibilitychange')?.length || 0, 0);
 });

@@ -91,7 +91,7 @@ export class QuarterScreen {
     render() {
         this._teardown();
         this.el = h('div', { class: 'screen active v3 quarter-screen' });
-        const run = this.rc?.run;
+        const run = this.rc?.currentRun?.();
         if (!run || isRunOver(run)) {
             this.run = null;
             this.el.append(h('div', { class: 'v3-empty' },
@@ -194,7 +194,7 @@ export class QuarterScreen {
             speaker = { spriteId: id, name: CHAIRMAN_SPRITES[id]?.label || 'The Chairman', role: 'Chairman' };
             lines.push(this.rc.boardIntro().line);
         }
-        if (run.mandate === null) {
+        if (run.mandate === null && this.canPropose) {   // no nudge where the proposal can't be made (Q8)
             if (!speaker && member) {
                 speaker = { spriteId: spriteIdForMember(member, index), name: member.name, role: member.title };
             }
@@ -266,6 +266,9 @@ export class QuarterScreen {
         const info = this.app.content?.powerups || {};
         let ids = POWER_UP_IDS.filter(id => this.rc.canBuy(id));
         if (this.capConflict && ids.includes('facilities')) ids = ['facilities', ...ids.filter(id => id !== 'facilities')];
+        // R51: facilities is the fix but can't be afforded: show it greyed out, with the reason.
+        const poor = this.capConflict && !ids.includes('facilities') && this._facilitiesUnaffordable(run);
+        if (poor) ids = ['facilities', ...ids];
         if (!ids.length) return null;
         this.powerBtns = ids.map(id => {
             const card = info[id] || {};
@@ -273,20 +276,28 @@ export class QuarterScreen {
                 ? card.levels[run.forecastLevel] ?? card.blurb
                 : card.blurb;
             const urgent = this.capConflict && id === 'facilities';
+            const cantAfford = poor && id === 'facilities';
             return h('button', {
-                class: `pu-card${urgent ? ' is-urgent' : ''}`, type: 'button', 'data-powerup': id, 'aria-pressed': 'false',
+                class: `pu-card${urgent ? ' is-urgent' : ''}${cantAfford ? ' is-unaffordable' : ''}`, type: 'button',
+                'data-powerup': id, 'aria-pressed': 'false', disabled: cantAfford,
                 on: { click: () => this._update(d => { d.buyPowerUp = d.buyPowerUp === id ? null : id; }) }
             },
             h('span', { class: 'pu-head' },
                 h('span', { class: 'pu-name', text: card.name || id }),
                 h('span', { class: 'pu-cost', text: formatCash(powerUpCost(run, id), run.baseCurrency) })),
             urgent ? h('span', { class: 'pu-urgent', text: "Your board's policy needs this" }) : null,
+            cantAfford ? h('span', { class: 'pu-reason', text: `Can't afford it yet: you have ${formatCash(run.cash, run.baseCurrency)}` }) : null,
             blurb ? h('span', { class: 'pu-blurb', text: blurb }) : null,
             card.hedjLine ? h('span', { class: 'pu-hedj', text: card.hedjLine }) : null);
         });
         return h('section', { class: 'q-powerups', 'aria-label': 'Power-ups' },
             h('h2', { text: 'Power-up (one per quarter)' }),
             this.powerBtns);
+    }
+
+    _facilitiesUnaffordable(run) {
+        const owned = run.powerUps.owned.includes('facilities') || run.powerUps.used.includes('facilities');
+        return !owned && this.rc.unlockedPowerUps().includes('facilities') && run.cash < powerUpCost(run, 'facilities');
     }
 
     // ── State ─────────────────────────────────────────────────────────────
