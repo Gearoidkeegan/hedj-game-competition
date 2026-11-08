@@ -48,7 +48,7 @@ test('quips.json boardIntro has at least 4 lines per board type, and band lines 
 
 test('breachLoss hints at immediate dismissal at least twice per persona', () => {
     const q = loadJson('data/quips.json');
-    const sack = /fired|out|lanyard|HR|clear your desk|security|dismiss|access card|coat|pass|final written/i;
+    const sack = /\b(fired|dismiss\w*|P45|clear your desk|replac(e|ing) you|exit interview|lanyard|access card|security|final written warning)\b/i;
     for (const p of PERSONALITIES) {
         const n = q.board[p].breachLoss.filter((l) => sack.test(l)).length;
         assert.ok(n >= 2, `board.${p}.breachLoss has ${n} dismissal hints`);

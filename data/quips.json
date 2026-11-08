@@ -107,7 +107,7 @@
                 "Painful. But nobody can say you broke the rules. Annoying, that.",
                 "I'm irritated, not furious. The policy gets the credit. You get the blame.",
                 "Rough. The hedge did what we signed up for. I just wanted a better quarter.",
-                "Within policy, so I can't fire you. Believe me, I checked."
+                "Within policy, so I can't even shout at you. I'm shouting at the market."
             ],
             "noPolicyHedgeLoss": [
                 "The hedge LOST money? Who approved this? Oh. You did.",
@@ -179,11 +179,11 @@
             ],
             "breachLoss": [
                 "A breach AND a loss. I've informed the audit committee and, frankly, HR.",
-                "Outside approved limits, with losses. This is now a disciplinary matter.",
+                "Outside approved limits, with losses. I am recommending your dismissal.",
                 "I've documented this breach in full. HR has asked for a copy. So has legal.",
                 "Unauthorised positions, realised losses. Your trading limits are suspended.",
-                "This is exactly what the policy forbids. The investigation starts on Monday.",
-                "Off-mandate losses. I'm recommending an independent review. Of you."
+                "This is exactly what the policy forbids. Please clear your desk by Monday.",
+                "Off-mandate losses. The committee will vote on replacing you. Unanimously, I expect."
             ],
             "inPolicyBad": [
                 "A loss, but within the approved bands. The policy has worked as designed.",
@@ -197,7 +197,7 @@
             "noPolicyHedgeLoss": [
                 "A hedge loss with no policy to explain it? This will need a formal inquiry.",
                 "The hedge lost money. Under what authority was it placed? Please cite the page.",
-                "I see a realised loss on a hedge. I do not see the protected exposure. Remind me.",
+                "I see a realised loss on a hedge. The exposure is irrelevant. The loss is red.",
                 "A loss on the hedging line. I'm opening an incident. And a second one.",
                 "Hedge P&L is negative. We have no policy to blame, so I'm blaming you.",
                 "Who approved a transaction that loses money by design? Oh, it's by design?",
