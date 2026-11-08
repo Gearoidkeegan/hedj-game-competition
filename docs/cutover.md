@@ -100,7 +100,7 @@ Names used below:
       stack, so the URL should not change). If it differs, update the origin.
 - [ ] **C4. Smoke-test the API:**
       ```sh
-      curl -fsS "https://competition.hedj.eu/api/leaderboard?mode=simple&period=all&limit=3"; echo
+      curl -fsS "https://competition.hedj.eu/api/leaderboard?mode=simple&period=event&limit=3"; echo
       ```
       Expect valid JSON with an empty list (the `test` event has no scores yet).
 
