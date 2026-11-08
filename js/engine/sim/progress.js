@@ -18,7 +18,7 @@ export const UNLOCK_RULES = [
     { id: 'mode:pro', test: (p, run) => run?.status === 'complete' },
     { id: 'industry:construction', test: p => p.best.simple >= 1500 },
     { id: 'industry:pharma', test: p => p.runs >= 3 },
-    { id: 'industry:tech', test: p => p.best.simple >= 2500 },
+    { id: 'industry:tech', test: p => p.best.simple >= 2250 },
     { id: 'industry:energy', test: p => p.runs >= 6 },
     { id: 'powerup:visibility', test: p => p.runs >= 2 },
     // `crisis:*` in the design: one unlock per crisis.

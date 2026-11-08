@@ -66,8 +66,8 @@ test('unlock thresholds are exact', () => {
     assert.ok(high(1500).includes('industry:construction'));
     // A9 (R44): the options power-up is gone from Simple, so it is never unlocked.
     assert.ok(!high(10000).includes('powerup:options'));
-    assert.ok(!high(2499).includes('industry:tech'));
-    assert.ok(high(2500).includes('industry:tech'));
+    assert.ok(!high(2249).includes('industry:tech'));
+    assert.ok(high(2250).includes('industry:tech'));
 });
 
 test('personal best detected only when strictly higher', () => {

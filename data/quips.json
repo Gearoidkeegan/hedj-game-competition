@@ -383,32 +383,32 @@
             "line": "Promising. You've been trusted with the coffee order and a hedge ratio."
         },
         {
-            "min": 1800,
+            "min": 1600,
             "title": "Assistant Treasurer",
             "line": "Solid work. You now get invited to meetings you can't leave."
         },
         {
-            "min": 2200,
+            "min": 2000,
             "title": "Group Treasurer",
             "line": "Respectable. The banks send you Christmas cards and conference invites."
         },
         {
-            "min": 2500,
+            "min": 2250,
             "title": "Head of Treasury",
             "line": "The board trusts you. The auditors tolerate you. That's the dream."
         },
         {
-            "min": 2900,
+            "min": 2550,
             "title": "Chief Financial Officer",
             "line": "Corner office, panel slot, 4,000 unread emails. You've made it."
         },
         {
-            "min": 3500,
+            "min": 3000,
             "title": "Treasury Legend",
             "line": "Keynote material. You'll overrun by forty minutes and nobody will mind."
         },
         {
-            "min": 4200,
+            "min": 3400,
             "title": "Master of the Hedge",
             "line": "Flawless. Bankers whisper your name in the coffee queue."
         }
