@@ -13,6 +13,7 @@ import { eventEngine } from '../../js/engine/EventEngine.js';
 import { HEDGING_POLICY_TYPES, PHASE, GAME_CONFIG } from '../../js/utils/constants.js';
 import { eligibleStartYears } from '../../js/engine/sim/startYears.js';
 import { toQuarterSummary, proCashMeterInput } from '../../js/engine/sim/proAdapter.js';
+import { boardLineKey, resultQuipKey } from '../../js/screens/simple/RunController.js';
 import { CashMeter } from '../../js/ui/CashMeter.js';
 
 marketEngine.loadFromObjects(loadMarketData());
@@ -132,11 +133,13 @@ test('lines sum to marketResult when a hedge has no matching exposure, and with 
     const details = [expo('a', 'EURUSD', -50), expo('b', 'EURUSD', -20), hdg('EURUSD', 30), hdg('BRENT', 12)];
     const r = result({ details, hedgePnL: 42, tradingCosts: 3, premiums: 4 });
     const s = toQuarterSummary(baseState(), r);
-    near(sum(s.lines.map(l => l.exposureImpact + l.hedgeImpact)), s.marketResult, 'lines sum');
+    near(sum(s.lines.map(l => l.exposureImpact + l.hedgeImpact + l.costImpact)), s.marketResult, 'lines sum');
     near(sum(s.lines.map(l => l.exposureImpact)), s.benchmarkDelta, 'exposure part');
     const other = s.lines.find(l => l.exposureId === 'other');
     assert.ok(other, 'an other-hedges line carries the unattributed hedge');
-    near(other.hedgeImpact, 12 - 3 - 4);
+    near(other.hedgeImpact, 12, 'costs are not in hedgeImpact');
+    near(other.costImpact, -7);
+    assert.ok(s.lines.filter(l => l.exposureId !== 'other').every(l => l.costImpact === 0));
     assert.equal(other.exposureImpact, 0);
 });
 
@@ -144,7 +147,22 @@ test('with every hedge attributed and no costs there is no other line', () => {
     const details = [expo('a', 'EURUSD', -50), hdg('EURUSD', 30)];
     const s = toQuarterSummary(baseState(), result({ details, hedgePnL: 30 }));
     assert.equal(s.lines.length, 1);
-    near(s.lines[0].exposureImpact + s.lines[0].hedgeImpact, s.marketResult);
+    near(s.lines[0].exposureImpact + s.lines[0].hedgeImpact + s.lines[0].costImpact, s.marketResult);
+});
+
+test('R54: a premium-only quarter is not a hedge loss for the no-policy board', () => {
+    const state = baseState({ hedgingPolicy: { id: 'none' } });
+    const s = toQuarterSummary(state, result({ details: [expo('a', 'EURUSD', 0)], hedgePnL: 0, premiums: 5 }));
+    assert.equal(s.policy, 'none');
+    assert.ok(s.lines.some(l => l.costImpact === -5));
+    assert.equal(boardLineKey(s, 55), 'noPolicyNudge');
+});
+
+test('R54: a small premium does not cancel a bigSave', () => {
+    // hedge worth 30 on 1000 starting cash (3% > 2%); the premium of 15 would drop it below 2% if it counted
+    const details = [expo('a', 'EURUSD', -40), hdg('EURUSD', 30)];
+    const s = toQuarterSummary(baseState(), result({ details, hedgePnL: 30, premiums: 15 }));
+    assert.equal(resultQuipKey(s, 1000), 'bigSave');
 });
 
 // ---- Cash meter wiring ----
@@ -155,18 +173,23 @@ afterEach(() => dom.restore());
 test('the cash meter takes Pro cash numbers: dashboard cash, starting cash and the red line', async () => {
     init('airline', 4242);
     gameState.update({ cashBalance: 321e6 });
-    const input = proCashMeterInput(gameState.get());
-    assert.equal(input.cash, 321e6);
+    let input = proCashMeterInput(gameState.get());
+    assert.equal(input.cash, gameState.get().startingCash, 'before any quarter: starting cash, not the dashboard balance');
     assert.equal(input.startingCash, gameState.get().startingCash);
     near(input.redLine, 0.2 * gameState.get().startingCash);
     const host = dom.document.createElement('div');
     const meter = new CashMeter(host, { currency: gameState.get().industry.baseCurrency });
     await meter.set(input);
-    assert.equal(meter.value, 321e6);
+    assert.equal(meter.value, gameState.get().startingCash);
     assert.ok(host.querySelector('.cm-value').textContent.length > 0);
-    gameState.update({ cashBalance: input.redLine - 1 });
-    await meter.set(proCashMeterInput(gameState.get()));
-    assert.equal(meter.state, 'danger');
+    // After a quarter the meter shows the economic cashAfter that decides bankrupt / red zone, whatever the dashboard cash says.
+    const sc = gameState.get().startingCash;
+    gameState.update({ cashBalance: sc * 5, quarterSummaries: [{ cashAfter: sc * 0.1 }] });
+    input = proCashMeterInput(gameState.get());
+    assert.equal(input.cash, sc * 0.1);
+    near(input.redLine, 0.2 * sc);
+    await meter.set(input);
+    assert.equal(meter.state, 'danger', 'in the red zone by cashAfter even though dashboard cash is high');
 });
 
 test('DashboardScreen shows cash with the CashMeter and the scene with SceneLoop', () => {
@@ -196,4 +219,35 @@ test('no legacy SOFR/SONIA labels in the Pro screens', () => {
         const src = readFileSync(new URL(`../../js/screens/${f}`, import.meta.url), 'utf8');
         assert.doesNotMatch(src, /SOFR|SONIA/, f);
     }
+});
+
+// ---- multi-quarter cap ----
+test('a 3-quarter IR cap pays each quarter, nothing extra at maturity, premium once, credit released', () => {
+    startFloatingDebt();
+    const s0 = gameState.get();
+    const exp = s0.exposures.find(e => e.type === 'ir');
+    const hedge = hedgingEngine.createTrade({
+        exposure: exp, productId: 'ir_cap', notional: 1e9, tenorQuarters: 3,
+        spotRate: s0.currentRates[exp.underlying], currentQuarter: s0.totalQuartersPlayed,
+        bankId: bankEngine.getActiveBanks()[0].id
+    });
+    const cashBefore = gameState.get().cashBalance;
+    assert.equal(gameLoop.bookHedge(hedge, 0), true);
+    const cashBooked = gameState.get().cashBalance;
+    near(cashBefore - cashBooked, hedge.premiumPaid, 'premium paid once at booking');
+    const payoff = 0.01 * 1e9 * 0.25;
+    for (let q = 1; q <= 3; q++) {
+        const before = gameState.get().cashBalance;
+        const r = playQuarter({ EURIBOR: hedge.strike + 0.01 });
+        const d = r.details.find(x => x.type === 'hedge');
+        near(d.mtmChange, payoff, `quarter ${q} payoff`);
+        near(gameState.get().cashBalance - before, d.mtmChange, `quarter ${q}: one payoff into cash`);
+        near(r.premiums, q === 1 ? hedge.premiumPaid : 0, `quarter ${q}: premium counted only in the booking quarter`);
+        if (q < 3) {
+            gameLoop.completeSummary(); gameLoop.completeBoardReview();
+        }
+    }
+    assert.equal(gameState.get().hedgePortfolio.length, 0, 'matured and removed');
+    assert.ok(bankEngine.getSummary().every(b => b.tradeCount === 0), 'credit released at maturity');
+    near(gameState.get().cashBalance - cashBooked, 3 * payoff, 'total cash = 3 payoffs, no extra at maturity');
 });

@@ -85,3 +85,25 @@ test('complete() works before the start delay has passed, and cancel() leaves th
     assert.equal(b.text.textContent, 'he');
     assert.equal(timers.pending(), 0);
 });
+
+test('emoji are typed whole, never split into surrogate halves', () => {
+    const timers = fakeTimers();
+    const { text, cursor } = parts();
+    let done = 0;
+    typewrite({ textEl: text, cursorEl: cursor, text: 'a😀b', delay: 0, timers, onDone: () => done++ });
+    timers.advance(MS_PER_CHAR * 2);
+    assert.equal(text.textContent, 'a😀');
+    timers.advance(MS_PER_CHAR * 5);
+    assert.equal(text.textContent, 'a😀b');
+    assert.equal(done, 1);
+});
+
+test('onDone fires once, also when a tap completes the text', () => {
+    const timers = fakeTimers();
+    const { text, cursor } = parts();
+    let done = 0;
+    const t = typewrite({ textEl: text, cursorEl: cursor, text: 'abc', delay: 0, timers, onDone: () => done++ });
+    t.complete(); t.complete();
+    timers.advance(100);
+    assert.equal(done, 1);
+});

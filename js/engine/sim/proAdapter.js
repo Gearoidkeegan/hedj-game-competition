@@ -58,6 +58,7 @@ export function toQuarterSummary(state, quarterResult) {
             movePct: movePct(d.exposureType, d.startRate, d.currentRate),
             exposureImpact: num(d.pnl),
             hedgeImpact,
+            costImpact: 0,
             realisedNotional: num(d.realizedNotional),
             forecastNotional: num(d.forecastNotional)
         };
@@ -65,13 +66,15 @@ export function toQuarterSummary(state, quarterResult) {
 
     const ev = (state.eventHistory || []).find(e => e.quarter === quarterResult.quarter);
 
-    // Hedges whose underlying has no exposure detail, plus trading costs and premiums, go on an "other" line so
-    // that the sum of (exposureImpact + hedgeImpact) over the lines equals marketResult exactly.
+    // R54: hedges whose underlying has no exposure detail go on an "other" line as hedgeImpact, and trading costs
+    // and premiums go on the same line as costImpact (never in hedgeImpact), so that
+    // sum(exposureImpact + hedgeImpact + costImpact) over the lines equals marketResult exactly.
     const attributed = lines.reduce((s, l) => s + l.hedgeImpact, 0);
-    const otherHedge = num(quarterResult.hedgePnL) - attributed - num(quarterResult.tradingCosts) - num(quarterResult.premiums);
-    if (Math.abs(otherHedge) > 1e-9) {
+    const otherHedge = num(quarterResult.hedgePnL) - attributed;
+    const costImpact = -(num(quarterResult.tradingCosts) + num(quarterResult.premiums));
+    if (Math.abs(otherHedge) > 1e-9 || costImpact !== 0) {
         lines.push({
-            exposureId: 'other', movePct: 0, exposureImpact: 0, hedgeImpact: otherHedge,
+            exposureId: 'other', movePct: 0, exposureImpact: 0, hedgeImpact: otherHedge, costImpact,
             realisedNotional: 0, forecastNotional: 0
         });
     }
@@ -95,12 +98,16 @@ export function toQuarterSummary(state, quarterResult) {
     };
 }
 
-// Input for the CashMeter on the Pro dashboard: the dashboard's own cash balance, with the 20% red line.
+// Input for the CashMeter on the Pro dashboard: the same economic cash that toQuarterSummary scores
+// (startingCash + sum of playerDelta, i.e. the last summary's cashAfter), with the same red line, so the meter
+// never disagrees with bankrupt, the red zone or the board.
 export function proCashMeterInput(state) {
+    const last = (state.quarterSummaries || []).at(-1);
+    const startingCash = num(state.startingCash);
     return {
-        cash: num(state.cashBalance),
-        startingCash: num(state.startingCash),
-        redLine: BALANCE.redLinePct * num(state.startingCash)
+        cash: last ? num(last.cashAfter) : startingCash,
+        startingCash,
+        redLine: BALANCE.redLinePct * startingCash
     };
 }
 

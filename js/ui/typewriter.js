@@ -16,7 +16,8 @@ const globalTimers = () => ({
  * @returns {{ complete(): void, cancel(): void, done: boolean }}
  *   complete() shows the whole text now; cancel() stops and leaves what is typed.
  */
-export function typewrite({ textEl, cursorEl = null, text, delay = START_DELAY_MS, msPerChar = MS_PER_CHAR, timers = globalTimers() }) {
+export function typewrite({ textEl, cursorEl = null, text, delay = START_DELAY_MS, msPerChar = MS_PER_CHAR, timers = globalTimers(), onDone = null }) {
+    const chars = Array.from(String(text));   // by code point, so emoji are never split
     let index = 0;
     let startTimer = null;
     let typeTimer = null;
@@ -30,13 +31,15 @@ export function typewrite({ textEl, cursorEl = null, text, delay = START_DELAY_M
         complete() {
             stop();
             textEl.textContent = text;
-            index = text.length;
+            index = chars.length;
             finish();
         },
         cancel() { stop(); }
     };
     function finish() {
+        const first = !handle.done;
         handle.done = true;
+        if (first && onDone) onDone();
         if (cursorEl) cursorEl.style.display = 'none';
     }
 
@@ -44,10 +47,10 @@ export function typewrite({ textEl, cursorEl = null, text, delay = START_DELAY_M
     startTimer = timers.setTimeout(() => {
         startTimer = null;
         typeTimer = timers.setInterval(() => {
-            if (index < text.length) {
-                textEl.textContent += text[index++];
+            if (index < chars.length) {
+                textEl.textContent += chars[index++];
             }
-            if (index >= text.length) {
+            if (index >= chars.length) {
                 stop();
                 finish();
             }
