@@ -179,7 +179,5 @@ export const PHASE = {
     EVENT: 'event',
     BOARD: 'board',
     SUMMARY: 'summary',
-    EXTEND: 'extend',
-    LEVEL_COMPLETE: 'level_complete',
     GAMEOVER: 'gameover'
 };
