@@ -5,7 +5,11 @@ import { assertLengths, jsonShape } from '../helpers/copy.js';
 
 const RESULT_KEYS = ['bigSave', 'bigMiss', 'overHedged', 'nearBankrupt', 'calm', 'boom'];
 const PERSONALITIES = ['aggressive', 'cautious', 'operational'];
-const BOARD_KEYS = ['moodUp', 'moodDown', 'redZone', 'luckyBreach', 'breachLoss'];
+const BOARD_KEYS = [
+    'moodUp', 'moodDown', 'redZone', 'luckyBreach', 'breachLoss',
+    'inPolicyBad', 'noPolicyHedgeLoss', 'noPolicyHedgeWin', 'noPolicyNudge', 'policyAdopted',
+];
+const BOARD_INTRO_KEYS = ['band', 'noHedge', 'none'];
 const CHAIRMEN = ['jameson', 'musk', 'oleary', 'dimon', 'buffett', 'jobs', 'dorsey', 'ackman'];
 
 function assertStringArray(arr, min, label) {
@@ -33,6 +37,22 @@ test('quips.json has at least 4 lines for each parody chairman', () => {
     const q = loadJson('data/quips.json');
     assert.deepEqual(Object.keys(q.chairman).sort(), [...CHAIRMEN].sort());
     for (const c of CHAIRMEN) assertStringArray(q.chairman[c], 4, `chairman.${c}`);
+});
+
+test('quips.json boardIntro has at least 4 lines per board type, and band lines carry {band}', () => {
+    const { boardIntro } = loadJson('data/quips.json');
+    assert.deepEqual(Object.keys(boardIntro).sort(), [...BOARD_INTRO_KEYS].sort());
+    for (const k of BOARD_INTRO_KEYS) assertStringArray(boardIntro[k], 4, `boardIntro.${k}`);
+    for (const line of boardIntro.band) assert.ok(line.includes('{band}'), `band intro has {band}: ${line}`);
+});
+
+test('breachLoss hints at immediate dismissal at least twice per persona', () => {
+    const q = loadJson('data/quips.json');
+    const sack = /fired|out|lanyard|HR|clear your desk|security|dismiss|access card|coat|pass|final written/i;
+    for (const p of PERSONALITIES) {
+        const n = q.board[p].breachLoss.filter((l) => sack.test(l)).length;
+        assert.ok(n >= 2, `board.${p}.breachLoss has ${n} dismissal hints`);
+    }
 });
 
 test('quips.json bankrupt and fired have at least 6 lines', () => {
