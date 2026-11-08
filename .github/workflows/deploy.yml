@@ -1,0 +1,264 @@
+name: Deploy Competition (backend, then frontend)
+
+# One workflow so the frontend never goes live before the API it needs (R56).
+# A push to main deploys the backend first (if backend/ changed), then the frontend (if the site changed).
+# The frontend is skipped if the backend deploy fails or is cancelled.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to deploy
+        type: choice
+        options:
+          - both
+          - backend
+          - frontend
+        default: both
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'index.html'
+      - 'admin.html'
+      - 'privacy.html'
+      - 'stand.html'
+      - 'css/**'
+      - 'js/**'
+      - 'data/**'
+      - 'assets/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+# Two deploys never overlap; a second push waits for the first to finish.
+concurrency:
+  group: deploy-comp
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.detect.outputs.backend }}
+      frontend: ${{ steps.detect.outputs.frontend }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TARGET: ${{ inputs.target }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            case "${TARGET:-both}" in
+              backend)  backend=true;  frontend=false ;;
+              frontend) backend=false; frontend=true ;;
+              *)        backend=true;  frontend=true ;;
+            esac
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            # New branch, or a force push whose old head is gone: deploy both.
+            backend=true; frontend=true
+          else
+            files=$(git diff --name-only "$BEFORE" "$AFTER")
+            backend=false; frontend=false
+            if printf '%s\n' "$files" | grep -Eq '^backend/'; then backend=true; fi
+            if printf '%s\n' "$files" | grep -Eq '^((index|admin|privacy|stand)\.html$|css/|js/|data/|assets/)'; then
+              frontend=true
+            fi
+          fi
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "Deploy backend: $backend, frontend: $frontend"
+
+  backend:
+    name: Backend (SAM build + deploy)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_COMP }}
+          aws-region: eu-north-1
+          role-session-name: GitHubActions-SAMDeploy-${{ github.run_id }}
+
+      - name: SAM build
+        working-directory: backend
+        run: sam build --template template.yaml
+
+      # Event settings come from repository variables (Settings → Secrets and variables → Actions → Variables).
+      # Every parameter is always passed: SAM reuses the previous value of any parameter left out on an update,
+      # so omitting one would silently keep an old event live.
+      - name: SAM deploy
+        working-directory: backend
+        env:
+          ADMIN_KEY: ${{ secrets.COMP_ADMIN_KEY }}
+          EVENT_ID: ${{ vars.COMP_EVENT_ID || 'test' }}
+          EVENT_END_ISO: ${{ vars.COMP_EVENT_END_ISO }}
+          TOKEN_TTL_HOURS: ${{ vars.COMP_TOKEN_TTL_HOURS || '120' }}
+        run: |
+          # The event id is part of every leaderboard key ("<event>#<mode>#<day>"), so keep it plain.
+          if ! printf '%s' "$EVENT_ID" | grep -Eq '^[A-Za-z0-9_-]{1,40}$'; then
+            echo "::error::COMP_EVENT_ID must be 1-40 letters, digits, '_' or '-' (got '$EVENT_ID')"; exit 1
+          fi
+          if ! printf '%s' "$TOKEN_TTL_HOURS" | grep -Eq '^[1-9][0-9]{0,3}$'; then
+            echo "::error::COMP_TOKEN_TTL_HOURS must be a whole number of hours (got '$TOKEN_TTL_HOURS')"; exit 1
+          fi
+          if [ -n "$EVENT_END_ISO" ] && ! date -u -d "$EVENT_END_ISO" >/dev/null 2>&1; then
+            echo "::error::COMP_EVENT_END_ISO must be an ISO-8601 date, e.g. 2026-11-20T18:00:00Z (got '$EVENT_END_ISO')"; exit 1
+          fi
+          # An empty end date is passed as "" so it clears any earlier value. The backend treats an empty or
+          # unparseable value as "no end date" and keeps rows 90 days after each write.
+          END_ARG="${EVENT_END_ISO:-\"\"}"
+          echo "Deploying EventId=$EVENT_ID EventEndIso=${EVENT_END_ISO:-<empty>} TokenTtlHours=$TOKEN_TTL_HOURS"
+          sam deploy \
+            --stack-name hedj-competition-backend \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --region eu-north-1 \
+            --parameter-overrides \
+              "AdminKey=$ADMIN_KEY" \
+              "EventId=$EVENT_ID" \
+              "EventEndIso=$END_ARG" \
+              "TokenTtlHours=$TOKEN_TTL_HOURS"
+
+      - name: Print API URL
+        env:
+          EVENT_ID: ${{ vars.COMP_EVENT_ID || 'test' }}
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name hedj-competition-backend \
+            --region eu-north-1 \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+            --output text)
+          echo "## Backend Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "**Event:** ${EVENT_ID}" >> $GITHUB_STEP_SUMMARY
+          echo "**API URL:** ${API_URL}" >> $GITHUB_STEP_SUMMARY
+          echo "Add this as the /api/* origin in CloudFront." >> $GITHUB_STEP_SUMMARY
+          echo "API_URL=${API_URL}" >> $GITHUB_STEP_SUMMARY
+
+  frontend:
+    name: Frontend (S3 + CloudFront)
+    needs: [changes, backend]
+    # always() lets this job run when the backend job was skipped; it still never runs after a failed or
+    # cancelled backend deploy.
+    if: >-
+      always()
+      && needs.changes.result == 'success'
+      && needs.changes.outputs.frontend == 'true'
+      && (needs.backend.result == 'success' || needs.backend.result == 'skipped')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_COMP }}
+          aws-region: eu-north-1
+          role-session-name: GitHubActions-DeployComp-${{ github.run_id }}
+
+      - name: Sync game files to S3
+        run: |
+          aws s3 sync . "s3://hedj-comp-assets-eu-north-1/" \
+            --region eu-north-1 \
+            --cache-control "public, max-age=300" \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "backend/*" \
+            --exclude "tools/*" \
+            --exclude "*.md" \
+            --exclude ".gitignore" \
+            --exclude ".claude/*" \
+            --exclude "tests/*" \
+            --exclude "docs/*" \
+            --exclude "node_modules/*" \
+            --exclude "package.json" \
+            --exclude "package-lock.json" \
+            --exclude ".superpowers/*" \
+            --exclude "Open Game.url" \
+            --exclude "Individual industry sample images.png" \
+            --exclude "assets/fonts/*.woff2" \
+            --delete
+
+          # Correct MIME types
+          for ext in js css json; do
+            case $ext in
+              js) ct="application/javascript" ;;
+              css) ct="text/css" ;;
+              json) ct="application/json" ;;
+            esac
+            aws s3 cp "s3://hedj-comp-assets-eu-north-1/" \
+              "s3://hedj-comp-assets-eu-north-1/" \
+              --recursive \
+              --exclude "*" \
+              --include "*.${ext}" \
+              --content-type "${ct}" \
+              --metadata-directive REPLACE \
+              --cache-control "public, max-age=300" \
+              --region eu-north-1
+          done
+
+      # Fonts get their own sync: an explicit font/woff2 type (not the CLI's mimetypes guess) and a one-year
+      # immutable cache. The file names are not content-hashed, so a changed font must get a new file name.
+      # Files excluded from a sync are also protected from its --delete, which is why the main sync leaves
+      # *.woff2 alone and this step deletes stale fonts itself.
+      - name: Sync fonts
+        run: |
+          aws s3 sync assets/fonts "s3://hedj-comp-assets-eu-north-1/assets/fonts/" \
+            --region eu-north-1 \
+            --exclude "*" \
+            --include "*.woff2" \
+            --content-type "font/woff2" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --delete
+
+      - name: Invalidate CloudFront
+        env:
+          CF_ID: ${{ secrets.CF_COMP_DISTRIBUTION_ID }}
+        run: |
+          if [ -n "$CF_ID" ]; then
+            aws cloudfront create-invalidation \
+              --distribution-id "$CF_ID" \
+              --paths "/*" \
+              --region us-east-1
+            echo "CloudFront invalidation created"
+          else
+            echo "CF_COMP_DISTRIBUTION_ID not set — skipping CloudFront invalidation"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Deployed Competition Frontend" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** $(git rev-parse --short HEAD)" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://competition.hedj.eu" >> $GITHUB_STEP_SUMMARY
