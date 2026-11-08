@@ -117,9 +117,7 @@ class App {
         }
 
         // Load market data (non-blocking). A Simple run needs it: await app.marketReady before start().
-        this.marketReady = marketEngine.loadData('data/market').catch(() => {
-            console.warn('Market data not available — using placeholder rates');
-        });
+        this.loadMarket();
 
         // Load events and board dialogue (non-blocking)
         eventEngine.loadEvents('data').catch(() => {
@@ -128,6 +126,21 @@ class App {
         boardAI.loadDialogue('data').catch(() => {
             console.warn('Board dialogue not available');
         });
+    }
+
+    // (Re)loads the market data and sets app.marketReady. startRun calls it again when the first load failed (M3).
+    // A load already in flight is shared, so a double tap doesn't fetch twice. Never rejects.
+    loadMarket() {
+        if (!this._marketLoading) {
+            this._marketLoading = marketEngine.loadData('data/market')
+                .catch(() => {})
+                .then(() => {
+                    if (!marketEngine.isLoaded()) console.warn('Market data not available');
+                })
+                .finally(() => { this._marketLoading = null; });
+            this.marketReady = this._marketLoading;
+        }
+        return this._marketLoading;
     }
 
     onPhaseChange(phase) {
