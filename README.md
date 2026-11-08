@@ -145,7 +145,7 @@ There is no career mode and no extension past 8 quarters.
 
 ### Core Gameplay Loop
 
-Each quarter runs through the following phases:
+In Pro mode each quarter runs through the following phases (Simple mode is one screen per quarter: set the dials, answer any event, run it, read the result):
 
 1. **Decision Phase** — Select which exposures to hedge, at what notional, with which instrument and counterparty bank.
 2. **Resolution Phase** — Market rates advance; P&L is calculated against budget rates; policy compliance is checked.
@@ -170,7 +170,7 @@ SkyBridge Airlines, Roasters Plc, NexGen Electronics, MedGlobal Labs, Momentum C
 
 ### Policies
 
-Six hedging policy templates control the rules the player must operate within:
+In Pro mode, six hedging policy templates control the rules the player must operate within (Simple mode uses the board types under Board Dynamics):
 
 | Policy | Difficulty | Key Rules |
 |---|---|---|
@@ -194,11 +194,32 @@ The game-over title comes from `gameOverTitles` in `data/quips.json`.
 
 ### Board Dynamics
 
-- Board satisfaction starts at 55–60 and ranges from 10–100.
-- Satisfaction increases for policy compliance, decreases for over-hedging, over-trading, large losses, and policy violations.
-- If satisfaction drops below 10 the player is fired; cumulative stress above 100 triggers burnout.
-- In Simple mode the board is one of three kinds: a hedging band (stay inside it), a "policy is not to hedge" board, or a board with no policy that judges each hedge on its own profit until the player proposes one.
-- Bank lines cap hedging at 50% until the player buys Bigger Bank Facilities, which also adds a borrowing cushion. Rate & Commodity Hedging is a power-up too.
+Simple mode (the rules live in `js/engine/sim/contract.md`; the numbers in `js/engine/sim/balance.js`):
+
+- **Board types.** Each run draws one board: a hedging band of 25–50%, 50–75% or 75–100% (20% each), a "our policy is
+  not to hedge" board (15%), or an immature board with no policy at all (25%).
+- **Board mood** starts at 60 and stays within 0–100. It moves on results, not on hedging as such:
+  - in policy and the quarter made money: up a little (+4); in policy and it lost money: down slightly (−2);
+  - off policy but the quarter made money: no change (mixed praise and criticism);
+  - off policy and it lost money: the heaviest criticism (−12);
+  - beating the do-nothing benchmark (strictly): +3; cash below the red line (20% of starting cash): −12.
+- **The no-policy board** judges each hedge on its own profit: a hedge loss costs −20 even if the business gained, and
+  a hedge win earns +1. It also loses patience every quarter it still has no policy (−6.25). The player's first move
+  should be to propose a policy: it is adopted from the next quarter, with a one-off mood boost (+10).
+- **How a run ends,** checked in this order after each quarter:
+  1. cash below zero (below the borrowing cushion once Bigger Bank Facilities is bought): bankrupt, "CFO replaced";
+  2. one very bad off-policy quarter (a market loss of 35% of starting cash or more): fired at once;
+  3. board mood at or below 10: fired;
+  4. otherwise the run completes after 8 quarters.
+
+  There is no two-strike rule, and following the board's policy (including a policy not to hedge) never gets you
+  fired on its own.
+- **Bank lines** cap every hedge at 50% until the player buys Bigger Bank Facilities, which lifts the cap to 100% and
+  adds a borrowing cushion of 10% of starting cash. Interest-rate and commodity exposures can't be hedged until Rate &
+  Commodity Hedging is bought.
+
+Pro mode keeps its own board review screen and mood, but ends runs in the same order: bankrupt, a severe off-policy
+loss, mood at or below 10 (or the legacy board walk-out), then complete.
 
 ---
 

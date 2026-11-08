@@ -229,3 +229,19 @@ test('parseSave returns null on garbage and wrong shapes, never throws', () => {
     assert.equal(parseSave(JSON.stringify(noHistory)), null);
     assert.equal(parseSave(JSON.stringify({ ...run, history: 'x' })), null);
 });
+
+test('applyRunToProgress rounds and clamps the run score into best, like the backend normalise', () => {
+    const run = (score, p = emptyProgress()) => applyRunToProgress(p, { mode: 'simple', score, status: 'complete' });
+    assert.equal(run(1234.6).progress.best.simple, 1235);
+    assert.equal(run(12345).progress.best.simple, 10000);
+    assert.equal(run(-50).progress.best.simple, 0);
+    assert.equal(run(-50).isPersonalBest, false);
+    // A fraction above the stored best is not a new best once rounded.
+    const p = { ...emptyProgress(), best: { simple: 1500, pro: 0 } };
+    assert.equal(run(1500.4, p).isPersonalBest, false);
+    assert.equal(run(1500.4, p).progress.best.simple, 1500);
+    // The stored value equals what a backend round trip would keep.
+    const after = run(2249.5).progress;
+    assert.deepEqual(mergeProgress(after, emptyProgress()).best, after.best);
+    assert.ok(after.unlocked.includes('industry:tech'), '2249.5 rounds to 2250, the tech threshold');
+});

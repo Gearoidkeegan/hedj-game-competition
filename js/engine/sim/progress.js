@@ -41,7 +41,6 @@ function union(a, b) {
     return [...new Set([...(a || []), ...(b || [])])];
 }
 
-const num = v => (Number.isFinite(v) ? v : 0);
 
 // Normalisation mirrors backend/lib/progress.mjs (the authority): ids must match the sync pattern,
 // arrays are de-duplicated and capped at 50, runs is a floored count, bests are rounded and clamped to 0..10000.
@@ -70,7 +69,8 @@ function normalise(p) {
 export function applyRunToProgress(rawProgress, { mode, score, chairmenMet, crisisId, status }) {
     const progress = normalise(rawProgress);
     const key = mode === 'pro' ? 'pro' : 'simple';
-    const points = num(score);
+    // Rounded and clamped to 0..10000 now, as the backend normalise would on the next sync.
+    const points = bestScore(score);
     const isCrisis = !!crisisId;
     const isPersonalBest = !isCrisis && points > progress.best[key];
 

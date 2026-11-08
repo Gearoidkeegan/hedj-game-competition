@@ -359,7 +359,13 @@ test('R51: facilities is shown greyed out, with the reason, when the board needs
 });
 
 test('a pending event missing from the content is dropped, so the run cannot lock', () => {
-    const { q, run, played } = setup(SEED.band2550, { patch: { pendingEvent: 'gone_from_events_json' } });
+    const warnings = [];
+    const warn = console.warn;
+    console.warn = (...a) => warnings.push(a.join(' '));
+    let screen;
+    try { screen = setup(SEED.band2550, { patch: { pendingEvent: 'gone_from_events_json' } }); } finally { console.warn = warn; }
+    assert.deepEqual(warnings, ['RunController: dropping unknown pending event gone_from_events_json']);
+    const { q, run, played } = screen;
     assert.equal(q('.q-event'), null);
     assert.equal(run.disabled, false);
     run.click();
