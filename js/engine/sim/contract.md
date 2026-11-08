@@ -35,7 +35,8 @@ Shapes and signatures only. Every stream reads this first. Source of truth: the 
 
 `useOptions` is gone (A9, R44: Simple has no options; Pro keeps its own). A hedge ratio outside 0..1 throws. A ratio above
 what the exposure allows is clamped, not thrown: the limit is 0 when `isHedgeable` is false, otherwise `hedgeCap(run)`.
-`proposePolicy` throws (like `applyPowerUp`) when the board already has a policy or the band is not one of `POLICY_OPTIONS`.
+`proposePolicy` throws (like `applyPowerUp`) when the board already has a policy, when the band is not one of
+`POLICY_OPTIONS`, or in the final quarter (`run.quarter === run.maxQuarters − 1`), where the policy could never apply.
 The proposal is adopted after the quarter resolves: this quarter is still judged as no-policy; `run.mandate` and
 `run.boardType` are set for the next quarter.
 
@@ -75,6 +76,7 @@ before `facilities` is off policy). The no-policy board's hedge result is `Σ li
 ```js
 activeExposures(run) -> Exposure[]            // unlockQuarter <= run.quarter
 POLICY_OPTIONS                                // A9: [{0.25,0.5},{0.5,0.75},{0.75,1},{0,0}], the proposals a no-policy board accepts
+                                              // (frozen, entries too)
 createRun({ industry, seed, startedAt, market, crisisId = null, forcedYear = null }) -> RunState
                                               // RNG order (run seed): start year (no draw with forcedYear), then the board
                                               // (one rng.weightedPick over BALANCE.boards)
@@ -93,8 +95,8 @@ A severe breach is scored as a normal `'loss'` breach (A5 scoring is unchanged).
 { startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: 0.05, eventChance: 0.35,
   boards: [{ type:'band', min:0.25, max:0.5, weight:0.2 }, { type:'band', min:0.5, max:0.75, weight:0.2 },
            { type:'band', min:0.75, max:1, weight:0.2 }, { type:'noHedge', min:0, max:0, weight:0.15 }, { type:'none', weight:0.25 }],
-  mood: { inPolicyGood: 4, inPolicyBad: -2, luckyBreach: 0, breachLoss: -22,
-          noPolicyHedgeLoss: -20, noPolicyHedgeWin: 1, policyAdopted: 10, beatBenchmark: 3, redZone: -12 },
+  mood: { inPolicyGood: 4, inPolicyBad: -2, luckyBreach: 0, breachLoss: -12,
+          noPolicyHedgeLoss: -20, noPolicyHedgeWin: 1, noPolicyDrift: -6.25, policyAdopted: 10, beatBenchmark: 3, redZone: -12 },
   severeBreachLossPct: 0.35,
   notionalScale: 5,
   forecast: { baseVariance: 0.4 },
@@ -115,13 +117,16 @@ one-quarter varianceMult`. They draw a number even when the variance is 0. `ir` 
 
 Board mood (step 7, A9 R41/R43), clamped to 0..100:
 
-- `policy === 'none'` (no-policy board, judges the hedge alone): `Σ hedgeImpact < 0` → `+mood.noPolicyHedgeLoss` (even if
-  the business gained); `> 0` → `+mood.noPolicyHedgeWin`; `0` → nothing.
+- `policy === 'none'` (no-policy board, judges the hedge alone): `+mood.noPolicyDrift` every such quarter (R49: it loses
+  patience while there is no policy, the proposal quarter included); plus `Σ hedgeImpact < 0` → `+mood.noPolicyHedgeLoss`
+  (even if the business gained); `> 0` → `+mood.noPolicyHedgeWin`; `0` → nothing more.
 - `policy === 'in'`: `marketResult >= 0` → `+mood.inPolicyGood`; otherwise `+mood.inPolicyBad` (critical, falls slightly).
   A `noHedge` board with 0 hedging everywhere is in policy.
 - `breach === 'lucky'` (off policy, good): `+mood.luckyBreach` (mixed, about 0).
 - `breach === 'loss'` (off policy, bad): `+mood.breachLoss` (the heaviest criticism).
-- `+mood.beatBenchmark` if `playerDelta >= benchmarkDelta`; `+mood.redZone` if `cashAfter < redLine`.
+- `+mood.beatBenchmark` only if `playerDelta > benchmarkDelta` (R49: strictly; an unhedged tie earns nothing);
+  `+mood.redZone` if `cashAfter < redLine`.
+- `boardMood` is a number (not necessarily an integer, since `noPolicyDrift` is −6.25); round it for display.
 - `+mood.policyAdopted` once, in the quarter a proposal is made.
 
 Status (step 9, A9 R40: results decide, not hedging), checked in this order:
@@ -253,11 +258,20 @@ Result-quip selection rules (B3):
 
 - `bigSave`: total `hedgeImpact` > 2% of starting cash.
 - `bigMiss`: `benchmarkDelta - playerDelta` > 2% of starting cash.
-- `overHedged`: any line with `h * forecast > 1.15 * realised`.
+- `overHedged`: any line with `lines[].hedgeRatio × forecastNotional > 1.15 × realisedNotional` (`hedgeRatio` is the
+  applied ratio after clamping, not the requested one).
 - `nearBankrupt`: `cashAfter < redLine`.
 - otherwise `calm`, or `boom` on a large favourable move.
 
-Board line selection (B1; A9 adds the policy cases, D3 writes the lines): `breach === 'loss'` -> `breachLoss`. This is a heavy, scathing telling-off, and the angry sprite always wins over other moods. `breach === 'lucky'` -> `luckyBreach`: a grudging "it worked, but don't do that again". Otherwise `redZone`, `moodUp` or `moodDown` by mood change.
+Board line selection (B1; D3 writes the lines). First match wins:
+
+1. `summary.policyAdopted` set → `policyAdopted` (the board welcomes the proposal).
+2. `policy === 'none'` → `noPolicyHedgeLoss` if `Σ lines[].hedgeImpact < 0`; `noPolicyHedgeWin` if `> 0`; otherwise
+   `noPolicyNudge` (no hedge: the board presses for a policy).
+3. `breach === 'loss'` → `breachLoss`. A heavy, scathing telling-off; the angry sprite always wins over other moods.
+4. `breach === 'lucky'` → `luckyBreach`: mixed, "it worked, but that wasn't the policy".
+5. `policy === 'in'` and `marketResult < 0` → `inPolicyBad`: critical but mild.
+6. Otherwise `redZone` (`cashAfter < redLine`), `moodUp` or `moodDown` by mood change.
 
 Tone: `luckyBreach` is mixed (some praise, some criticism); `breachLoss` is the harshest in the game (the board is furious,
 with HR hints). A9: an in-policy loss is critical but mild; the no-policy board is hyper-focused on the hedge's own P&L

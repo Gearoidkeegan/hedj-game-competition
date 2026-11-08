@@ -12,9 +12,10 @@ import { exposureCashImpact, hedgeCashImpact } from './exposureMath.js';
 const MAX_QUARTERS = 8;
 
 // A9 (R43): the policies a player may propose to a no-policy board: the three bands and "not to hedge".
-export const POLICY_OPTIONS = BALANCE.boards
+// Frozen: validation relies on it, so UI code must not be able to change what the engine accepts.
+export const POLICY_OPTIONS = Object.freeze(BALANCE.boards
     .filter(b => b.type !== 'none')
-    .map(b => ({ min: b.min, max: b.max }));
+    .map(b => Object.freeze({ min: b.min, max: b.max })));
 
 export function activeExposures(run) {
     return run.exposures.filter(e => e.unlockQuarter <= run.quarter);
@@ -102,9 +103,11 @@ function usableRate(r) {
     return typeof r === 'number' && Number.isFinite(r);
 }
 
-// A9 (R43): a proposal is only valid on a no-policy board and must be one of POLICY_OPTIONS.
+// A9 (R43): a proposal is only valid on a no-policy board, before the final quarter (it applies from the next
+// quarter), and must be one of POLICY_OPTIONS.
 function validateProposal(run, proposal) {
     if (run.mandate !== null) throw new Error('Cannot propose a policy: the board already has one');
+    if (run.quarter >= run.maxQuarters - 1) throw new Error('Cannot propose a policy in the final quarter');
     const ok = proposal && typeof proposal === 'object'
         && POLICY_OPTIONS.some(o => o.min === proposal.min && o.max === proposal.max);
     if (!ok) throw new Error(`Invalid policy proposal: ${JSON.stringify(proposal)}`);
@@ -208,16 +211,18 @@ export function simulateQuarter(run, decisions, market, content) {
     const playerDelta = next.cash - run.cash;
     const benchmarkDelta = next.benchmarkCash - run.benchmarkCash;
 
-    // 7. Board mood (R41 outcome-based; R43 the no-policy board judges the hedge P&L alone)
+    // 7. Board mood (R41 outcome-based; R43 the no-policy board judges the hedge P&L alone; R49 it also loses
+    // patience every quarter it still has no policy, and a tie with the benchmark is not a beat)
     const M = BALANCE.mood;
     let mood = next.boardMood;
     if (policy === 'none') {
+        mood += M.noPolicyDrift;
         if (hedgeResult < 0) mood += M.noPolicyHedgeLoss;
         else if (hedgeResult > 0) mood += M.noPolicyHedgeWin;
     } else if (breach === 'none') mood += marketResult >= 0 ? M.inPolicyGood : M.inPolicyBad;
     else if (breach === 'lucky') mood += M.luckyBreach;
     else mood += M.breachLoss;
-    if (playerDelta >= benchmarkDelta) mood += M.beatBenchmark;
+    if (playerDelta > benchmarkDelta) mood += M.beatBenchmark;
     if (next.cash < next.redLine) mood += M.redZone;
     if (proposal !== null) mood += M.policyAdopted;
     next.boardMood = Math.min(100, Math.max(0, mood));

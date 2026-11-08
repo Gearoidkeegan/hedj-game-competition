@@ -56,6 +56,24 @@
 // fired rate by starting board (band / noHedge / none): unhedged 0.725 / 0.000 / 0.000; flat50 0.301 / 0.827 / 0.756.
 // Every criterion in tools/simulate.js criteria() passes with >= 16% relative margin (n = 1000) and >= 15% (n = 300).
 // Policy scores sit ~220 below the A8 mandate strategy, so new gameOverTitles mins are proposed to D3 (A9 report).
+//
+// A9 fix round 1 (ruling R49): the no-policy board never pressured a non-hedger (0 mood for no hedge, +3 for an
+// unhedged tie with the benchmark: unhedged fired 0.000 on none boards). Added mood.noPolicyDrift (every
+// no-policy quarter) and made beatBenchmark strict (playerDelta > benchmarkDelta). The strict beat also lifted
+// unhedged band-board firing (0.725 -> 0.871), so breachLoss was softened. Criteria added: firedRate(policy) < 0.05;
+// on none boards firedRate(unhedged) >= 0.5 x its band-board rate and mean(unhedged) < mean(policy).
+// Retuned: mood.breachLoss -22 -> -12, mood.noPolicyDrift -6.25 (new). The drift is a cliff (-6 gives 0.317 on
+// none boards, -6.5 gives 0.538); severeBreachLossPct stays 0.35. `node tools/simulate.js --n 1000`:
+//
+//  strategy   mean    p10    p25 median    p75    p90    max bankrupt  fired severe meanQ
+//  unhedged    450      0      0    116    767   1802   1986    0.056  0.427  0.183  6.87
+//    flat50    916      0     70    388   2032   2287   3152    0.043  0.401  0.117  6.35
+//    policy   2216   1775   1951   2201   2467   2866   5783    0.035  0.000  0.000  7.90
+//      full    874      0      0    428   1424   2533   7186    0.009  0.420  0.056  6.38
+//    random    647      0     52    342   1131   1807   3121    0.047  0.430  0.156  6.45
+//
+// fired rate by starting board (band / noHedge / none): unhedged 0.541 / 0.000 / 0.427; flat50 0.151 / 0.436 / 0.935.
+// Every criterion passes with >= 15% relative margin at n = 1000 and n = 300.
 
 export const BALANCE = {
     startMood: 60,
@@ -73,8 +91,8 @@ export const BALANCE = {
         { type: 'none', weight: 0.25 }
     ],
     mood: {
-        inPolicyGood: 4, inPolicyBad: -2, luckyBreach: 0, breachLoss: -22,
-        noPolicyHedgeLoss: -20, noPolicyHedgeWin: 1, policyAdopted: 10,
+        inPolicyGood: 4, inPolicyBad: -2, luckyBreach: 0, breachLoss: -12,
+        noPolicyHedgeLoss: -20, noPolicyHedgeWin: 1, noPolicyDrift: -6.25, policyAdopted: 10,
         beatBenchmark: 3, redZone: -12
     },
     severeBreachLossPct: 0.35,

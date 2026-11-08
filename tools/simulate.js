@@ -210,6 +210,9 @@ export function criteria(res) {
     const random = shareAbove(res.random.scores, medPolicy);
     const noneP = mean(P.byBoard.none.scores);
     const noneF = mean(res.flat50.byBoard.none.scores);
+    const noneU = mean(res.unhedged.byBoard.none.scores);
+    const uNoneFired = boardFired(res.unhedged, 'none');
+    const uBandHalf = 0.5 * bandFired(res.unhedged);
     const c = (name, pass, value, margin) => ({ name, pass, value, margin });
     return [
         c('mean(policy) > mean(unhedged)', mean(P.scores) > mean(res.unhedged.scores),
@@ -222,6 +225,8 @@ export function criteria(res) {
         c('bankruptRate(unhedged) in [0.015, 0.30]', res.unhedged.bankruptRate >= 0.015 && res.unhedged.bankruptRate <= 0.30,
             res.unhedged.bankruptRate.toFixed(3), Math.min(above(res.unhedged.bankruptRate, 0.015), below(res.unhedged.bankruptRate, 0.30))),
         c('bankruptRate(policy) < 0.05', P.bankruptRate < 0.05, P.bankruptRate.toFixed(3), below(P.bankruptRate, 0.05)),
+        // In-policy play keeps you employed (A7, re-added in A9 fix round 1).
+        c('firedRate(policy) < 0.05', P.firedRate < 0.05, P.firedRate.toFixed(3), below(P.firedRate, 0.05)),
         c('firedRate(unhedged) <= 0.50', res.unhedged.firedRate <= 0.50, res.unhedged.firedRate.toFixed(3),
             below(res.unhedged.firedRate, 0.50)),
         c('firedRate(unhedged | noHedge board) <= 0.15', boardFired(res.unhedged, 'noHedge') <= 0.15,
@@ -232,6 +237,10 @@ export function criteria(res) {
         c('flat50 firedRate: none board > band boards', boardFired(res.flat50, 'none') > bandFired(res.flat50),
             `${boardFired(res.flat50, 'none').toFixed(3)} vs ${bandFired(res.flat50).toFixed(3)}`,
             above(boardFired(res.flat50, 'none'), bandFired(res.flat50))),
+        // R49: the no-policy board pressures a player who never proposes a policy.
+        c('none board: firedRate(unhedged) >= 0.5 x its band-board firedRate', uNoneFired >= uBandHalf,
+            `${uNoneFired.toFixed(3)} vs ${uBandHalf.toFixed(3)}`, above(uNoneFired, uBandHalf)),
+        c('none board: mean(unhedged) < mean(policy)', noneU < noneP, `${noneU.toFixed(0)} vs ${noneP.toFixed(0)}`, below(noneU, noneP)),
         c('max quarters === 8', maxQ === 8, String(maxQ), maxQ === 8 ? Infinity : -1)
     ];
 }

@@ -114,6 +114,53 @@ test('a proposal is rejected when a policy already exists or is not one of the f
     assert.doesNotThrow(() => simulateQuarter(none, decide(hedgesAt(none, 0), { proposePolicy: null }), marketEngine, content));
 });
 
+test('a proposal in the final quarter is rejected (it could never apply); the quarter before is fine', () => {
+    const none = runOn(marketEngine, null);
+    const last = { ...none, quarter: none.maxQuarters - 1 };
+    assert.throws(() => simulateQuarter(last, decide(hedgesAt(last, 0), { proposePolicy: BAND_LOW }), marketEngine, content),
+        /final quarter/);
+    const before = { ...none, quarter: none.maxQuarters - 2 };
+    const { run: after } = simulateQuarter(before, decide(hedgesAt(before, 0), { proposePolicy: BAND_LOW }), marketEngine, content);
+    assert.deepEqual(after.mandate, BAND_LOW);
+});
+
+test('POLICY_OPTIONS and its entries are frozen', () => {
+    assert.ok(Object.isFrozen(POLICY_OPTIONS));
+    assert.ok(POLICY_OPTIONS.every(o => Object.isFrozen(o)));
+    assert.throws(() => { POLICY_OPTIONS.push({ min: 0, max: 1 }); });
+    assert.throws(() => { POLICY_OPTIONS[0].min = 0; });
+});
+
+// R49: the no-policy board loses patience every quarter it still has no policy, the proposal quarter included.
+test('the patience drift applies every no-policy quarter and stops once a policy is adopted', () => {
+    const mkt = market({});
+    let run = runOn(mkt, null);
+    const q1 = simulateQuarter(run, decide(hedgesAt(run, 0)), mkt, content);
+    assert.equal(moodChange(run, q1.summary), BALANCE.mood.noPolicyDrift);
+    run = { ...q1.run, pendingEvent: null };
+    const q2 = simulateQuarter(run, decide(hedgesAt(run, 0), { proposePolicy: NO_HEDGE }), mkt, content);
+    assert.equal(q2.summary.policy, 'none');
+    assert.equal(moodChange(run, q2.summary), BALANCE.mood.noPolicyDrift + BALANCE.mood.policyAdopted);
+    run = { ...q2.run, pendingEvent: null };
+    const q3 = simulateQuarter(run, decide(hedgesAt(run, 0)), mkt, content);
+    assert.equal(q3.summary.policy, 'in');
+    // A flat market: in policy and good (marketResult 0), a tie with the benchmark, no drift.
+    assert.equal(q3.summary.marketResult, 0);
+    assert.equal(moodChange(run, q3.summary), BALANCE.mood.inPolicyGood);
+});
+
+test('a tie with the benchmark is not a beat on any board', () => {
+    const mkt = market({ JETNWE: 1.05, EURUSD: 1.05 });
+    for (const mandate of [BAND_LOW, NO_HEDGE, null]) {
+        const run = runOn(mkt, mandate);
+        const { summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), mkt, content);
+        assert.equal(summary.playerDelta, summary.benchmarkDelta);
+        const term = mandate === null ? BALANCE.mood.noPolicyDrift
+            : mandate.max === 0 ? BALANCE.mood.inPolicyBad : BALANCE.mood.breachLoss;
+        assert.equal(moodChange(run, summary), term, JSON.stringify(mandate));
+    }
+});
+
 test('no-policy board: a hedge loss drops mood by noPolicyHedgeLoss even when the business gained', () => {
     // Everything falls: fuel is cheaper and USD revenue is worth more, so the USD hedge loses.
     const mkt = market({ JETNWE: 0.9, EURUSD: 0.9 });
@@ -123,22 +170,26 @@ test('no-policy board: a hedge loss drops mood by noPolicyHedgeLoss even when th
     assert.ok(hedge < 0, `hedge ${hedge}`);
     assert.ok(summary.playerDelta > 0, `playerDelta ${summary.playerDelta}`);
     assert.ok(summary.playerDelta < summary.benchmarkDelta);
-    assert.equal(moodChange(run, summary), BALANCE.mood.noPolicyHedgeLoss);
+    assert.equal(moodChange(run, summary), BALANCE.mood.noPolicyHedgeLoss + BALANCE.mood.noPolicyDrift);
     assert.ok(BALANCE.mood.noPolicyHedgeLoss < BALANCE.mood.inPolicyBad);
 });
 
-test('no-policy board: a hedge win lifts mood by noPolicyHedgeWin only, and no hedge moves nothing', () => {
+test('no-policy board: a hedge win earns noPolicyHedgeWin, and no hedge earns only the patience drift', () => {
     const mkt = market({ JETNWE: 1.02, EURUSD: 1.05 });
     const run = runOn(mkt, null);
     const win = simulateQuarter(run, decide(hedgesAt(run, 0.5)), mkt, content).summary;
     assert.ok(win.lines.reduce((s, l) => s + l.hedgeImpact, 0) > 0);
     assert.ok(win.playerDelta >= win.benchmarkDelta);
     assert.ok(win.cashAfter >= win.redLine);
-    assert.equal(moodChange(run, win), BALANCE.mood.noPolicyHedgeWin + BALANCE.mood.beatBenchmark);
+    assert.ok(win.playerDelta > win.benchmarkDelta);
+    assert.equal(moodChange(run, win), BALANCE.mood.noPolicyHedgeWin + BALANCE.mood.noPolicyDrift + BALANCE.mood.beatBenchmark);
     assert.ok(BALANCE.mood.noPolicyHedgeWin < BALANCE.mood.inPolicyGood, 'the hardest board to please');
 
+    // R49: no hedge ties the benchmark (no beat) and the board still loses patience.
     const flat = simulateQuarter(run, decide(hedgesAt(run, 0)), mkt, content).summary;
-    assert.equal(moodChange(run, flat), BALANCE.mood.beatBenchmark);
+    assert.equal(flat.playerDelta, flat.benchmarkDelta);
+    assert.equal(moodChange(run, flat), BALANCE.mood.noPolicyDrift);
+    assert.ok(BALANCE.mood.noPolicyDrift < 0);
 });
 
 test('no-policy board: no policy or breach points, never severe', () => {
@@ -190,8 +241,9 @@ test('noHedge board: hedging nothing is in policy, judged on the outcome', () =>
     const { summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), mkt, content);
     assert.equal(summary.policy, 'in');
     assert.ok(summary.marketResult < 0);
-    // Unhedged equals the benchmark, so the beat applies.
-    assert.equal(moodChange(run, summary), BALANCE.mood.inPolicyBad + BALANCE.mood.beatBenchmark);
+    // R49: unhedged ties the benchmark, and a tie is not a beat.
+    assert.equal(summary.playerDelta, summary.benchmarkDelta);
+    assert.equal(moodChange(run, summary), BALANCE.mood.inPolicyBad);
     const off = simulateQuarter(run, decide(hedgesAt(run, 0.25)), mkt, content).summary;
     assert.equal(off.policy, 'off');
 });
@@ -206,8 +258,9 @@ test('off policy: lucky is mixed (about 0), a loss is the heaviest criticism', (
     assert.equal(loss.policy, 'off');
     assert.equal(loss.breach, 'loss');
     assert.equal(lucky.breach, 'lucky');
-    assert.equal(moodChange(runUp, loss), BALANCE.mood.breachLoss + BALANCE.mood.beatBenchmark);
-    assert.equal(moodChange(runDown, lucky), BALANCE.mood.luckyBreach + BALANCE.mood.beatBenchmark);
+    // Unhedged ties the benchmark: no beat (R49).
+    assert.equal(moodChange(runUp, loss), BALANCE.mood.breachLoss);
+    assert.equal(moodChange(runDown, lucky), BALANCE.mood.luckyBreach);
     assert.ok(Math.abs(BALANCE.mood.luckyBreach) <= 2);
     assert.ok(BALANCE.mood.breachLoss < BALANCE.mood.inPolicyBad);
 });
@@ -266,6 +319,30 @@ test('cash below 0 but above -buffer survives with facilities and is bankrupt wi
 
     const deep = simulateQuarter({ ...setCash(withFac), cash: -1.5 * buffer - probe }, decide(hedgesAt(base, 0)), mkt, content);
     assert.equal(deep.run.status, 'bankrupt');
+});
+
+// Bankruptcy is cash < -buffer: exactly -buffer survives, exactly 0 without facilities survives.
+// A flat market and no hedging make the quarter's cash change exactly the base operating cash flow.
+test('bankruptcy boundaries: exactly -buffer survives with facilities; exactly 0 survives and just below 0 is bankrupt without', () => {
+    const flat = market({});
+    const base = runOn(flat, NO_HEDGE);
+    const ocf = BALANCE.baseOcfPct * base.startingCash;
+    const play = (run, cash) => simulateQuarter({ ...run, cash: cash - ocf }, decide(hedgesAt(run, 0)), flat, content);
+
+    const withFac = applyPowerUp(base, 'facilities');
+    const buffer = borrowingBuffer(withFac);
+    const atBuffer = play(withFac, -buffer);
+    assert.equal(atBuffer.summary.cashAfter, -buffer);
+    assert.equal(atBuffer.run.status, 'playing');
+    const pastBuffer = play(withFac, -buffer - 1);
+    assert.equal(pastBuffer.run.status, 'bankrupt');
+
+    const atZero = play(base, 0);
+    assert.equal(atZero.summary.cashAfter, 0);
+    assert.equal(atZero.run.status, 'playing');
+    const belowZero = play(base, -1);
+    assert.equal(belowZero.summary.cashAfter, -1);
+    assert.equal(belowZero.run.status, 'bankrupt');
 });
 
 test('status precedence: bankrupt beats a severe loss in the same quarter', () => {

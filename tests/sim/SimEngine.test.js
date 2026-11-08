@@ -152,8 +152,9 @@ test('lucky breach is criticised less than a losing breach', () => {
     const lossChange = loss.boardMoodAfter - runUp.boardMood;
     const luckyChange = lucky.boardMoodAfter - runDown.boardMood;
     assert.ok(luckyChange > lossChange, `${luckyChange} > ${lossChange}`);
-    assert.equal(lossChange, BALANCE.mood.breachLoss + BALANCE.mood.beatBenchmark);
-    assert.equal(luckyChange, BALANCE.mood.luckyBreach + BALANCE.mood.beatBenchmark);
+    // Unhedged ties the benchmark, which is not a beat (R49).
+    assert.equal(lossChange, BALANCE.mood.breachLoss);
+    assert.equal(luckyChange, BALANCE.mood.luckyBreach);
 });
 
 // A9 (R41): in policy, the board judges the outcome. The fuel exposure is not hedgeable yet.
