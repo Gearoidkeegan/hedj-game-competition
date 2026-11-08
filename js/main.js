@@ -6,21 +6,41 @@ import { gameLoop } from './engine/GameLoop.js';
 import { marketEngine } from './engine/MarketEngine.js';
 import { eventEngine } from './engine/EventEngine.js';
 import { boardAI } from './engine/BoardAI.js';
-import { careerEngine } from './engine/CareerEngine.js';
 import { PHASE } from './utils/constants.js';
 import { TitleScreen } from './screens/TitleScreen.js';
 import { SetupScreen } from './screens/SetupScreen.js';
 import { DashboardScreen } from './screens/DashboardScreen.js';
 import { BoardScreen } from './screens/BoardScreen.js';
 import { QuarterSummaryScreen } from './screens/QuarterSummary.js';
-import { ExtendScreen } from './screens/ExtendScreen.js';
 import { EventScreen } from './screens/EventScreen.js';
-import { LevelCompleteScreen } from './screens/LevelCompleteScreen.js';
 import { GameOverScreen } from './screens/GameOverScreen.js';
 import { HowToPlayScreen } from './screens/HowToPlayScreen.js';
 import { RegistrationScreen } from './screens/RegistrationScreen.js';
-import { trackEvent, submitScore, flushScoreQueue } from './utils/api.js';
-import { getRegistration, getPendingScore, clearPendingScore } from './utils/storage.js';
+import { RunController } from './screens/simple/RunController.js';
+import * as api from './utils/api.js';
+import * as storage from './utils/storage.js';
+
+const { trackEvent, submitScore, flushScoreQueue } = api;
+const { getRegistration, getPendingScore, clearPendingScore } = storage;
+
+// Stand-in for the Simple screens that B2 (industry, quarter) and B3 (result) build.
+class PlaceholderScreen {
+    constructor(app, name) {
+        this.app = app;
+        this.name = name;
+        this.el = null;
+    }
+
+    render() {
+        this.el = document.createElement('div');
+        this.el.className = 'screen active';
+        this.el.textContent = `${this.name.toUpperCase()}: coming soon`;
+        return this.el;
+    }
+
+    mount() {}
+    unmount() {}
+}
 
 class App {
     constructor() {
@@ -29,25 +49,35 @@ class App {
         this.screens = {};
         this.industriesData = null;
         this.productsData = null;
-        this.gameMode = 'quickplay'; // 'quickplay' or 'career'
+        this.gameMode = 'quickplay';
+        // v3 Simple mode content and the run hub (set up in init)
+        this.content = { industries: [], events: [], quips: null, powerups: null };
+        this.marketReady = Promise.resolve();
+        this.runController = null;
     }
 
     async init() {
         // Load game data
         await this.loadData();
+        this.runController = new RunController({
+            storage, api, market: marketEngine, content: this.content, now: () => Date.now()
+        });
 
         // Initialize screens
         this.screens = {
             title: new TitleScreen(this),
             registration: new RegistrationScreen(this),
+            // Simple mode (v3)
+            industry: new PlaceholderScreen(this, 'industry'),
+            quarter: new PlaceholderScreen(this, 'quarter'),
+            result: new PlaceholderScreen(this, 'result'),
+            gameover: new GameOverScreen(this),
+            // Pro mode
             setup: new SetupScreen(this),
             dashboard: new DashboardScreen(this),
             event: new EventScreen(this),
-            levelComplete: new LevelCompleteScreen(this),
             board: new BoardScreen(this),
             summary: new QuarterSummaryScreen(this),
-            extend: new ExtendScreen(this),
-            gameover: new GameOverScreen(this),
             howtoplay: new HowToPlayScreen(this)
         };
 
@@ -70,18 +100,25 @@ class App {
 
     async loadData() {
         try {
-            const [industriesResp, productsResp] = await Promise.all([
+            const [industriesResp, productsResp, quipsResp, simpleEventsResp, powerupsResp] = await Promise.all([
                 fetch('data/industries.json'),
-                fetch('data/products.json')
+                fetch('data/products.json'),
+                fetch('data/quips.json'),
+                fetch('data/simple-events.json'),
+                fetch('data/powerups.json')
             ]);
             this.industriesData = await industriesResp.json();
             this.productsData = await productsResp.json();
+            this.content.industries = this.industriesData?.industries || [];
+            this.content.quips = await quipsResp.json();
+            this.content.events = (await simpleEventsResp.json())?.events || [];
+            this.content.powerups = await powerupsResp.json();
         } catch (e) {
             console.error('Failed to load game data:', e);
         }
 
-        // Load market data (non-blocking — game works without it)
-        marketEngine.loadData('data/market').catch(() => {
+        // Load market data (non-blocking). A Simple run needs it: await app.marketReady before start().
+        this.marketReady = marketEngine.loadData('data/market').catch(() => {
             console.warn('Market data not available — using placeholder rates');
         });
 
@@ -91,9 +128,6 @@ class App {
         });
         boardAI.loadDialogue('data').catch(() => {
             console.warn('Board dialogue not available');
-        });
-        careerEngine.loadLevels('data').catch(() => {
-            console.warn('Career levels not available');
         });
     }
 
@@ -115,12 +149,6 @@ class App {
             case PHASE.SUMMARY:
                 this.showScreen('summary');
                 break;
-            case PHASE.LEVEL_COMPLETE:
-                this.showScreen('levelComplete');
-                break;
-            case PHASE.EXTEND:
-                this.showScreen('extend');
-                break;
             case PHASE.GAMEOVER:
                 this.showScreen('gameover');
                 break;
@@ -128,8 +156,8 @@ class App {
     }
 
     showScreen(screenId) {
-        // Redirect to registration when setup is requested but no valid token exists
-        if (screenId === 'setup') {
+        // Redirect to registration when a run (Pro setup or Simple industry pick) is requested without a valid token
+        if (screenId === 'setup' || screenId === 'industry') {
             const reg = getRegistration();
             if (!reg || reg.gameTokenExpiry < Date.now()) {
                 screenId = 'registration';

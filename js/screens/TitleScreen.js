@@ -3,7 +3,6 @@
 import { hasSavedGame, getLeaderboard, hasSeenGuide, getRegistration, clearRegistration } from '../utils/storage.js';
 import { fetchLeaderboard, fetchPlayCount } from '../utils/api.js';
 import { CONFIG } from '../config.js';
-import { careerEngine } from '../engine/CareerEngine.js';
 import { soundFX } from '../ui/SoundFX.js';
 import { escapeHtml } from '../utils/escape.js';
 
@@ -35,7 +34,6 @@ export class TitleScreen {
 
             <div class="title-menu">
                 <button class="btn btn-gold" id="btn-quick-play">QUICK PLAY</button>
-                <button class="btn btn-primary" id="btn-career-mode">CAREER MODE</button>
                 <button class="btn" id="btn-leaderboard">LEADERBOARD</button>
                 <button class="btn" id="btn-how-to-play">HOW TO PLAY</button>
             </div>
@@ -45,7 +43,6 @@ export class TitleScreen {
             <div class="title-mode-info" id="mode-info">
                 <div class="pixel-text" style="font-size:7px;color:var(--text-muted);margin-top:8px;">
                     QUICK PLAY: ~5 minutes, single industry, 8 quarters
-                    <br>CAREER MODE: 5 levels, startup to listed company
                 </div>
             </div>
 
@@ -75,22 +72,7 @@ export class TitleScreen {
     mount() {
         // Quick play
         this.el.querySelector('#btn-quick-play').addEventListener('click', () => {
-            careerEngine.reset();
             this.app.gameMode = 'quickplay';
-            if (!hasSeenGuide()) {
-                const guide = this.app.screens.howtoplay;
-                guide.fromAutoShow = true;
-                guide.returnScreen = 'setup';
-                this.app.showScreen('howtoplay');
-            } else {
-                this.app.showScreen('setup');
-            }
-        });
-
-        // Career mode
-        this.el.querySelector('#btn-career-mode').addEventListener('click', () => {
-            careerEngine.startCareer();
-            this.app.gameMode = 'career';
             if (!hasSeenGuide()) {
                 const guide = this.app.screens.howtoplay;
                 guide.fromAutoShow = true;
@@ -356,7 +338,6 @@ export class TitleScreen {
             'Manage FX, commodity & interest rate risk',
             'Survive boardroom reviews with dry humour',
             'Navigate market crashes from 1994-2024',
-            'Build a career from startup to listed company',
             'Real historical data, real hedging instruments',
         ];
         const fact = facts[Math.floor(Math.random() * facts.length)];
