@@ -11,11 +11,12 @@ Shapes and signatures only. Every stream reads this first. Source of truth: the 
   industryId: string, baseCurrency: string, crisisId: string|null,
   startYear: number, quarter: number /* quarters completed, 0..8 */, maxQuarters: 8,
   startingCash: number, cash: number, benchmarkCash: number, redLine: number,
-  mandate: { min: number, max: number },
+  mandate: { min: number, max: number } | null,   // A9: the board's policy; null = no policy at all (boardType 'none')
+  boardType: 'band'|'noHedge'|'none',       // A9 (R42): noHedge = "our policy is not to hedge" ({0,0}); none = immature, no policy
   exposures: [{ id, type, underlying, direction, unit, quarterlyNotional, unlockQuarter, description }],
   rates: { [underlying]: number },          // rates at the start of the next quarter
-  powerUps: { owned: string[], used: string[] },
-  varianceMultiplier: number,               // 1, reduced by the forecasting power-up
+  powerUps: { owned: string[], used: string[] },   // owned: forecasting (once, at level >= 1), facilities, hedgeAccess; used: visibility
+  forecastLevel: 0|1|2|3,                   // A9 (R44): forecasting modules bought (replaces varianceMultiplier)
   boardMood: number,                        // 0..100, starts at BALANCE.startMood
   pendingEvent: string|null,                // event id to resolve in the next quarter
   chairmenMet: string[],                    // filled in by RunController (B1); the engine passes it through untouched
@@ -28,19 +29,33 @@ Shapes and signatures only. Every stream reads this first. Source of truth: the 
 ## Decisions (Simple)
 
 ```js
-{ hedges: { [exposureId]: 0|0.25|0.5|0.75|1 }, useOptions: boolean, buyPowerUp: string|null, eventChoice: string|null }
+{ hedges: { [exposureId]: 0|0.25|0.5|0.75|1 }, buyPowerUp: string|null, eventChoice: string|null,
+  proposePolicy?: { min, max } | null }   // A9 (R43): only while run.mandate === null; one of POLICY_OPTIONS
 ```
+
+`useOptions` is gone (A9, R44: Simple has no options; Pro keeps its own). A hedge ratio outside 0..1 throws. A ratio above
+what the exposure allows is clamped, not thrown: the limit is 0 when `isHedgeable` is false, otherwise `hedgeCap(run)`.
+`proposePolicy` throws (like `applyPowerUp`) when the board already has a policy, when the band is not one of
+`POLICY_OPTIONS`, or in the final quarter (`run.quarter === run.maxQuarters − 1`), where the policy could never apply.
+The proposal is adopted after the quarter resolves: this quarter is still judged as no-policy; `run.mandate` and
+`run.boardType` are set for the next quarter.
 
 ## QuarterSummary (shared with Pro, consumed by score.js)
 
 ```js
-{ q: number, inMandate: boolean, playerDelta: number, benchmarkDelta: number,
-  marketResult: number,   // Σ(exposureImpact + hedgeImpact) − option premiums this quarter (excludes baseOcf, events, power-ups)
-  breach: 'none'|'lucky'|'loss',   // 'none' if inMandate; else 'lucky' if marketResult ≥ 0, 'loss' if marketResult < 0
+{ q: number,
+  policy: 'in'|'off'|'none',   // A9: 'none' = no-policy board this quarter (Pro emits it too)
+  inMandate: boolean|null,     // policy === 'in'; null when policy === 'none'
+  playerDelta: number, benchmarkDelta: number,
+  marketResult: number,   // Σ(exposureImpact + hedgeImpact) this quarter (excludes baseOcf, events, power-ups)
+  breach: 'none'|'lucky'|'loss',   // 'none' if in policy or no policy; else 'lucky' if marketResult ≥ 0, 'loss' if < 0
   severe: boolean,   // A8/R35: breach === 'loss' and marketResult ≤ −BALANCE.severeBreachLossPct × startingCash (fires at once)
   cashAfter: number, benchmarkCashAfter: number, redLine: number, boardMoodAfter: number,
-  lines: [{ exposureId, movePct, exposureImpact, hedgeImpact, realisedNotional, forecastNotional }],
-  event: { id, choice } | null, powerUp: string|null }
+  lines: [{ exposureId, movePct, exposureImpact, hedgeImpact, realisedNotional, forecastNotional,
+            hedgeRatio,     // A9: the ratio actually applied (after clamping)
+            clamped }],     // A9: true when the requested ratio was above the allowed limit
+  event: { id, choice } | null, powerUp: string|null,
+  policyAdopted: { min, max } | null }   // A9 (R43): the proposal adopted at the end of this quarter
 ```
 
 Interest rates in the market data are decimals (EURIBOR 0.034671 = 3.47%). The IR cash impact is
@@ -50,7 +65,9 @@ Interest rates in the market data are decimals (EURIBOR 0.034671 = 3.47%). The I
 `(end − start) × 100`. A zero or missing start rate (or missing end rate) is no move: `movePct`, `exposureImpact` and
 `hedgeImpact` are all 0.
 
-`inMandate` is vacuously true when no active exposure has a non-zero notional (every current industry has one from Q1).
+Policy compliance counts only active, hedgeable exposures with a non-zero notional; it is vacuously in policy when there
+are none. It uses the applied (clamped) ratio against the real band, even when the cap makes the band unreachable (75–100
+before `facilities` is off policy). The no-policy board's hedge result is `Σ lines[].hedgeImpact`.
 
 `QuarterResult` (return of `simulateQuarter`): `{ run: RunState, summary: QuarterSummary }`.
 
@@ -58,7 +75,11 @@ Interest rates in the market data are decimals (EURIBOR 0.034671 = 3.47%). The I
 
 ```js
 activeExposures(run) -> Exposure[]            // unlockQuarter <= run.quarter
+POLICY_OPTIONS                                // A9: [{0.25,0.5},{0.5,0.75},{0.75,1},{0,0}], the proposals a no-policy board accepts
+                                              // (frozen, entries too)
 createRun({ industry, seed, startedAt, market, crisisId = null, forcedYear = null }) -> RunState
+                                              // RNG order (run seed): start year (no draw with forcedYear), then the board
+                                              // (one rng.weightedPick over BALANCE.boards)
 simulateQuarter(run, decisions, market, content) -> { run, summary }   // pure; content = { events: SimpleEvent[] }
 isRunOver(run) -> boolean                     // status !== 'playing'
 classifyBreach({ inMandate, marketResult, startingCash }) -> { breach: 'none'|'lucky'|'loss', severe: boolean }
@@ -68,47 +89,81 @@ classifyBreach({ inMandate, marketResult, startingCash }) -> { breach: 'none'|'l
 
 A severe breach is scored as a normal `'loss'` breach (A5 scoring is unchanged).
 
-## BALANCE (A3, `js/engine/sim/balance.js`; A5 adds `points`; A7 tuned values, R34; A8 adds `severeBreachLossPct`, R35)
+## BALANCE (A3, `js/engine/sim/balance.js`; A5 points; A7 R34; A8 severeBreachLossPct R35; A9 R40–R44)
 
 ```js
 { startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: 0.05, eventChance: 0.35,
-  mandates: [{min:0.25,max:0.5},{min:0.5,max:0.75},{min:0.75,max:1}],
-  mood: { inMandate: 4, luckyBreach: -3, breachLoss: -25, beatBenchmark: 3, redZone: -12 },
-  breachLossesToFire: 2,
+  boards: [{ type:'band', min:0.25, max:0.5, weight:0.2 }, { type:'band', min:0.5, max:0.75, weight:0.2 },
+           { type:'band', min:0.75, max:1, weight:0.2 }, { type:'noHedge', min:0, max:0, weight:0.15 }, { type:'none', weight:0.25 }],
+  mood: { inPolicyGood: 4, inPolicyBad: -2, luckyBreach: 0, breachLoss: -12,
+          noPolicyHedgeLoss: -20, noPolicyHedgeWin: 1, noPolicyDrift: -6.25, policyAdopted: 10, beatBenchmark: 3, redZone: -12 },
   severeBreachLossPct: 0.35,
-  notionalScale: 6,
-  points: { inMandate: 100, luckyBreach: 25, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 12, survival: 500 } }
+  notionalScale: 5,
+  forecast: { baseVariance: 0.4 },
+  facilities: { baseHedgeCap: 0.5, borrowPct: 0.1 },
+  powerUpCosts: { forecasting: [0.005, 0.01, 0.015], visibility: 0.005, facilities: 0.01, hedgeAccess: 0.01 },   // × startingCash
+  points: { inMandate: 100, luckyBreach: 25, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 12,
+            survival: 500, policyAdopted: 100 } }
 ```
 
-## simulateQuarter rules fixed by the contract (A3)
+`BALANCE.mandates` and `BALANCE.breachLossesToFire` are gone (A9).
+
+## simulateQuarter rules fixed by the contract (A3, A9)
 
 Forecast variance (step 4): `fx` and `commodity` exposures (volume-driven) have
-`realised = forecast × (1 + (rng.next()×2−1) × variance)`. `ir` exposures (debt principal, contractual) have
-`realised = forecast` exactly and draw no random number.
+`realised = forecast × (1 + (rng.next()×2−1) × variance)`, with `variance = forecastVariance(run) × the event's
+one-quarter varianceMult`. They draw a number even when the variance is 0. `ir` exposures (debt principal, contractual) have
+`realised = forecast` exactly and draw no random number. There is no year decay in Simple (A9).
 
-Board mood (step 7), clamped to 0..100:
+Board mood (step 7, A9 R41/R43), clamped to 0..100:
 
-- `breach === 'none'`: `+BALANCE.mood.inMandate`.
-- `breach === 'lucky'`: `+BALANCE.mood.luckyBreach` (a mild telling-off).
-- `breach === 'loss'`: `+BALANCE.mood.breachLoss` (a heavy telling-off).
-- `+BALANCE.mood.beatBenchmark` if `playerDelta >= benchmarkDelta`.
-- `+BALANCE.mood.redZone` if `cashAfter < redLine`.
+- `policy === 'none'` (no-policy board, judges the hedge alone): `+mood.noPolicyDrift` every such quarter (R49: it loses
+  patience while there is no policy, the proposal quarter included); plus `Σ hedgeImpact < 0` → `+mood.noPolicyHedgeLoss`
+  (even if the business gained); `> 0` → `+mood.noPolicyHedgeWin`; `0` → nothing more.
+- `policy === 'in'`: `marketResult >= 0` → `+mood.inPolicyGood`; otherwise `+mood.inPolicyBad` (critical, falls slightly).
+  A `noHedge` board with 0 hedging everywhere is in policy.
+- `breach === 'lucky'` (off policy, good): `+mood.luckyBreach` (mixed, about 0).
+- `breach === 'loss'` (off policy, bad): `+mood.breachLoss` (the heaviest criticism).
+- `+mood.beatBenchmark` only if `playerDelta > benchmarkDelta` (R49: strictly; an unhedged tie earns nothing);
+  `+mood.redZone` if `cashAfter < redLine`.
+- `boardMood` is a number (not necessarily an integer, since `noPolicyDrift` is −6.25); round it for display.
+- `+mood.policyAdopted` once, in the quarter a proposal is made.
 
-Status (step 8), checked in this order:
+Status (step 9, A9 R40: results decide, not hedging), checked in this order:
 
-1. `cash <= 0` -> `'bankrupt'`.
-2. this quarter's `severe` is true -> `'fired'` (A8, R35: one particularly bad losing breach fires at once).
-3. the run's count of `breach === 'loss'` quarters reaches `BALANCE.breachLossesToFire` -> `'fired'`.
-4. `boardMood <= BALANCE.fireThreshold` -> `'fired'`.
-5. `quarter === 8` -> `'complete'`.
+1. `cash < −borrowingBuffer(run)` → `'bankrupt'` ("CFO replaced"). Without facilities the buffer is 0.
+2. this quarter's `severe` is true → `'fired'` (A8, R35; `classifyBreach` unchanged; never on the no-policy board).
+3. `boardMood <= BALANCE.fireThreshold` → `'fired'`.
+4. `quarter === 8` → `'complete'`.
+
+The two-strike rule is gone.
 
 ## Power-ups and events (A4)
 
-`POWER_UPS`, keyed by id (exact object shape is defined by Task A4):
+`POWER_UPS`, keyed by id (A9, R44; costs are `BALANCE.powerUpCosts` × startingCash):
 
-- `forecasting`: cost `0.01 × startingCash`; sets `varianceMultiplier = 0.5` permanently.
-- `visibility`: cost `0.005 × startingCash`, single use; adds `+0.03 × startingCash` to the player only.
-- `options`: cost `0.005 × startingCash`; unlocks `useOptions`.
+- `forecasting`: tiered, up to 3 modules (`run.forecastLevel` 0..3); each costs the next entry of
+  `powerUpCosts.forecasting`. Accuracy = 0.4 + 0.2 × level; variance = `forecast.baseVariance × (1 − accuracy) / 0.6`
+  (0.40, 0.267, 0.133, 0). A 4th purchase is rejected.
+- `visibility`: unchanged. Cost 0.005, single use; adds `+0.03 × startingCash` to the player only.
+- `facilities` (bigger bank facilities): one purchase. Hedge cap 0.5 → 1.0 and borrowing buffer 0 → `0.10 × startingCash`.
+- `hedgeAccess` (interest-rate and commodity hedging): one purchase, only when the industry has an `ir` or `commodity`
+  exposure (`canBuyPowerUp` is false otherwise). Before it, `ir` and `commodity` exposures can't be hedged.
+- `options` is removed from Simple (Pro keeps its own options product).
+
+A power-up bought in a quarter's decisions applies to that quarter's hedges.
+
+```js
+// powerUps.js exports for the Simple UI (B) and SimEngine
+POWER_UP_IDS                       // ['forecasting', 'visibility', 'facilities', 'hedgeAccess']
+powerUpCost(run, id) -> number     // the next purchase's cost (forecasting: next module); Infinity at forecasting level 3
+forecastAccuracy(run) -> 0.4|0.6|0.8|1
+forecastVariance(run) -> number    // 0.40, 0.267, 0.133, 0
+hedgeCap(run) -> 0.5|1
+borrowingBuffer(run) -> number     // 0, or 0.10 × startingCash with facilities
+isHedgeable(run, exposure) -> boolean   // fx always; ir/commodity only with hedgeAccess
+maxHedgeRatio(run, exposure) -> number  // isHedgeable ? hedgeCap : 0 (the clamp SimEngine applies)
+```
 
 ```js
 canBuyPowerUp(run, id, unlockedIds) -> boolean
@@ -129,8 +184,10 @@ applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult, quarterVar
 
 ```js
 quarterPoints(summary, startingCash) -> number
-  // sums: BALANCE.points.inMandate (100) when breach === 'none'; luckyBreach (25) when 'lucky';
-  // breachLoss (-300) when 'loss'; aboveRedLine (50) when cashAfter >= redLine; plus the stability bonus
+  // sums: BALANCE.points.inMandate (100) when in policy (policy === 'in'; a summary without `policy` falls back to
+  // inMandate === true), so a no-policy quarter (policy 'none', inMandate null, breach 'none') earns none;
+  // luckyBreach (25) when 'lucky'; breachLoss (-300) when 'loss'; aboveRedLine (50) when cashAfter >= redLine;
+  // policyAdopted (100) once when summary.policyAdopted is set; plus the stability bonus
 finalScore({ history, status, startingCash, boardMood }, gameOverTitles?) ->
   { total: number, breakdown: { quarters, outperformance, survival, moodMultiplier }, title: string }
 SCORE_MAX = 10000
@@ -145,10 +202,12 @@ SCORE_MAX = 10000
 { version: 3, runs: number, best: { simple: number, pro: number },
   unlocked: string[], chairmenMet: string[], crisisBadges: string[] }
 
-emptyProgress() -> Progress      // unlocked: ['industry:airline','industry:agrifoods','industry:retail','powerup:forecasting']
+emptyProgress() -> Progress      // unlocked: ['industry:airline','industry:agrifoods','industry:retail',
+                                 //   'powerup:forecasting','powerup:facilities','powerup:hedgeAccess'] (A9: facilities and
+                                 //   hedgeAccess gate core play, so they are free from run 1)
 UNLOCK_RULES                     // mode:pro: first completed run (R32); industry:construction best.simple>=1500; industry:pharma runs>=3;
                                  // industry:tech best.simple>=2500; industry:energy runs>=6; powerup:visibility runs>=2;
-                                 // powerup:options best.simple>=2000; crisis:* runs>=4
+                                 // crisis:* runs>=4 (A9: powerup:options removed)
 applyRunToProgress(progress, { mode, score, chairmenMet, crisisId, status }) -> { progress, newlyUnlocked: string[], isPersonalBest: boolean }
 mergeProgress(a, b) -> Progress  // max of runs and each best; ordered union of arrays (a first); tolerates missing/partial a or b; output is always version 3
 CRISES                           // each { id, label, forcedYear, industryId }; unranked (never submitted to leaderboard)
@@ -199,14 +258,28 @@ Result-quip selection rules (B3):
 
 - `bigSave`: total `hedgeImpact` > 2% of starting cash.
 - `bigMiss`: `benchmarkDelta - playerDelta` > 2% of starting cash.
-- `overHedged`: any line with `h * forecast > 1.15 * realised`.
+- `overHedged`: any line with `lines[].hedgeRatio × forecastNotional > 1.15 × realisedNotional` (`hedgeRatio` is the
+  applied ratio after clamping, not the requested one).
 - `nearBankrupt`: `cashAfter < redLine`.
 - otherwise `calm`, or `boom` on a large favourable move.
 
-Board line selection (B1): `breach === 'loss'` -> `breachLoss`. This is a heavy, scathing telling-off, and the angry sprite always wins over other moods. `breach === 'lucky'` -> `luckyBreach`: a grudging "it worked, but don't do that again". Otherwise `redZone`, `moodUp` or `moodDown` by mood change.
+Board line selection (B1; D3 writes the lines). First match wins:
 
-Tone: `luckyBreach` is mild and wry; `breachLoss` is the harshest in the game (the board is furious, with HR hints). The `fired` lines follow from repeated losing breaches (or one severe one, A8).
+1. `summary.policyAdopted` set → `policyAdopted` (the board welcomes the proposal).
+2. `policy === 'none'` → `noPolicyHedgeLoss` if `Σ lines[].hedgeImpact < 0`; `noPolicyHedgeWin` if `> 0`; otherwise
+   `noPolicyNudge` (no hedge: the board presses for a policy).
+3. `breach === 'loss'` → `breachLoss`. A heavy, scathing telling-off; the angry sprite always wins over other moods.
+4. `breach === 'lucky'` → `luckyBreach`: mixed, "it worked, but that wasn't the policy".
+5. `policy === 'in'` and `marketResult < 0` → `inPolicyBad`: critical but mild.
+6. Otherwise `redZone` (`cashAfter < redLine`), `moodUp` or `moodDown` by mood change.
+
+Tone: `luckyBreach` is mixed (some praise, some criticism); `breachLoss` is the harshest in the game (the board is furious,
+with HR hints). A9: an in-policy loss is critical but mild; the no-policy board is hyper-focused on the hedge's own P&L
+(`Σ lines[].hedgeImpact`) and hardest to please, and the player's first step there is to propose a policy. `fired`
+follows from overall results: a sinking board mood, or one severe off-policy loss (A8). Running out of cash is
+`bankrupt` ("CFO replaced").
 
 ## Events and power-ups (A4)
 
-`applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult, quarterVarianceMult }`. `varianceMult` and `notionalMult` last only for the quarter the event resolves in (R21); `notionalMult` keys naming an exposure the industry lacks are ignored. `rollEvent(run, events, rng)` only selects an unseen event by weight (SimEngine rolls the chance). Fixture/content shape: `{ events: SimpleEvent[] }`. `visibility` is single use per run (recorded in `powerUps.used`); `forecasting` and `options` go in `powerUps.owned`.
+`applyEventChoice(run, event, choiceId) -> { run, quarterNotionalMult, quarterVarianceMult }`. `varianceMult` and `notionalMult` last only for the quarter the event resolves in (R21); `notionalMult` keys naming an exposure the industry lacks are ignored. `rollEvent(run, events, rng)` only selects an unseen event by weight (SimEngine rolls the chance). Fixture/content shape: `{ events: SimpleEvent[] }`. `visibility` is single use per run (recorded in `powerUps.used`); `forecasting` (once, with `run.forecastLevel` counting
+modules), `facilities` and `hedgeAccess` go in `powerUps.owned`.

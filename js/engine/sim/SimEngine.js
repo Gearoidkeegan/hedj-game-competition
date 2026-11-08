@@ -1,14 +1,21 @@
 // Simple-mode run creation and quarter simulation. Pure: no DOM, storage, Math.random or Date.now.
 
 import { SeededRandom } from '../../utils/random.js';
-import { forecastEngine } from '../ForecastEngine.js';
 import { BALANCE } from './balance.js';
 import { pickStartYear } from './startYears.js';
-import { applyPowerUp, canBuyPowerUp, POWER_UPS } from './powerUps.js';
+import {
+    applyPowerUp, borrowingBuffer, canBuyPowerUp, forecastVariance, isHedgeable, maxHedgeRatio, POWER_UP_IDS
+} from './powerUps.js';
 import { applyEventChoice, rollEvent } from './events.js';
-import { exposureCashImpact, hedgeCashImpact, optionPremium } from './exposureMath.js';
+import { exposureCashImpact, hedgeCashImpact } from './exposureMath.js';
 
 const MAX_QUARTERS = 8;
+
+// A9 (R43): the policies a player may propose to a no-policy board: the three bands and "not to hedge".
+// Frozen: validation relies on it, so UI code must not be able to change what the engine accepts.
+export const POLICY_OPTIONS = Object.freeze(BALANCE.boards
+    .filter(b => b.type !== 'none')
+    .map(b => Object.freeze({ min: b.min, max: b.max })));
 
 export function activeExposures(run) {
     return run.exposures.filter(e => e.unlockQuarter <= run.quarter);
@@ -23,6 +30,8 @@ function calendar(startYear, i) {
     return { year: startYear + Math.floor(i / 4), quarter: (i % 4) + 1 };
 }
 
+const boardTypeOf = mandate => (mandate === null ? 'none' : mandate.max === 0 ? 'noHedge' : 'band');
+
 export function createRun({ industry, seed, startedAt, market, crisisId = null, forcedYear = null }) {
     const rng = new SeededRandom(seed);
     const exposures = industry.exposures.map(e => ({
@@ -35,8 +44,10 @@ export function createRun({ industry, seed, startedAt, market, crisisId = null, 
         unlockQuarter: e.unlockQuarter ?? 0,
         description: e.description ?? ''
     }));
+    // RNG order: the start year first (no draw when forcedYear is set), then the board (one draw).
     const { year: startYear } = pickStartYear(market, exposures, rng, { quarters: MAX_QUARTERS, forcedYear });
-    const { min, max } = rng.pick(BALANCE.mandates);
+    const board = rng.weightedPick(BALANCE.boards);
+    const mandate = board.type === 'none' ? null : { min: board.min, max: board.max };
 
     const rates = {};
     for (const e of exposures) {
@@ -60,11 +71,12 @@ export function createRun({ industry, seed, startedAt, market, crisisId = null, 
         cash: startingCash,
         benchmarkCash: startingCash,
         redLine: BALANCE.redLinePct * startingCash,
-        mandate: { min, max },
+        mandate,
+        boardType: board.type,
         exposures,
         rates,
         powerUps: { owned: [], used: [] },
-        varianceMultiplier: 1,
+        forecastLevel: 0,
         boardMood: BALANCE.startMood,
         pendingEvent: null,
         chairmenMet: [],
@@ -91,6 +103,16 @@ function usableRate(r) {
     return typeof r === 'number' && Number.isFinite(r);
 }
 
+// A9 (R43): a proposal is only valid on a no-policy board, before the final quarter (it applies from the next
+// quarter), and must be one of POLICY_OPTIONS.
+function validateProposal(run, proposal) {
+    if (run.mandate !== null) throw new Error('Cannot propose a policy: the board already has one');
+    if (run.quarter >= run.maxQuarters - 1) throw new Error('Cannot propose a policy in the final quarter');
+    const ok = proposal && typeof proposal === 'object'
+        && POLICY_OPTIONS.some(o => o.min === proposal.min && o.max === proposal.max);
+    if (!ok) throw new Error(`Invalid policy proposal: ${JSON.stringify(proposal)}`);
+}
+
 export function simulateQuarter(run, decisions, market, content) {
     if (isRunOver(run)) throw new Error(`Run is over (${run.status})`);
     const hedges = decisions.hedges || {};
@@ -99,14 +121,16 @@ export function simulateQuarter(run, decisions, market, content) {
             throw new Error(`Hedge ratio for ${id} must be between 0 and 1, got ${h}`);
         }
     }
+    const proposal = decisions.proposePolicy ?? null;
+    if (proposal !== null) validateProposal(run, proposal);
 
     // 1. Quarter RNG
     const rng = new SeededRandom((run.seed ^ Math.imul(run.quarter + 1, 0x9E3779B1)) >>> 0);
 
-    // 2. Power-up purchase and event choice (A4), on a private copy
+    // 2. Power-up purchase and event choice (A4), on a private copy. A power-up bought now applies this quarter.
     let next = structuredClone(run);
     if (decisions.buyPowerUp) {
-        if (!canBuyPowerUp(next, decisions.buyPowerUp, Object.keys(POWER_UPS))) {
+        if (!canBuyPowerUp(next, decisions.buyPowerUp, POWER_UP_IDS)) {
             throw new Error(`Cannot buy power-up ${decisions.buyPowerUp}`);
         }
         next = applyPowerUp(next, decisions.buyPowerUp);
@@ -127,22 +151,23 @@ export function simulateQuarter(run, decisions, market, content) {
         endRates[u] = usableRate(er) ? er : r;
     }
 
-    // 4. Exposures
-    const variance = forecastEngine.getEffectiveVariance(Math.floor(run.quarter / 4), 0) * next.varianceMultiplier * quarterVarianceMult;
-    const useOption = !!decisions.useOptions && next.powerUps.owned.includes('options');
-    const product = useOption ? 'option' : 'forward';
+    // 4. Exposures. Variance comes from the forecasting level; an event may scale it for this quarter only.
+    const variance = forecastVariance(next) * quarterVarianceMult;
     let playerMarket = 0;
     let benchmarkMarket = 0;
-    let premiums = 0;
-    // Vacuously in mandate when no active exposure has a non-zero notional (every current industry has one from Q1).
-    let inMandate = true;
+    let hedgeResult = 0;
+    // Only hedgeable exposures with a non-zero notional count toward the policy; vacuously in policy otherwise.
+    let inPolicy = true;
     const lines = [];
     for (const exp of activeExposures(next)) {
         const forecast = exp.quarterlyNotional * (quarterNotionalMult[exp.id] ?? 1);
         // Volume forecasts (fx, commodity) miss by up to ±variance; debt principal (ir) is contractual.
-        // ir draws no random number.
+        // ir draws no random number; fx and commodity always draw one (even at zero variance).
         const realised = exp.type === 'ir' ? forecast : forecast * (1 + (rng.next() * 2 - 1) * variance);
-        const h = hedges[exp.id] ?? 0;
+        // A9 (R44): clamp, don't throw: 0 if not hedgeable yet, otherwise the facilities cap.
+        const requested = hedges[exp.id] ?? 0;
+        const allowed = maxHedgeRatio(next, exp);
+        const h = Math.min(requested, allowed);
         const hedged = h * forecast;
         const startRate = next.rates[exp.underlying];
         const endRate = endRates[exp.underlying];
@@ -157,42 +182,62 @@ export function simulateQuarter(run, decisions, market, content) {
             movePct = exp.type === 'ir' ? (endRate - startRate) * 100 : ((endRate - startRate) / startRate) * 100;
             // `+ 0` turns -0 into 0 so the run stays deep-equal after a JSON round trip.
             exposureImpact = exposureCashImpact(exp, startRate, endRate, realised) + 0;
-            hedgeImpact = hedgeCashImpact(exp, startRate, endRate, hedged, product) + 0;
+            hedgeImpact = hedgeCashImpact(exp, startRate, endRate, hedged, 'forward') + 0;
         }
-        const premium = useOption ? optionPremium(hedged) : 0;
 
         playerMarket += exposureImpact + hedgeImpact;
         benchmarkMarket += exposureImpact;
-        premiums += premium;
-        if (forecast !== 0 && (h < next.mandate.min || h > next.mandate.max)) inMandate = false;
-        lines.push({ exposureId: exp.id, movePct, exposureImpact, hedgeImpact, realisedNotional: realised, forecastNotional: forecast });
+        hedgeResult += hedgeImpact;
+        if (next.mandate && forecast !== 0 && isHedgeable(next, exp)
+            && (h < next.mandate.min || h > next.mandate.max)) inPolicy = false;
+        lines.push({
+            exposureId: exp.id, movePct, exposureImpact, hedgeImpact,
+            realisedNotional: realised, forecastNotional: forecast, hedgeRatio: h, clamped: requested > allowed
+        });
     }
 
     // 5. Base operating cash flow, both sides
     const baseOcf = BALANCE.baseOcfPct * next.startingCash;
-    next.cash += playerMarket - premiums + baseOcf;
+    next.cash += playerMarket + baseOcf;
     next.benchmarkCash += benchmarkMarket + baseOcf;
     next.rates = endRates;
 
-    // 6. Mandate and breach
-    const marketResult = playerMarket - premiums;
-    const { breach, severe } = classifyBreach({ inMandate, marketResult, startingCash: next.startingCash });
+    // 6. Policy and breach. The no-policy board has nothing to breach.
+    const marketResult = playerMarket;
+    const policy = next.mandate === null ? 'none' : inPolicy ? 'in' : 'off';
+    const { breach, severe } = policy === 'none'
+        ? { breach: 'none', severe: false }
+        : classifyBreach({ inMandate: inPolicy, marketResult, startingCash: next.startingCash });
     const playerDelta = next.cash - run.cash;
     const benchmarkDelta = next.benchmarkCash - run.benchmarkCash;
 
-    // 7. Board mood
+    // 7. Board mood (R41 outcome-based; R43 the no-policy board judges the hedge P&L alone; R49 it also loses
+    // patience every quarter it still has no policy, and a tie with the benchmark is not a beat)
+    const M = BALANCE.mood;
     let mood = next.boardMood;
-    if (breach === 'none') mood += BALANCE.mood.inMandate;
-    else if (breach === 'lucky') mood += BALANCE.mood.luckyBreach;
-    else mood += BALANCE.mood.breachLoss;
-    if (playerDelta >= benchmarkDelta) mood += BALANCE.mood.beatBenchmark;
-    if (next.cash < next.redLine) mood += BALANCE.mood.redZone;
+    if (policy === 'none') {
+        mood += M.noPolicyDrift;
+        if (hedgeResult < 0) mood += M.noPolicyHedgeLoss;
+        else if (hedgeResult > 0) mood += M.noPolicyHedgeWin;
+    } else if (breach === 'none') mood += marketResult >= 0 ? M.inPolicyGood : M.inPolicyBad;
+    else if (breach === 'lucky') mood += M.luckyBreach;
+    else mood += M.breachLoss;
+    if (playerDelta > benchmarkDelta) mood += M.beatBenchmark;
+    if (next.cash < next.redLine) mood += M.redZone;
+    if (proposal !== null) mood += M.policyAdopted;
     next.boardMood = Math.min(100, Math.max(0, mood));
+
+    // 8. Policy adoption: judged from the next quarter.
+    if (proposal !== null) {
+        next.mandate = { min: proposal.min, max: proposal.max };
+        next.boardType = boardTypeOf(next.mandate);
+    }
 
     next.quarter = run.quarter + 1;
     const summary = {
         q: next.quarter,
-        inMandate,
+        policy,
+        inMandate: policy === 'none' ? null : inPolicy,
         playerDelta,
         benchmarkDelta,
         marketResult,
@@ -204,19 +249,18 @@ export function simulateQuarter(run, decisions, market, content) {
         boardMoodAfter: next.boardMood,
         lines,
         event: run.pendingEvent ? { id: run.pendingEvent, choice: decisions.eventChoice ?? null } : null,
-        powerUp: decisions.buyPowerUp ?? null
+        powerUp: decisions.buyPowerUp ?? null,
+        policyAdopted: proposal === null ? null : { min: proposal.min, max: proposal.max }
     };
     next.history = [...next.history, summary];
 
-    // 8. Status
-    const losses = next.history.filter(s => s.breach === 'loss').length;
-    if (next.cash <= 0) next.status = 'bankrupt';
+    // 9. Status (R40): results, not hedging, decide the CFO's fate.
+    if (next.cash < -borrowingBuffer(next)) next.status = 'bankrupt';
     else if (severe) next.status = 'fired';
-    else if (losses >= BALANCE.breachLossesToFire) next.status = 'fired';
     else if (next.boardMood <= BALANCE.fireThreshold) next.status = 'fired';
     else if (next.quarter >= next.maxQuarters) next.status = 'complete';
 
-    // 9. Next event (only while the run continues)
+    // 10. Next event (only while the run continues)
     next.pendingEvent = null;
     if (next.status === 'playing' && rng.chance(BALANCE.eventChance)) {
         next.pendingEvent = rollEvent(next, content.events || [], rng);

@@ -5,7 +5,8 @@ import { loadMarketData, loadIndustries } from '../helpers/loadData.js';
 import { marketEngine } from '../../js/engine/MarketEngine.js';
 import { SeededRandom } from '../../js/utils/random.js';
 import { createRun, simulateQuarter, isRunOver } from '../../js/engine/sim/SimEngine.js';
-import { POWER_UPS, canBuyPowerUp, applyPowerUp } from '../../js/engine/sim/powerUps.js';
+import { BALANCE } from '../../js/engine/sim/balance.js';
+import { POWER_UPS, canBuyPowerUp, applyPowerUp, forecastVariance } from '../../js/engine/sim/powerUps.js';
 import { rollEvent, applyEventChoice } from '../../js/engine/sim/events.js';
 
 marketEngine.loadFromObjects(loadMarketData());
@@ -14,13 +15,20 @@ const content = JSON.parse(readFileSync(new URL('../fixtures/simple-events.json'
 const [supplier, conference] = content.events;
 const ALL = Object.keys(POWER_UPS);
 
-const newRun = (seed = 12345) => createRun({ industry: airline, seed, startedAt: 1, market: marketEngine, forcedYear: 2010 });
+// A 25-50% band board, whatever board the seed draws (A9: it may have no policy).
+const newRun = (seed = 12345) => ({
+    ...createRun({ industry: airline, seed, startedAt: 1, market: marketEngine, forcedYear: 2010 }),
+    mandate: { min: 0.25, max: 0.5 }, boardType: 'band'
+});
+// An in-policy hedge for whatever board the seed drew (0 on a no-policy or noHedge board).
+const policyHedge = run => (run.mandate ? run.mandate.min : 0);
 const noHedges = run => Object.fromEntries(run.exposures.map(e => [e.id, 0]));
-const decide = (run, extra = {}) => ({ hedges: noHedges(run), useOptions: false, buyPowerUp: null, eventChoice: null, ...extra });
+const decide = (run, extra = {}) => ({ hedges: noHedges(run), buyPowerUp: null, eventChoice: null, ...extra });
 const fuelLine = summary => summary.lines.find(l => l.exposureId === 'fuel');
 
+// forecasting is tiered (3 modules): see powerUpsV2.test.js.
 test('cannot buy twice', () => {
-    for (const id of ALL) {
+    for (const id of ['visibility', 'facilities', 'hedgeAccess']) {
         const run = applyPowerUp(newRun(), id);
         assert.equal(canBuyPowerUp(run, id, ALL), false, id);
         assert.throws(() => applyPowerUp(run, id));
@@ -32,19 +40,22 @@ test('cannot buy when cash < cost, or when not unlocked', () => {
     assert.equal(canBuyPowerUp(poor, 'forecasting', ALL), false);
     assert.throws(() => applyPowerUp(poor, 'forecasting'));
     assert.throws(() => simulateQuarter(poor, decide(poor, { buyPowerUp: 'forecasting' }), marketEngine, content));
-    assert.equal(canBuyPowerUp(newRun(), 'options', ['forecasting']), false);
-    assert.equal(canBuyPowerUp(newRun(), 'options', ALL), true);
+    assert.equal(canBuyPowerUp(newRun(), 'facilities', ['forecasting']), false);
+    assert.equal(canBuyPowerUp(newRun(), 'facilities', ALL), true);
     assert.equal(canBuyPowerUp(newRun(), 'nonsense', ALL), false);
 });
 
-test('costs are fractions of starting cash and options unlocks useOptions', () => {
+test('costs are fractions of starting cash and a purchase is recorded on the run and the summary', () => {
     const run = newRun();
-    assert.equal(applyPowerUp(run, 'forecasting').cash, run.cash - 0.01 * run.startingCash);
-    assert.equal(applyPowerUp(run, 'options').cash, run.cash - 0.005 * run.startingCash);
-    assert.deepEqual(applyPowerUp(run, 'options').powerUps.owned, ['options']);
-    const bought = simulateQuarter(run, decide(run, { buyPowerUp: 'options', useOptions: true }), marketEngine, content);
-    assert.equal(bought.summary.powerUp, 'options');
-    assert.deepEqual(bought.run.powerUps.owned, ['options']);
+    const C = BALANCE.powerUpCosts;
+    assert.equal(applyPowerUp(run, 'forecasting').cash, run.cash - C.forecasting[0] * run.startingCash);
+    assert.equal(applyPowerUp(run, 'facilities').cash, run.cash - C.facilities * run.startingCash);
+    assert.equal(applyPowerUp(run, 'hedgeAccess').cash, run.cash - C.hedgeAccess * run.startingCash);
+    assert.deepEqual(applyPowerUp(run, 'facilities').powerUps.owned, ['facilities']);
+    const inBand = Object.fromEntries(run.exposures.map(e => [e.id, 0.25]));
+    const bought = simulateQuarter(run, decide(run, { hedges: inBand, buyPowerUp: 'facilities' }), marketEngine, content);
+    assert.equal(bought.summary.powerUp, 'facilities');
+    assert.deepEqual(bought.run.powerUps.owned, ['facilities']);
 });
 
 test('visibility adds 3% to the player only (benchmark unchanged)', () => {
@@ -68,10 +79,11 @@ function spread(buy) {
     return Math.sqrt(misses.reduce((a, b) => a + (b - mean) ** 2, 0) / misses.length);
 }
 
-test('forecasting halves variance', () => {
+// A9 (R44): one module takes accuracy from 40% to 60%, so the variance falls from 0.40 to 0.267.
+test('one forecasting module cuts the volume spread to two thirds', () => {
     const ratio = spread('forecasting') / spread(null);
-    assert.ok(ratio > 0.4 && ratio < 0.6, `ratio ${ratio}`);
-    assert.equal(applyPowerUp(newRun(), 'forecasting').varianceMultiplier, 0.5);
+    assert.ok(Math.abs(ratio - 2 / 3) < 1e-6, `ratio ${ratio}`);
+    assert.equal(applyPowerUp(newRun(), 'forecasting').forecastLevel, 1);
 });
 
 test('forecasting variance stays permanent across quarters', () => {
@@ -81,7 +93,9 @@ test('forecasting variance stays permanent across quarters', () => {
     const q1 = simulateQuarter(run, decide(run, { hedges: inBand, buyPowerUp: 'forecasting' }), marketEngine, content);
     assert.equal(q1.run.status, 'playing');
     const q2 = simulateQuarter({ ...q1.run, pendingEvent: null }, decide(q1.run, { hedges: inBand }), marketEngine, content);
-    assert.equal(q2.run.varianceMultiplier, 0.5);
+    assert.equal(q2.run.forecastLevel, 1);
+    assert.equal(forecastVariance(q2.run), forecastVariance(q1.run));
+    assert.ok(forecastVariance(q2.run) < BALANCE.forecast.baseVariance);
 });
 
 test('event cashPct hits both sides equally', () => {
@@ -126,7 +140,7 @@ test('notionalMult and varianceMult last one quarter only; unknown exposure igno
     const fuelExp = base.exposures.find(e => e.id === 'fuel');
     assert.equal(fuelLine(q1.summary).forecastNotional, fuelExp.quarterlyNotional * 1.5);
     assert.equal(q1.summary.event.choice, 'refuse');
-    assert.equal(q1.run.varianceMultiplier, 1, 'variance effect is not stored on the run');
+    assert.equal(q1.run.forecastLevel, 0, 'variance effect is not stored on the run');
 
     // Same quarter RNG without the event: the variance of 2 doubles the realised miss.
     const plain = simulateQuarter(newRun(), decide(newRun()), marketEngine, content);
@@ -137,15 +151,16 @@ test('notionalMult and varianceMult last one quarter only; unknown exposure igno
     // The following quarter is back to normal: no notional multiplier, normal variance.
     const q2 = simulateQuarter({ ...q1.run, pendingEvent: null }, decide(q1.run), marketEngine, content);
     assert.equal(fuelLine(q2.summary).forecastNotional, fuelExp.quarterlyNotional);
-    const control = simulateQuarter({ ...q1.run, pendingEvent: null, varianceMultiplier: 1 }, decide(q1.run), marketEngine, content);
-    assert.deepEqual(q2.summary.lines, control.summary.lines);
+    // Same Q2 draw as a run that had no event in Q1: the realised miss matches.
+    const control = simulateQuarter({ ...plain.run, pendingEvent: null }, decide(plain.run), marketEngine, content);
+    assert.ok(Math.abs(miss(q2.summary) - miss(control.summary)) < 1e-12);
 });
 
 test('a full run with events resolves each once and never repeats one', () => {
     let run = createRun({ industry: airline, seed: 5, startedAt: 1, market: marketEngine });
     const ids = [];
     while (!isRunOver(run)) {
-        const hedges = Object.fromEntries(run.exposures.map(e => [e.id, run.mandate.min]));
+        const hedges = Object.fromEntries(run.exposures.map(e => [e.id, policyHedge(run)]));
         const ev = run.pendingEvent ? content.events.find(e => e.id === run.pendingEvent) : null;
         run = simulateQuarter(run, decide(run, { hedges, eventChoice: ev ? ev.choices[0].id : null }), marketEngine, content).run;
         const last = run.history.at(-1).event;
@@ -162,7 +177,7 @@ test('simulateQuarter requires an eventChoice while an event is pending', () => 
 function playWithEvents(seed) {
     let run = createRun({ industry: airline, seed, startedAt: 1, market: marketEngine });
     while (!isRunOver(run)) {
-        const hedges = Object.fromEntries(run.exposures.map(e => [e.id, run.mandate.min]));
+        const hedges = Object.fromEntries(run.exposures.map(e => [e.id, policyHedge(run)]));
         const ev = run.pendingEvent ? content.events.find(e => e.id === run.pendingEvent) : null;
         run = simulateQuarter(run, decide(run, { hedges, eventChoice: ev ? ev.choices[0].id : null }), marketEngine, content).run;
     }

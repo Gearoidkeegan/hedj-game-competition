@@ -3,7 +3,11 @@
 
 import { CRISES } from './crises.js';
 
-const FREE_UNLOCKS = ['industry:airline', 'industry:agrifoods', 'industry:retail', 'powerup:forecasting'];
+// A9 (R44): facilities and hedgeAccess gate core play, so they are free from run 1.
+const FREE_UNLOCKS = [
+    'industry:airline', 'industry:agrifoods', 'industry:retail',
+    'powerup:forecasting', 'powerup:facilities', 'powerup:hedgeAccess'
+];
 const CRISIS_RUNS_REQUIRED = 4;
 
 // Run status rules (R32): every finished run (complete, bankrupt or fired) counts toward `runs`,
@@ -17,7 +21,6 @@ export const UNLOCK_RULES = [
     { id: 'industry:tech', test: p => p.best.simple >= 2500 },
     { id: 'industry:energy', test: p => p.runs >= 6 },
     { id: 'powerup:visibility', test: p => p.runs >= 2 },
-    { id: 'powerup:options', test: p => p.best.simple >= 2000 },
     // `crisis:*` in the design: one unlock per crisis.
     ...CRISES.map(c => ({ id: `crisis:${c.id}`, test: p => p.runs >= CRISIS_RUNS_REQUIRED }))
 ];
