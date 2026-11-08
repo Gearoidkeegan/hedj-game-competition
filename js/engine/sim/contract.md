@@ -52,6 +52,7 @@ The proposal is adopted after the quarter resolves: this quarter is still judged
   severe: boolean,   // A8/R35: breach === 'loss' and marketResult ≤ −BALANCE.severeBreachLossPct × startingCash (fires at once)
   cashAfter: number, benchmarkCashAfter: number, redLine: number, boardMoodAfter: number,
   lines: [{ exposureId, movePct, exposureImpact, hedgeImpact, realisedNotional, forecastNotional,
+            costImpact,     // F2/R54: trading costs and premiums (≤ 0), Pro's exposureId 'other' line only; 0 or absent elsewhere
             hedgeRatio,     // A9: the ratio actually applied (after clamping)
             clamped }],     // A9: true when the requested ratio was above the allowed limit
   event: { id, choice } | null, powerUp: string|null,
@@ -68,6 +69,8 @@ Interest rates in the market data are decimals (EURIBOR 0.034671 = 3.47%). The I
 Policy compliance counts only active, hedgeable exposures with a non-zero notional; it is vacuously in policy when there
 are none. It uses the applied (clamped) ratio against the real band, even when the cap makes the band unreachable (75–100
 before `facilities` is off policy). The no-policy board's hedge result is `Σ lines[].hedgeImpact`.
+Costs and premiums are never in `hedgeImpact`; the identity is `Σ (exposureImpact + hedgeImpact + costImpact) = marketResult`.
+Pro adds an `exposureId: 'other'` line for hedges with no exposure detail (`hedgeImpact`) and for costs (`costImpact`).
 
 `QuarterResult` (return of `simulateQuarter`): `{ run: RunState, summary: QuarterSummary }`.
 

@@ -6,13 +6,14 @@ import { gameLoop } from '../engine/GameLoop.js';
 import { formatPnL, formatQuarter } from '../utils/formatters.js';
 import { EraPopup } from '../ui/EraPopup.js';
 import { soundFX } from '../ui/SoundFX.js';
+import { typewrite } from '../ui/typewriter.js';
 import { escapeHtml } from '../utils/escape.js';
 
 export class EventScreen {
     constructor(app) {
         this.app = app;
         this.el = null;
-        this.typewriterTimer = null;
+        this.typing = null;
     }
 
     render() {
@@ -121,10 +122,7 @@ export class EventScreen {
     }
 
     unmount() {
-        if (this.typewriterTimer) {
-            clearInterval(this.typewriterTimer);
-            this.typewriterTimer = null;
-        }
+        if (this.typing) { this.typing.cancel(); this.typing = null; }
     }
 
     handleChoice(event, choiceId) {
@@ -152,19 +150,9 @@ export class EventScreen {
         const cursor = container.querySelector('.blink');
         if (!textSpan) return;
 
-        let index = 0;
-
-        this.typewriterTimer = setInterval(() => {
-            if (index < text.length) {
-                textSpan.textContent += text[index];
-                index++;
-            } else {
-                clearInterval(this.typewriterTimer);
-                this.typewriterTimer = null;
-                if (cursor) cursor.style.display = 'none';
-                if (onComplete) onComplete();
-            }
-        }, 20);
+        // 8 ms per character; a tap on the text completes it (and reveals the choices).
+        this.typing = typewrite({ textEl: textSpan, cursorEl: cursor, text, delay: 0, onDone: onComplete });
+        container.addEventListener('click', () => this.typing?.complete());
     }
 
     isAcknowledgeEvent(event) {

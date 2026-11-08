@@ -3,6 +3,8 @@
 
 import { GAME_CONFIG, PHASE } from '../utils/constants.js';
 import { SeededRandom, generateSeed } from '../utils/random.js';
+import { marketEngine } from './MarketEngine.js';
+import { pickStartYear } from './sim/startYears.js';
 
 class GameStateManager {
     constructor() {
@@ -109,9 +111,15 @@ class GameStateManager {
         const gameSeed = seed || generateSeed();
         this.rng = new SeededRandom(gameSeed);
 
-        // Pick random start year ensuring enough forward data
-        const maxStart = GAME_CONFIG.MAX_DATA_YEAR - GAME_CONFIG.GAME_WINDOW_YEARS;
-        const startYear = this.rng.intRange(GAME_CONFIG.MIN_DATA_YEAR, maxStart);
+        // Start year: only where every exposure has real monthly data for the whole run (A1 chooser).
+        // Without loaded market data (tests, offline) fall back to any year with a full game window.
+        let startYear;
+        if (marketEngine.isLoaded()) {
+            startYear = pickStartYear(marketEngine, industry.exposures, this.rng, { quarters: GAME_CONFIG.MAX_QUARTERS }).year;
+        } else {
+            const maxStart = GAME_CONFIG.MAX_DATA_YEAR - GAME_CONFIG.GAME_WINDOW_YEARS;
+            startYear = this.rng.intRange(GAME_CONFIG.MIN_DATA_YEAR, maxStart);
+        }
 
         // Deep-copy all exposures for progression tracking
         const allExposures = JSON.parse(JSON.stringify(industry.exposures));

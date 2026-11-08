@@ -240,6 +240,14 @@ class GameLoopController {
                 const newMtm = intrinsic * hedge.notional;
                 mtmChange = newMtm - (hedge.currentMtm || 0);
                 hedge.currentMtm = newMtm;
+            } else if (hedge.productType === 'cap') {
+                // IR cap: each quarter pays max(0, floating - strike) * notional * 0.25 in cash, like a swap
+                // leg that can only be positive. The premium was paid and counted at booking.
+                const quarterPayoff = Math.max(0, currentRate - hedge.strike) * hedge.notional * 0.25;
+                mtmChange = quarterPayoff;
+                hedge.currentMtm = (hedge.currentMtm || 0) + quarterPayoff;
+                cashImpact += quarterPayoff;
+                settlesQuarterly = true;
             } else if (hedge.productType === 'swap') {
                 // IR Swap: (floating - fixed) * notional * 0.25, rates are decimals
                 const floatingRate = currentRate;

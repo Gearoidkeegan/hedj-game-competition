@@ -520,3 +520,56 @@
 .gd-dot.is-active { background: var(--v3-gold); }
 .gd-next { justify-self: end; min-width: 120px; }
 .gd-back { justify-self: start; min-width: 88px; }
+
+/* ---- Pro desk polish (Task F2): fit the legacy dashboard and board in 360px at 12px minimum ---- */
+.pro-cash { min-width: 0; }
+.pro-cash .cash-meter { width: 100%; }
+
+@media (max-width: 768px) {
+    /* Body text in Pro screens is VT323; Press Start 2P stays on tabs, buttons, names and headings. */
+    .dashboard-screen .pixel-text,
+    .board-screen .pixel-text {
+        font-family: var(--font-readable);
+        font-size: 16px !important;
+        letter-spacing: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .dashboard-screen .btn,
+    .dashboard-screen .tab,
+    .dashboard-screen .quarter-bar .company-name,
+    .dashboard-screen .quarter-bar .quarter-label,
+    .board-screen .quarter-bar .company-name,
+    .board-screen .quarter-bar .quarter-label,
+    .board-screen .board-member-name {
+        font-family: var(--font-pixel);
+        font-size: 12px !important;
+        letter-spacing: 0;
+    }
+
+    /* Quarter bar: long company names ellipsise instead of pushing the bar wider than the phone. */
+    .quarter-bar .company-name {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .quarter-bar .quarter-label { flex: 0 0 auto; }
+    .qbar-row2 { flex-wrap: wrap; }
+    .qbar-row2 .pro-cash { flex: 1 1 100%; order: -1; }
+    .qbar-stat { min-width: 0; }
+
+    /* Hedge ladder: fixed 36-48px columns cannot hold 12px text. */
+    .hedge-ladder-header,
+    .hedge-ladder-row {
+        grid-template-columns: 44px minmax(0, 1fr) 46px 46px 64px !important;
+    }
+
+    /* Board review */
+    .board-screen { padding: 8px; }
+    .board-screen .board-speech { font-size: 18px; line-height: 1.2; overflow-wrap: anywhere; cursor: pointer; }
+    .board-screen .board-member-name,
+    .board-screen .board-member-role { overflow-wrap: anywhere; }
+    .board-screen .quarter-bar { flex-wrap: wrap; row-gap: 4px; }
+}
