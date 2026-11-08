@@ -5,8 +5,14 @@ import { h } from '../../ui/dom.js';
 import { exposureTitle, unlockRuleText } from '../../ui/labels.js';
 
 // Starts a run once the market data has loaded (createRun throws without it). Shared with the title's crises.
+// M3: if the first load failed (flaky Wi-Fi), load it again now (app.loadMarket), so a retry can succeed instead
+// of failing until the page is reloaded. Still offline: start() throws and the caller's toast says to try again.
 export async function startRun(app, industryId, opts = {}) {
     await app.marketReady;
+    const market = app.runController?.market;
+    if (typeof market?.isLoaded === 'function' && !market.isLoaded() && typeof app.loadMarket === 'function') {
+        await app.loadMarket();
+    }
     return app.runController.start(industryId, opts);
 }
 

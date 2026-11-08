@@ -9,6 +9,7 @@ import { finalScore } from '../../engine/sim/score.js';
 import { applyRunToProgress, emptyProgress, mergeProgress, serialiseSave } from '../../engine/sim/progress.js';
 import { CRISES } from '../../engine/sim/crises.js';
 import { SeededRandom } from '../../utils/random.js';
+import { isFinalRejection, rejectionText } from '../../utils/scoreRejection.js';
 import { CHAIRMAN_SPRITES, spriteIdForMember } from '../../ui/pixel/sprites.js';
 
 // The chairman speaks instead of a board member in these quarters, and whenever the gap to the benchmark
@@ -99,9 +100,9 @@ function withFreeUnlocks(progress) {
 
 const snapDown = v => Math.floor(v * 4 + 1e-9) / 4;
 
-function policyDefault(run) {
-    if (!run.mandate) return 0;
-    return Math.round(((run.mandate.min + run.mandate.max) / 2) * 4) / 4;
+// The midpoint of a policy band, rounded to a 0.25 step (0 for "not to hedge").
+function bandMidpoint(policy) {
+    return Math.round(((policy.min + policy.max) / 2) * 4) / 4;
 }
 
 
@@ -166,6 +167,12 @@ export class RunController {
         this.run = run;
         this.email = email;
         this._save();
+        // The admin PLAYS counter (M4): one play per new run, as Pro sends at its start. Fire-and-forget.
+        try {
+            if (typeof this.api?.trackEvent === 'function') this.api.trackEvent('play');
+        } catch {
+            // analytics never blocks a run
+        }
         return this.run;
     }
 
@@ -191,18 +198,18 @@ export class RunController {
         return run;
     }
 
-    // Dials for the coming quarter. Q1 (and the quarter after a policy is adopted): the band midpoint rounded to
-    // a 0.25 step, 0 with no policy or a noHedge policy. Otherwise the previous quarter's applied dials.
+    // Dials for the coming quarter (R65). Q1: every dial at 0, whatever the board. Later quarters: the ratio the
+    // player applied last quarter; an exposure that has just become active starts at 0. The quarter after the
+    // board adopts a policy the player proposed: that policy's midpoint, rounded to a 0.25 step.
     // Always capped by maxHedgeRatio (the 50% line before facilities, 0 for ir/commodity before hedgeAccess).
     currentDecisionsDefaults() {
         const run = this._requireRun();
         const last = run.history[run.history.length - 1];
-        const previous = last && !last.policyAdopted
-            ? Object.fromEntries(last.lines.map(l => [l.exposureId, l.hedgeRatio]))
-            : {};
+        const adopted = last?.policyAdopted ? bandMidpoint(last.policyAdopted) : null;
+        const previous = last ? Object.fromEntries(last.lines.map(l => [l.exposureId, l.hedgeRatio])) : {};
         const hedges = {};
         for (const exp of activeExposures(run)) {
-            const wanted = Object.hasOwn(previous, exp.id) ? previous[exp.id] : policyDefault(run);
+            const wanted = adopted ?? (Object.hasOwn(previous, exp.id) ? previous[exp.id] : 0);
             hedges[exp.id] = snapDown(Math.min(wanted, maxHedgeRatio(run, exp)));
         }
         return { hedges, buyPowerUp: null, eventChoice: null, proposePolicy: null };
@@ -400,8 +407,15 @@ export class RunController {
                 this.storage.removeQueuedScore(payload.gameId);
                 result.queued = false;
                 if (res && !res.duplicate && Number.isFinite(res.rank)) result.rank = res.rank;
-            } catch {
-                // Offline or rejected: it stays queued, and flushScoreQueue retries it (or drops a bad one).
+            } catch (err) {
+                // Refused for good (R63): drop it and say why. Otherwise (offline, 401, 408, 429, 5xx) it stays
+                // queued, and flushScoreQueue retries it.
+                if (isFinalRejection(err)) {
+                    this.storage.removeQueuedScore(payload.gameId);
+                    result.queued = false;
+                    result.rejected = true;
+                    result.rejectedReason = rejectionText(err.message);
+                }
             }
             if (typeof this.api.flushScoreQueue === 'function') {
                 Promise.resolve().then(() => this.api.flushScoreQueue()).catch(() => {});

@@ -22,6 +22,7 @@ import { cosmeticRng } from './simple/RunController.js';
 import { startRun } from './simple/IndustryScreen.js';
 import { createTapGuard } from '../ui/tapGuard.js';
 import * as realApi from '../utils/api.js';
+import { isFinalRejection, rejectionText } from '../utils/scoreRejection.js';
 import * as realStorage from '../utils/storage.js';
 
 export const COUNT_MS = 1500;           // score count-up
@@ -58,12 +59,14 @@ export function endingQuip(quips, status, severe, rng) {
     return rng.pick(pool);
 }
 
-// The leaderboard line for a ranked run's outcome: { rank, queued, storageFailed, pending?, notRegistered? }.
+// The leaderboard line for a ranked run's outcome:
+// { rank, queued, storageFailed, pending?, notRegistered?, rejected?, rejectedReason? }.
 export function rankText(o) {
     if (!o) return '';
     const parts = [];
     if (o.pending) parts.push('Submitting your score…');
     else if (Number.isFinite(o.rank)) parts.push(`Rank #${o.rank} on the leaderboard`);
+    else if (o.rejected) parts.push(o.rejectedReason || rejectionText());
     else if (o.queued) parts.push('Queued, will submit when online');
     else if (o.notRegistered) parts.push('Register to get on the leaderboard');
     else if (!o.storageFailed) parts.push('Score submitted');
@@ -301,8 +304,15 @@ export class GameOverScreen {
                 storage.removeQueuedScore(payload.gameId);
                 result.queued = false;
                 if (res && !res.duplicate && Number.isFinite(res.rank)) result.rank = res.rank;
-            } catch {
-                // Offline or rejected: it stays queued and flushScoreQueue retries it.
+            } catch (err) {
+                // Refused for good (R63): drop it and say why. Otherwise it stays queued and flushScoreQueue
+                // retries it.
+                if (isFinalRejection(err)) {
+                    storage.removeQueuedScore(payload.gameId);
+                    result.queued = false;
+                    result.rejected = true;
+                    result.rejectedReason = rejectionText(err.message);
+                }
             }
             Promise.resolve().then(() => api.flushScoreQueue?.()).catch(() => {});
             // Only while the same player is registered, so the progress is never sent with someone else's token.

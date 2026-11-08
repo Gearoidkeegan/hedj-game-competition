@@ -174,7 +174,7 @@ test('score rejects 10001, quartersPlayed 9, too-fast run, bad name', async () =
     const r = await register(deps);
     const cases = [
         { score: 10001 }, { score: -1 }, { score: 12.5 }, { score: '9' }, { quartersPlayed: 9 }, { quartersPlayed: 0 },
-        { mode: 'career' }, { startedAt: T0 - 59_999 }, { startedAt: T0 + MIN }, { startedAt: undefined },
+        { mode: 'career' }, { startedAt: T0 - 23_999 }, { startedAt: T0 + MIN }, { startedAt: undefined },
         { playerName: '<script>' }, { playerName: 'a'.repeat(21) }, { company: 'x<y' }, { company: 'c'.repeat(61) }
     ];
     for (const over of cases) {
@@ -183,6 +183,26 @@ test('score rejects 10001, quartersPlayed 9, too-fast run, bad name', async () =
     }
     const edge = await submit(deps, scoreBody(r.gameToken, { score: 10000, quartersPlayed: 8, startedAt: T0 - MIN }));
     assert.equal(edge.statusCode, 200);
+});
+
+test('the run-time floor scales with quarters played: max(15 s, 3 s per quarter) (R63)', async () => {
+    const { deps } = setup();
+    const r = await register(deps);
+    const cases = [
+        { quartersPlayed: 8, floor: 24_000 },
+        { quartersPlayed: 2, floor: 15_000 },
+        { quartersPlayed: 1, floor: 15_000 },
+        { quartersPlayed: 5, floor: 15_000 },
+        { quartersPlayed: 6, floor: 18_000 }
+    ];
+    let n = 0;
+    for (const { quartersPlayed, floor } of cases) {
+        const short = await submit(deps, scoreBody(r.gameToken, { gameId: `f${++n}`, quartersPlayed, startedAt: T0 - floor + 1 }));
+        assert.equal(short.statusCode, 400, `${quartersPlayed} quarters, 1 ms short`);
+        assert.equal(JSON.parse(short.body).error, 'Run too short');
+        const ok = await submit(deps, scoreBody(r.gameToken, { gameId: `f${++n}`, quartersPlayed, startedAt: T0 - floor }));
+        assert.equal(ok.statusCode, 200, `${quartersPlayed} quarters at exactly ${floor} ms`);
+    }
 });
 
 test('score rejects wrong token, unknown player and expired token', async () => {

@@ -81,3 +81,29 @@ test('HCompBest ByScore projection covers what the prize export reads', () => {
     const idx = yaml.split('HCompBest:')[1].split('HCompAnalytics:')[0].split('IndexName: ByScore')[1];
     assert.match(idx, /ProjectionType: ALL/); // email, playerName, company, score
 });
+
+test('every function runs on nodejs22.x (R62: nodejs20.x is past end of life)', () => {
+    const runtimes = yaml.match(/Runtime: \S+/g) || [];
+    assert.ok(runtimes.length >= 1);
+    for (const r of runtimes) assert.equal(r, 'Runtime: nodejs22.x');
+    assert.ok(!yaml.includes('nodejs20'));
+});
+
+test('the admin key is only in the environment of the two functions that check it (M6)', () => {
+    const globals = yaml.split('Globals:')[1].split('Resources:')[0];
+    assert.ok(!globals.includes('ADMIN_KEY'), 'not in Globals');
+    const block = (name, next) => yaml.split(`  ${name}:`)[1].split(`  ${next}:`)[0];
+    const blocks = {
+        RegisterFunction: block('RegisterFunction', 'ScoreFunction'),
+        ScoreFunction: block('ScoreFunction', 'LeaderboardFunction'),
+        LeaderboardFunction: block('LeaderboardFunction', 'AnalyticsFunction'),
+        AnalyticsFunction: block('AnalyticsFunction', 'AdminFunction'),
+        AdminFunction: block('AdminFunction', 'ProgressFunction'),
+        ProgressFunction: yaml.split('  ProgressFunction:')[1].split('Outputs:')[0]
+    };
+    for (const [name, b] of Object.entries(blocks)) {
+        const has = /Environment:\s+Variables:\s+ADMIN_KEY: !Ref AdminKey/.test(b);
+        assert.equal(has, name === 'AnalyticsFunction' || name === 'AdminFunction', name);
+        if (name !== 'AnalyticsFunction' && name !== 'AdminFunction') assert.ok(!b.includes('ADMIN_KEY'), name);
+    }
+});

@@ -218,6 +218,17 @@ test('rank text: offline, the score is queued', async () => {
     assert.equal(q('.go-rank').textContent, 'Queued, will submit when online');
 });
 
+test('rank text: a score the server refused says so, instead of Queued (R63)', async () => {
+    assert.equal(rankText({ ranked: true, rank: null, queued: false, rejected: true, rejectedReason: 'Score not accepted: run too short' }),
+        'Score not accepted: run too short');
+    assert.equal(rankText({ ranked: true, rank: null, queued: false, rejected: true }), 'Score not accepted: the server refused it');
+    const rc = stubRc();
+    const { q } = mountGameOver(makeApp(rc));
+    rc.resolve({ rank: null, queued: false, rejected: true, rejectedReason: 'Score not accepted: run too short' });
+    await flush();
+    assert.equal(q('.go-rank').textContent, 'Score not accepted: run too short');
+});
+
 test("rank text: storage failure says the score couldn't be saved", async () => {
     assert.equal(rankText({ ranked: true, rank: null, queued: false, storageFailed: true }),
         "Your score couldn't be saved on this device");
@@ -381,6 +392,18 @@ test('Pro: offline keeps the score queued; a re-render does not submit or count 
     await flush();
     assert.equal(api.calls.length, 1);
     assert.equal(storage.getProgress('ann@x.com').runs, 1);
+});
+
+test('Pro: a score the server refuses for good is dropped from the queue and shown as not accepted (R63)', async () => {
+    proState({ status: 'complete' });
+    const api = fakeApi();
+    api.submitScore = async function (p) { this.calls.push(p); throw Object.assign(new Error('Run too short'), { status: 400 }); };
+    const m = mountGameOver(makeApp(null, 'pro'), { api });
+    await flush();
+    await flush();
+    assert.equal(m.q('.go-rank').textContent, 'Score not accepted: run too short');
+    assert.deepEqual(storage.getQueuedScores(), []);
+    assert.equal(storage.getProgress('ann@x.com').runs, 1, 'the local record still counts the run');
 });
 
 // ── Integration: forced bankruptcy through the real controller (brief step 3, in Node) ──

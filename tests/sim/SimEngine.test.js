@@ -367,11 +367,17 @@ test('GBP exposure unlocks at Q4', () => {
     assert.ok(activeExposures({ ...run, quarter: 4 }).some(e => e.id === 'gbp-revenue'));
 });
 
-test('a zero or missing start rate is treated as no move', () => {
+test('a zero start rate, or a missing one with no data this quarter, is treated as no move', () => {
     const base = newRun();
-    for (const bad of [0, null]) {
+    const start = { year: base.startYear, quarter: 1 };
+    // No JETNWE data at the run's first quarter, so the missing rate can't be seeded (I4).
+    const gappy = {
+        getDataset: u => marketEngine.getDataset(u),
+        getRate: (u, y, q) => (u === 'JETNWE' && y === start.year && q === start.quarter ? null : marketEngine.getRate(u, y, q))
+    };
+    for (const [bad, market] of [[0, marketEngine], [null, gappy]]) {
         const run = { ...base, rates: { ...base.rates, JETNWE: bad } };
-        const { summary } = simulateQuarter(run, decide(hedgesAt(run, 0.5)), marketEngine, content);
+        const { summary } = simulateQuarter(run, decide(hedgesAt(run, 0.5)), market, content);
         const fuel = summary.lines.find(l => l.exposureId === 'fuel');
         assert.equal(fuel.movePct, 0);
         assert.equal(fuel.exposureImpact, 0);
@@ -380,7 +386,56 @@ test('a zero or missing start rate is treated as no move', () => {
     }
 });
 
+test('a missing start rate is seeded from this quarter when the data exists (I4)', () => {
+    const base = newRun();
+    const { JETNWE: _dropped, ...rest } = base.rates;
+    const run = { ...base, rates: rest };
+    const { summary } = simulateQuarter(run, decide(hedgesAt(run, 0.5)), marketEngine, content);
+    const ref = simulateQuarter(base, decide(hedgesAt(base, 0.5)), marketEngine, content).summary;
+    assert.deepEqual(summary, ref, 'same result as a run whose rate was set at creation');
+});
+
 test('out-of-range hedge ratio throws', () => {
     const run = newRun();
     assert.throws(() => simulateQuarter(run, decide({ fuel: 1.5 }), marketEngine, content));
+});
+
+// I4: an exposure that unlocks mid-run on an underlying with no data at the start year's Q1 (DAIRY starts 2006,
+// COPPER after 2000 Q1) used to show a 0.00% move every quarter. Its rate is now seeded when it becomes active.
+for (const [industryId, year, exposureId] of [['agrifoods', 2005, 'dairy'], ['tech', 2000, 'copper']]) {
+    test(`${industryId} ${year}: ${exposureId} moves after it unlocks mid-run`, () => {
+        const industry = loadIndustries().find(i => i.id === industryId);
+        const exp = industry.exposures.find(e => e.id === exposureId);
+        assert.ok(exp.unlockQuarter > 0);
+        assert.equal(marketEngine.getRate(exp.underlying, year, 1), null, 'the case under test: no data at Q1');
+        let run = createRun({ industry, seed: 777, startedAt: 1700000000000, market: marketEngine, forcedYear: year });
+        assert.equal(run.startYear, year);
+        run = { ...run, mandate: { min: 0, max: 1 }, boardType: 'band' };
+        const moves = [];
+        while (!isRunOver(run)) {
+            // Keep the run alive so every quarter is played; only the market lines matter here.
+            run = { ...run, boardMood: 100, cash: run.startingCash, pendingEvent: null };
+            const { run: next, summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), marketEngine, content);
+            const line = summary.lines.find(l => l.exposureId === exposureId);
+            if (line) moves.push(line);
+            run = next;
+        }
+        assert.equal(run.history.length, 8);
+        assert.equal(moves.length, 8 - exp.unlockQuarter, 'one line per active quarter');
+        assert.ok(moves.some(l => l.movePct !== 0 && l.exposureImpact !== 0), JSON.stringify(moves.map(l => l.movePct)));
+    });
+}
+
+test('seeding a late rate draws no random numbers: the same seed replays identically', () => {
+    const industry = loadIndustries().find(i => i.id === 'agrifoods');
+    const play = () => {
+        let run = createRun({ industry, seed: 4242, startedAt: 1700000000000, market: marketEngine, forcedYear: 2005 });
+        run = { ...run, mandate: { min: 0, max: 1 }, boardType: 'band' };
+        while (!isRunOver(run)) {
+            run = { ...run, boardMood: 100, cash: run.startingCash, pendingEvent: null };
+            run = simulateQuarter(run, decide(hedgesAt(run, 0.3)), marketEngine, content).run;
+        }
+        return run;
+    };
+    assert.deepEqual(play(), play());
 });

@@ -28,7 +28,7 @@ function fakeFetch(statusFor) {
     calls = [];
     globalThis.fetch = async (url, opts) => {
         const body = opts?.body ? JSON.parse(opts.body) : null;
-        calls.push({ url, body, headers: opts?.headers });
+        calls.push({ url, body, headers: opts?.headers, cache: opts?.cache });
         const status = statusFor(body, url);
         return {
             ok: status >= 200 && status < 300,
@@ -159,4 +159,10 @@ test('getRemoteProgress sends the player headers and returns null without a toke
     await getRemoteProgress();
     assert.equal(calls[0].headers['x-game-token'], 'tok');
     assert.equal(calls[0].headers['x-player-email'], A);
+});
+
+test('fetchLeaderboard bypasses the browser cache, so a player sees their own fresh entry (M2)', async () => {
+    fakeFetch(() => 200);
+    await fetchLeaderboard({ mode: 'simple', period: 'event' });
+    assert.equal(calls[0].cache, 'no-store');
 });

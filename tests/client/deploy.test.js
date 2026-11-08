@@ -155,3 +155,15 @@ test('fonts ship as font/woff2 with a long immutable cache', () => {
     assert.ok(fontStep.includes('max-age=31536000, immutable'));
     assert.ok(fontStep.includes('--include "*.woff2"'));
 });
+
+test('the backend job builds on Node 22, matching the Lambda runtime (R62)', () => {
+    assert.match(job('backend'), /node-version: '22'/);
+    assert.ok(!/node-version: '20'/.test(wf()));
+});
+
+test('every leaderboard URL in the cutover runbook uses a period the API accepts (M5)', () => {
+    const doc = read('docs/cutover.md');
+    const periods = [...doc.matchAll(/\/api\/leaderboard\?[^"'\s`]*period=([a-z]+)/g)].map(m => m[1]);
+    assert.ok(periods.length >= 1, 'the runbook smoke-tests the leaderboard');
+    for (const p of periods) assert.ok(['event', 'today'].includes(p), `period=${p}`);
+});

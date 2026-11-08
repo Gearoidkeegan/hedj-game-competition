@@ -127,7 +127,6 @@ export function initAdmin(env = {}) {
 
     function downloadCSV() {
         if (!playersData.length) return;
-        const csvEscape = v => `"${(v || '').replace(/"/g, '""')}"`;
         const rows = [
             'Name,Email,Company,Registered At,Marketing Consent',
             ...playersData.map(p =>
@@ -181,6 +180,15 @@ export function initAdmin(env = {}) {
     }
 
     return { ready, login, refresh, downloadCSV, downloadPrize };
+}
+
+// The R20 formula guard, mirrored from backend/handlers/admin.mjs csvEscape (that module pulls in the AWS SDK, so
+// the browser can't import it); tests/client/admin.test.js pins the two together. Prefix ' on values a spreadsheet
+// would read as a formula (= + - @ tab CR), and coerce non-strings.
+export function csvEscape(v) {
+    let str = typeof v === 'string' ? v : String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+    return `"${str.replace(/"/g, '""')}"`;
 }
 
 function esc(s) {

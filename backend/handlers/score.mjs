@@ -5,7 +5,9 @@ import { loadPlayer } from '../lib/auth.mjs';
 import { validCompany, dublinDate, ttlSeconds } from '../lib/util.mjs';
 
 const SCORE_MAX = 10000;
-const MIN_RUN_MS = 60000;
+// A plausibility check, not anti-cheat (R19, R63): a run must last at least max(15 s, 3 s per quarter played).
+const MIN_RUN_MS = 15000;
+const MIN_MS_PER_QUARTER = 3000;
 const INDUSTRY_RE = /^[a-z0-9_-]{1,40}$/;
 const MODES = ['simple', 'pro'];
 
@@ -57,7 +59,8 @@ export function createHandler(deps) {
             if (!Number.isInteger(quartersPlayed) || quartersPlayed < 1 || quartersPlayed > 8) {
                 return json(400, { error: 'quartersPlayed must be between 1 and 8' });
             }
-            if (!Number.isFinite(startedAt) || nowMs - startedAt < MIN_RUN_MS) {
+            const minRunMs = Math.max(MIN_RUN_MS, quartersPlayed * MIN_MS_PER_QUARTER);
+            if (!Number.isFinite(startedAt) || nowMs - startedAt < minRunMs) {
                 return json(400, { error: 'Run too short' });
             }
             if (typeof industryId !== 'string' || !INDUSTRY_RE.test(industryId)) {
