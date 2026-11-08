@@ -379,6 +379,8 @@ export class QuarterScreen {
         const off = offPolicyExposures(this.run, this.decisions, this.app.content?.events || []);
         if (off.length && !this.confirming) {
             this.confirming = true;
+            // RUN ANYWAY appears in RUN's footer slot: re-arm so a double tap can't confirm the off-policy quarter.
+            this.tapGuard.arm();
             this._refresh();
             return;
         }

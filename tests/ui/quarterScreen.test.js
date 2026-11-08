@@ -245,13 +245,14 @@ test('R51: an unreachable band shows the conflict on the dial and puts facilitie
 });
 
 test('R51: off-policy decisions need a confirm tap before RUN; ADJUST cancels', () => {
-    const { q, run, played, step } = setup(SEED.band75100);
+    const { q, run, played, step, clock } = setup(SEED.band75100);
     run.click();
     assert.equal(played.length, 0, 'not played yet');
     const confirm = q('.q-confirm');
     assert.equal(confirm.hidden, false);
     assert.equal(confirm.querySelector('p').textContent, OFF_POLICY_PROMPT);
     assert.equal(OFF_POLICY_PROMPT, "Outside the board's policy — run anyway?");
+    clock.t += TAP_GUARD_MS;   // opening the prompt re-arms the tap guard
     q('.q-adjust').click();
     assert.equal(confirm.hidden, true);
     assert.equal(played.length, 0);
@@ -259,6 +260,7 @@ test('R51: off-policy decisions need a confirm tap before RUN; ADJUST cancels', 
     step('usd-revenue', 0.25).click();   // any change withdraws the prompt
     assert.equal(confirm.hidden, true);
     run.click();
+    clock.t += TAP_GUARD_MS;
     q('.q-run-anyway').click();
     assert.equal(played.length, 1);
     assert.equal(played[0].hedges['usd-revenue'], 0.25);
@@ -452,6 +454,18 @@ test('controller: content loaded but the id is unknown drops the event and saves
         assert.equal(failed.currentRun().pendingEvent, 'nope');
         assert.equal(failed.eventMissing(), true);
     } finally { console.warn = warn; }
+});
+
+test('R53: a double tap on RUN cannot confirm an off-policy quarter (the prompt re-arms the guard)', () => {
+    const { q, run, played, clock } = setup(SEED.band75100);
+    run.click();
+    assert.equal(q('.q-confirm').hidden, false, 'off-policy prompt opens');
+    clock.t += TAP_GUARD_MS - 1;
+    q('.q-run-anyway').click();   // the second tap of a double tap lands in the same footer slot
+    assert.equal(played.length, 0, 'RUN ANYWAY ignored inside the re-armed window');
+    clock.t += 1;
+    q('.q-run-anyway').click();
+    assert.equal(played.length, 1);
 });
 
 test('R53: RUN ignores taps in the first 600 ms after mount (a double tap from NEXT), then works', () => {
