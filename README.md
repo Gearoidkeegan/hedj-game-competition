@@ -82,7 +82,7 @@ hedj-game-competition/
 │   │   └── ForecastEngine.js      # Notional variance (forecast uncertainty)
 │   │
 │   ├── screens/                   # UI screens
-│   │   ├── TitleScreen.js         # Main menu, attract mode (kiosk)
+│   │   ├── TitleScreen.js         # Main menu
 │   │   ├── RegistrationScreen.js  # Competition sign-up form
 │   │   ├── SetupScreen.js         # Industry / policy / difficulty selection
 │   │   ├── DashboardScreen.js     # Main gameplay UI
@@ -369,8 +369,7 @@ Upload all files except `backend/` to the S3 bucket. Invalidate the CloudFront d
 
 ```javascript
 {
-  apiBase: '/api',           // API Gateway base path (CloudFront rewrites /api/*)
-  attractModeIdleMs: 300000  // Kiosk attract mode delay (5 minutes)
+  apiBase: '/api'            // API Gateway base path (CloudFront rewrites /api/*)
 }
 ```
 

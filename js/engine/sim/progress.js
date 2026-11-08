@@ -41,7 +41,6 @@ function union(a, b) {
     return [...new Set([...(a || []), ...(b || [])])];
 }
 
-
 // Normalisation mirrors backend/lib/progress.mjs (the authority): ids must match the sync pattern,
 // arrays are de-duplicated and capped at 50, runs is a floored count, bests are rounded and clamped to 0..10000.
 const SCORE_MAX = 10000;

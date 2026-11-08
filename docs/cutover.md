@@ -118,28 +118,35 @@ Names used below:
 
 ## E. One-off bucket cleanup
 
-Earlier deploys synced some dev files into the public bucket. Excluded paths are never deleted by later deploys, so
-remove them once by hand. **Run each command with `--dryrun` first, read what it would delete, then run it again
-without `--dryrun`.**
+Earlier deploys synced some dev files into the public bucket, including the backend source, tools, workflows and
+editor settings. Excluded paths are never deleted by later deploys, so remove them once by hand. **Run E2 and E3 with
+`DRY=--dryrun` first, read what they would delete, then set `DRY=` (empty) and run them again for real.**
 
 - [ ] **E1. See what is there:**
       ```sh
       aws s3 ls s3://hedj-comp-assets-eu-north-1/ --region eu-north-1
       ```
+      Note any other root `*.md` file it lists, and add it to E3.
 - [ ] **E2. Folders** (dry run, then for real):
       ```sh
-      for p in tests docs node_modules .superpowers; do
-        aws s3 rm "s3://hedj-comp-assets-eu-north-1/$p/" --recursive --region eu-north-1 --dryrun
+      DRY=--dryrun   # second pass: DRY=
+      for p in tests docs node_modules .superpowers backend tools .github .claude; do
+        aws s3 rm "s3://hedj-comp-assets-eu-north-1/$p/" --recursive --region eu-north-1 $DRY
       done
       ```
 - [ ] **E3. Single files** (dry run, then for real):
       ```sh
-      for f in package.json package-lock.json "Open Game.url" "Individual industry sample images.png"; do
-        aws s3 rm "s3://hedj-comp-assets-eu-north-1/$f" --region eu-north-1 --dryrun
+      DRY=--dryrun   # second pass: DRY=
+      for f in package.json package-lock.json README.md .gitignore "Open Game.url" "Individual industry sample images.png"; do
+        aws s3 rm "s3://hedj-comp-assets-eu-north-1/$f" --region eu-north-1 $DRY
       done
       ```
-- [ ] **E4. Check:** `https://competition.hedj.eu/docs/game-qr.png` and `https://competition.hedj.eu/package.json`
-      should now give 403 or 404.
+- [ ] **E4. Check:** each of these should now give 403 or 404:
+      ```sh
+      for u in docs/game-qr.png package.json README.md backend/template.yaml tools/simulate.js .github/workflows/deploy.yml; do
+        printf '%s ' "$u"; curl -s -o /dev/null -w '%{http_code}\n' "https://competition.hedj.eu/$u"
+      done
+      ```
 
 ## F. Attach the CloudFront security headers policy
 
@@ -313,6 +320,10 @@ back **both** halves. During the dry run (before H), fixing forward is usually q
       `HCompBest` table from the stack: the table itself is retained, with its data, outside the stack.
       `HCompPlayers`, `HCompScores` and `HCompAnalytics` are kept as before (the v2 template drops their Retain
       policy again, which is a metadata change only).
+
+      **The two old workflows run at the same time, with no ordering between them,** so for a few minutes the v2
+      frontend may talk to the v3 API or the v3 frontend to the v2 API, and scores submitted then can fail. That is
+      acceptable for a rollback: do it outside play, and check both workflows finished green before reopening.
 - [ ] **J4. If GitHub Actions is unavailable,** restore by hand from the backups in A3 and A4:
       ```sh
       aws s3 sync ./comp-bucket-backup-<date>/ s3://hedj-comp-assets-eu-north-1/ --delete --region eu-north-1
