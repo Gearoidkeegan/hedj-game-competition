@@ -45,3 +45,19 @@ export function pnlClass(amount) {
     if (amount < 0) return 'pnl-negative';
     return 'pnl-neutral';
 }
+
+const CURRENCY_SYMBOLS = { EUR: '€', USD: '$', GBP: '£', JPY: '¥' };
+
+// Short money for the v3 phone screens: "€512.3m", "$1.25bn", "-£4.2m", "€13k", "CHF 800".
+export function formatCash(amount, currency = 'EUR') {
+    const n = Number.isFinite(amount) ? amount : 0;
+    const sym = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
+    const abs = Math.abs(n);
+    const sign = n < 0 ? '-' : '';
+    let body;
+    if (abs >= 1e9) body = `${(abs / 1e9).toFixed(2)}bn`;
+    else if (abs >= 1e6) body = `${(abs / 1e6).toFixed(1)}m`;
+    else if (abs >= 1e3) body = `${(abs / 1e3).toFixed(0)}k`;
+    else body = abs.toFixed(0);
+    return `${sign}${sym}${body}`;
+}

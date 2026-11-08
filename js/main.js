@@ -17,13 +17,15 @@ import { GameOverScreen } from './screens/GameOverScreen.js';
 import { HowToPlayScreen } from './screens/HowToPlayScreen.js';
 import { RegistrationScreen } from './screens/RegistrationScreen.js';
 import { RunController } from './screens/simple/RunController.js';
+import { IndustryScreen } from './screens/simple/IndustryScreen.js';
+import { QuarterScreen } from './screens/simple/QuarterScreen.js';
 import * as api from './utils/api.js';
 import * as storage from './utils/storage.js';
 
 const { trackEvent, submitScore, flushScoreQueue } = api;
 const { getRegistration, getPendingScore, clearPendingScore } = storage;
 
-// Stand-in for the Simple screens that B2 (industry, quarter) and B3 (result) build.
+// Stand-in for the Simple result screen that B3 builds.
 class PlaceholderScreen {
     constructor(app, name) {
         this.app = app;
@@ -54,6 +56,7 @@ class App {
         this.content = { industries: [], events: [], quips: null, powerups: null };
         this.marketReady = Promise.resolve();
         this.runController = null;
+        this.lastQuarter = null;   // the latest runController.playQuarter() result, for the result screen (B3)
     }
 
     async init() {
@@ -68,8 +71,8 @@ class App {
             title: new TitleScreen(this),
             registration: new RegistrationScreen(this),
             // Simple mode (v3)
-            industry: new PlaceholderScreen(this, 'industry'),
-            quarter: new PlaceholderScreen(this, 'quarter'),
+            industry: new IndustryScreen(this),
+            quarter: new QuarterScreen(this),
             result: new PlaceholderScreen(this, 'result'),
             gameover: new GameOverScreen(this),
             // Pro mode
@@ -160,6 +163,8 @@ class App {
         if (screenId === 'setup' || screenId === 'industry') {
             const reg = getRegistration();
             if (!reg || reg.gameTokenExpiry < Date.now()) {
+                // After registering, carry on to where the player was going.
+                if (this.screens.registration) this.screens.registration.nextScreen = screenId;
                 screenId = 'registration';
             }
         }
