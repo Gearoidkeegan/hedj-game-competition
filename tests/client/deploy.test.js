@@ -155,3 +155,8 @@ test('fonts ship as font/woff2 with a long immutable cache', () => {
     assert.ok(fontStep.includes('max-age=31536000, immutable'));
     assert.ok(fontStep.includes('--include "*.woff2"'));
 });
+
+test('the backend job builds on Node 22, matching the Lambda runtime (R62)', () => {
+    assert.match(job('backend'), /node-version: '22'/);
+    assert.ok(!/node-version: '20'/.test(wf()));
+});

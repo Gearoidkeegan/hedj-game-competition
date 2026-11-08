@@ -81,3 +81,10 @@ test('HCompBest ByScore projection covers what the prize export reads', () => {
     const idx = yaml.split('HCompBest:')[1].split('HCompAnalytics:')[0].split('IndexName: ByScore')[1];
     assert.match(idx, /ProjectionType: ALL/); // email, playerName, company, score
 });
+
+test('every function runs on nodejs22.x (R62: nodejs20.x is past end of life)', () => {
+    const runtimes = yaml.match(/Runtime: \S+/g) || [];
+    assert.ok(runtimes.length >= 1);
+    for (const r of runtimes) assert.equal(r, 'Runtime: nodejs22.x');
+    assert.ok(!yaml.includes('nodejs20'));
+});
