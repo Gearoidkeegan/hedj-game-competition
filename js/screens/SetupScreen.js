@@ -266,9 +266,7 @@ export class SetupScreen {
             'CORN': 4.5 + rng.floatRange(-0.8, 0.8),
             'GOLD': 1900 + rng.floatRange(-200, 200),
             'COFFEE': 150 + rng.floatRange(-40, 60),
-            'EURIBOR': 0.035 + rng.floatRange(-0.015, 0.015),
-            'SOFR': 0.05 + rng.floatRange(-0.02, 0.02),
-            'SONIA': 0.05 + rng.floatRange(-0.02, 0.02)
+            'EURIBOR': 0.035 + rng.floatRange(-0.015, 0.015)
         };
 
         // Try to use real historical data, falling back to placeholders per-underlying

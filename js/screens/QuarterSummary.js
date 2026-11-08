@@ -181,7 +181,7 @@ export class QuarterSummaryScreen {
 
     renderExposureDetail(d, hasBudget, baseCcy, prevRates) {
         const decimals = d.underlying.includes('JPY') ? 2 : 4;
-        const isIR = d.underlying === 'EURIBOR' || d.underlying === 'SOFR' || d.underlying === 'SONIA';
+        const isIR = d.underlying === 'EURIBOR';
         const dec = isIR ? 4 : decimals;
         const forecastNotional = d.forecastNotional || 0;
         const realizedNotional = d.realizedNotional || forecastNotional;
@@ -233,7 +233,7 @@ export class QuarterSummaryScreen {
     }
 
     renderHedgeDetail(d, baseCcy) {
-        const isIR = d.underlying === 'EURIBOR' || d.underlying === 'SOFR' || d.underlying === 'SONIA';
+        const isIR = d.underlying === 'EURIBOR';
         const dec = isIR ? 4 : 4;
 
         return `

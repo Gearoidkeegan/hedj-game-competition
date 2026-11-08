@@ -11,6 +11,7 @@ export class RegistrationScreen {
     constructor(app) {
         this.app = app;
         this.el = null;
+        this.nextScreen = null;   // set by main.js when a run was requested before registering
     }
 
     render() {
@@ -149,7 +150,10 @@ export class RegistrationScreen {
                 gameToken: result.gameToken,
                 gameTokenExpiry: result.expiresAt
             });
-            this.app.showScreen('setup');
+            // Where the player was heading (main.js sets it on the redirect); the title otherwise ("Not you?").
+            const next = this.nextScreen || 'title';
+            this.nextScreen = null;
+            this.app.showScreen(next);
         } catch (err) {
             btn.disabled = false;
             btn.textContent = 'REGISTER & PLAY';
