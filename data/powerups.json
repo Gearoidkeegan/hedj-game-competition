@@ -5,7 +5,7 @@
         "levels": [
             "Module 1: forecast accuracy 40% to 60%. Surprises shrink a little.",
             "Module 2: forecast accuracy 60% to 80%. The shocks get smaller.",
-            "Module 3: forecast accuracy 80% to 100%. Almost no surprises left."
+            "Module 3: forecast accuracy 80% to 100%. No volume surprises left."
         ],
         "hedjLine": "In real life, Hedj turns messy cash forecasts into numbers you can hedge against."
     },

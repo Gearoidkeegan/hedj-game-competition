@@ -161,3 +161,11 @@ test('Pro fuel_spike and pe_acquisition do not promise choices they do not offer
         for (const s of copy) assert.doesNotMatch(s, promise, `${id} copy offers no choice: "${s}"`);
     }
 });
+
+test('forecasting module 3 copy matches the engine: no volume surprises at all (M9)', async () => {
+    const { forecastVariance } = await import('../../js/engine/sim/powerUps.js');
+    assert.equal(forecastVariance({ forecastLevel: 3, powerUps: { owned: [], used: [] } }), 0);
+    const module3 = loadJson('data/powerups.json').forecasting.levels[2];
+    assert.ok(!/almost/i.test(module3), module3);
+    assert.match(module3, /No volume surprises left\./);
+});
