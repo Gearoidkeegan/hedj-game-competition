@@ -47,7 +47,7 @@ The proposal is adopted after the quarter resolves: this quarter is still judged
   policy: 'in'|'off'|'none',   // A9: 'none' = no-policy board this quarter (Pro emits it too)
   inMandate: boolean|null,     // policy === 'in'; null when policy === 'none'
   playerDelta: number, benchmarkDelta: number,
-  marketResult: number,   // Σ(exposureImpact + hedgeImpact) this quarter (excludes baseOcf, events, power-ups)
+  marketResult: number,   // Σ(exposureImpact + hedgeImpact + costImpact) this quarter; costImpact is absent/0 in Simple (R54) (excludes baseOcf, events, power-ups)
   breach: 'none'|'lucky'|'loss',   // 'none' if in policy or no policy; else 'lucky' if marketResult ≥ 0, 'loss' if < 0
   severe: boolean,   // A8/R35: breach === 'loss' and marketResult ≤ −BALANCE.severeBreachLossPct × startingCash (fires at once)
   cashAfter: number, benchmarkCashAfter: number, redLine: number, boardMoodAfter: number,
