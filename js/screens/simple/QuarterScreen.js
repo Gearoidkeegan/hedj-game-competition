@@ -106,6 +106,7 @@ export class QuarterScreen {
         this.decisions = { hedges: { ...defaults.hedges }, buyPowerUp: null, eventChoice: null, proposePolicy: null };
         this.confirming = false;
         this.busy = false;
+        this.eventBlocked = false;
         this.event = run.pendingEvent
             ? (this.app.content?.events || []).find(e => e.id === run.pendingEvent) || null
             : null;
@@ -126,7 +127,7 @@ export class QuarterScreen {
             h('div', { class: 'q-scene' }, this.sceneCanvas),
             this._boardCard(run),
             h('p', { class: 'q-policy', text: policyText(run) }),
-            this.event ? this._eventCard(this.event) : null,
+            this.event ? this._eventCard(this.event) : this.rc.eventMissing() ? this._eventErrorCard() : null,
             this.canPropose ? this._proposeCard() : null,
             h('div', { class: 'q-exposures' }, activeExposures(run).map(e => this._exposureCard(run, e))),
             this._powerUpSlot(run));
@@ -224,6 +225,22 @@ export class QuarterScreen {
             h('div', { class: 'q-choices' }, this.choiceBtns));
     }
 
+    // The content didn't load, so the pending event can't be shown. Never lock the run: offer a retry.
+    _eventErrorCard() {
+        this.eventBlocked = true;
+        return h('section', { class: 'q-event q-event-error', role: 'group', 'aria-label': 'Event' },
+            h('h2', { text: 'Event' }),
+            h('p', { class: 'q-event-text', text: "Couldn't load this event. Check your connection." }),
+            h('button', { class: 'btn q-retry', type: 'button', text: 'RETRY', on: { click: () => this._retryEvents() } }));
+    }
+
+    async _retryEvents() {
+        let ok = false;
+        try { ok = !!(await this.app.reloadEvents?.()); } catch { ok = false; }
+        if (ok) this.app.showScreen('quarter');   // rebuilds the screen with the event
+        else this.app.showToast?.("Still can't load the event. Try again.", 'error');
+    }
+
     _proposeCard() {
         this.policyBtns = POLICY_OPTIONS.map(opt => h('button', {
             class: 'btn q-policy-opt', type: 'button', 'aria-pressed': 'false',
@@ -279,8 +296,8 @@ export class QuarterScreen {
             const cantAfford = poor && id === 'facilities';
             return h('button', {
                 class: `pu-card${urgent ? ' is-urgent' : ''}${cantAfford ? ' is-unaffordable' : ''}`, type: 'button',
-                'data-powerup': id, 'aria-pressed': 'false', disabled: cantAfford,
-                on: { click: () => this._update(d => { d.buyPowerUp = d.buyPowerUp === id ? null : id; }) }
+                'data-powerup': id, 'aria-pressed': 'false', 'aria-disabled': cantAfford ? 'true' : null,
+                on: { click: () => cantAfford || this._update(d => { d.buyPowerUp = d.buyPowerUp === id ? null : id; }) }
             },
             h('span', { class: 'pu-head' },
                 h('span', { class: 'pu-name', text: card.name || id }),
@@ -331,12 +348,14 @@ export class QuarterScreen {
         for (const b of this.powerBtns || []) b.setAttribute('aria-pressed', String(b.getAttribute('data-powerup') === d.buyPowerUp));
 
         const needsChoice = !!this.event && !d.eventChoice;
+        const blocked = this.eventBlocked;
         const off = offPolicyExposures(run, d, this.app.content?.events || []);
-        this.runBtn.disabled = needsChoice || this.busy;
+        this.runBtn.disabled = needsChoice || blocked || this.busy;
         this.runBtn.hidden = this.confirming;
         this.confirmEl.hidden = !this.confirming;
         let status = '';
-        if (needsChoice) status = EVENT_FIRST;
+        if (blocked) status = "Couldn't load this event";
+        else if (needsChoice) status = EVENT_FIRST;
         else if (off.length) status = `Off policy: ${off.map(exposureTitle).join(', ')}`;
         else if (run.mandate) status = "Inside the board's policy";
         this.statusEl.textContent = status;
@@ -350,7 +369,7 @@ export class QuarterScreen {
     }
 
     _onRun() {
-        if (this.busy || (this.event && !this.decisions.eventChoice)) return;
+        if (this.busy || this.eventBlocked || (this.event && !this.decisions.eventChoice)) return;
         const off = offPolicyExposures(this.run, this.decisions, this.app.content?.events || []);
         if (off.length && !this.confirming) {
             this.confirming = true;

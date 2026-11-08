@@ -17,7 +17,8 @@ const dialMock = () => h('div', { class: 'gd-mock', 'aria-hidden': 'true' },
 const cashMock = () => h('div', { class: 'gd-mock', 'aria-hidden': 'true' },
     h('div', { class: 'gd-meter' }, h('span', { class: 'gd-meter-fill' }), h('span', { class: 'gd-meter-red' })),
     mockRow('Cash', '$4.2M', 'gd-ok'),
-    mockRow('Red line', '$1.5M', 'gd-bad'));
+    mockRow('Red line (board mood)', '$1.5M', 'gd-gold'),
+    mockRow('Bank calls below', '$0', 'gd-bad'));
 
 const beatMock = () => h('div', { class: 'gd-mock', 'aria-hidden': 'true' },
     mockRow('You', '+$180k', 'gd-ok'),
@@ -29,31 +30,34 @@ export const CARDS = [
         title: 'THE DIAL',
         mock: dialMock,
         points: [
-            'Each exposure has a dial: how much of it to hedge, from 0% to 100%.',
-            'Your board may have a hedging policy, a band like 50–75%. Stay inside it and the board stays happy.',
-            'Some boards say their policy is not to hedge. Others have no policy yet: your first move is to propose one.',
-            'Until a policy exists, the board judges every hedge on its own profit. That is the hardest board to please.',
-            'Bank lines cap you at 50%. Bigger Bank Facilities lifts the cap and adds a borrowing cushion.'
+            'Each exposure has a dial: how much of it to hedge, 0% to 100%.',
+            'Your board may set a policy, a band like 50–75%. Stay inside it.',
+            'Some boards say their policy is not to hedge. Others have none: propose one.',
+            'With no policy, the board judges each hedge on its own profit. Hardest to please.',
+            'Bank lines cap you at 50%. Bigger Bank Facilities lifts that and adds a cushion.'
         ]
     },
     {
         title: 'THE CASH METER',
         mock: cashMock,
         points: [
-            'Your cash is the score you can watch. Markets and events move it every quarter.',
-            'Fall below the red line and the bank calls, or the board replaces you.',
-            'One power-up a quarter: Cash Forecasting for better forecasts, Cash Visibility for a one-off cash find, Rate & Commodity Hedging to hedge more than currency.',
-            'An event may ask for a response before you can run the quarter.'
+            'Markets and events move your cash every quarter.',
+            'Cash below zero and the bank calls: the CFO is replaced. A cushion buys room.',
+            'Below the red line the board loses patience. Only its mood suffers.',
+            'One power-up a quarter. Cash Forecasting sharpens your forecasts.',
+            'Rate & Commodity Hedging lets you hedge interest rates and commodities.',
+            'Some events need a response before you can run the quarter.'
         ]
     },
     {
         title: 'BEAT DOING NOTHING',
         mock: beatMock,
         points: [
-            'Every quarter we also play out what would have happened if you had hedged nothing.',
-            'Beat that, and the board notices. Fall behind it, and board mood drops.',
-            'A run is 8 quarters, about 3 minutes. Hedge too little and you are exposed. Hedge off-policy and the board will say so.',
-            'Good luck, Treasurer.'
+            'Each quarter we also play out what hedging nothing would have done.',
+            'Beat that and the board warms to you a little.',
+            'The board fires you if its confidence runs out.',
+            'It also fires you at once after one very bad off-policy quarter.',
+            'A run is 8 quarters, about 3 minutes. Good luck, Treasurer.'
         ]
     }
 ];

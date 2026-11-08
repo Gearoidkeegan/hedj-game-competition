@@ -34,7 +34,13 @@ test('copy reflects the board model and avoids retired ideas', () => {
     const t = allText();
     for (const s of [/policy/i, /not to hedge/i, /propose/i, /Bigger Bank Facilities/, /Rate & Commodity Hedging/, /cap/i]) assert.match(t, s);
     assert.doesNotMatch(t, /career|strike/i);
-    for (const c of CARDS) for (const p of c.points) assert.ok(p.length < 200, p);
+    for (const c of CARDS) for (const p of c.points) assert.ok(p.length <= 90, `${p.length}: ${p}`);
+    // The loss rules match js/engine/sim/contract.md.
+    assert.match(t, /below zero and the bank calls/i);
+    assert.match(t, /red line the board loses patience/i);
+    assert.match(t, /fires you if its confidence runs out/i);
+    assert.match(t, /one very bad off-policy quarter/i);
+    assert.doesNotMatch(t, /fall behind|mood drops|red line and the bank/i);
 });
 
 test('NEXT walks the cards; the last one reads START GAME and finishes, marking the guide seen', () => {

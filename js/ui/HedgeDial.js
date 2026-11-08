@@ -9,7 +9,7 @@
 //   dial.setLockedReason(text)
 //   dial.destroy()
 //
-// Each detent is a button of at least 44px (css/v3.css). The track is a radiogroup (one tab stop) of five role="radio" buttons:
+// Each detent is a button of at least 44px (css/v3.css). The track is a radiogroup of five role="radio" buttons:
 // arrow keys move one detent, Home/End jump to 0 and the cap. Steps above `max` are locked (disabled and
 // hatched); `lockedReason` explains a dial whose cap is 0. The mandate band is shaded: none for a no-policy board
 // (mandate null), the 0 step for a "not to hedge" board ({0,0}), otherwise every step inside {min,max}.
@@ -40,7 +40,7 @@ export class HedgeDial {
             on: { click: () => this._pick(step) }
         }, h('span', { class: 'hd-step-label', text: pct(step) })));
         this.track = h('div', {
-            class: 'hd-track', role: 'radiogroup', tabindex: '0', 'aria-label': label
+            class: 'hd-track', role: 'radiogroup', 'aria-label': label
         }, this.steps);
         this.note = h('p', { class: 'hd-note', hidden: true });
         this.root = h('div', { class: 'hedge-dial' }, this.track, this.note);
@@ -107,6 +107,7 @@ export class HedgeDial {
         if (next === null) return;
         e.preventDefault();
         this._set(Math.max(0, Math.min(this.max, next)));
+        this.steps[DETENTS.indexOf(this._value)]?.focus?.();   // roving focus follows the selection
     }
 
     _inBand(step) {
@@ -125,6 +126,7 @@ export class HedgeDial {
             btn.classList.toggle('is-filled', step <= v + EPS && step > 0);
             btn.classList.toggle('is-band', this._inBand(step));
             btn.setAttribute('aria-checked', String(step === v));
+            btn.setAttribute('tabindex', step === v ? '0' : '-1');   // roving tabindex: one tab stop, on the checked radio
             btn.setAttribute('aria-label', locked ? `${pct(step)}, locked` : pct(step));
         });
         this.track.setAttribute('aria-disabled', String(this.max === 0));

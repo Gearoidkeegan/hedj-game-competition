@@ -19,6 +19,7 @@ class FakeStorage {
 
 const content = {
     industries: loadIndustries(),
+    eventsLoaded: true,
     events: loadJson('data/simple-events.json').events,
     quips: loadJson('data/quips.json'),
     powerups: loadJson('data/powerups.json')
@@ -344,7 +345,7 @@ test('R51: facilities is shown greyed out, with the reason, when the board needs
     const fac = q('[data-powerup="facilities"]');
     assert.ok(fac, 'still shown');
     assert.equal(qa('[data-powerup]')[0], fac, 'and first');
-    assert.equal(fac.disabled, true);
+    assert.equal(fac.getAttribute('aria-disabled'), 'true', 'aria-disabled keeps the reason readable');
     assert.ok(fac.classList.contains('is-unaffordable'));
     assert.match(fac.querySelector('.pu-reason').textContent, /^Can't afford it yet: you have /);
     fac.click();
@@ -379,4 +380,72 @@ test('unmount really stops the scene loop and removes its visibility listener', 
     screen.unmount();
     assert.equal(loop.running, false, 'stop() was called');
     assert.equal(dom.document.listeners.get('visibilitychange')?.length || 0, 0);
+});
+
+// ── Fix round 1: a failed content load must not destroy or lock a pending event ──
+
+test('events failed to load: the pending event is kept, nothing is saved, RUN is blocked with a retry', () => {
+    const ev = content.events.find(e => e.id === 'big_export_order');
+    const failed = { ...content, events: [], eventsLoaded: false };
+    const rc = new RunController({ storage, market: marketEngine, content: failed, now: () => 1_700_000_000_000 });
+    rc.start('airline', { seed: SEED.band2550 });
+    rc.run = { ...structuredClone(rc.run), pendingEvent: ev.id };
+    const saves = [];
+    const realSave = storage.saveRun;
+    rc._save = () => saves.push('save');
+    const app = { runController: rc, content: failed, shown: [], toasts: [],
+        showScreen(id) { this.shown.push(id); }, showToast(m, t) { this.toasts.push([m, t]); },
+        reloadEvents: async () => { failed.events = content.events; failed.eventsLoaded = true; return true; } };
+    const screen = new QuarterScreen(app);
+    const el = screen.render();
+    dom.document.body.appendChild(el);
+    assert.equal(rc.run.pendingEvent, ev.id, 'kept');
+    assert.deepEqual(saves, [], 'nothing persisted');
+    assert.ok(el.querySelector('.q-event-error'));
+    assert.match(el.querySelector('.q-event-error').textContent, /Couldn't load this event/);
+    const runBtn = el.querySelector('.q-run');
+    assert.equal(runBtn.disabled, true);
+    assert.equal(el.querySelector('.q-status').textContent, "Couldn't load this event");
+    runBtn.click();
+    assert.deepEqual(saves, []);
+    assert.ok(realSave);
+    return el.querySelector('.q-retry').click(), new Promise(r => setTimeout(r, 0)).then(() => {
+        assert.deepEqual(app.shown, ['quarter'], 'a successful retry rebuilds the quarter screen');
+        const again = new QuarterScreen(app).render();
+        assert.ok(again.querySelector('.q-event [data-choice]'), 'the event card is now shown');
+    });
+});
+
+test('a failed retry toasts and stays put', async () => {
+    const ev = content.events.find(e => e.id === 'big_export_order');
+    const failed = { ...content, events: [], eventsLoaded: false };
+    const rc = new RunController({ storage, market: marketEngine, content: failed, now: () => 1_700_000_000_000 });
+    rc.start('airline', { seed: SEED.band2550 });
+    rc.run = { ...structuredClone(rc.run), pendingEvent: ev.id };
+    const app = { runController: rc, content: failed, shown: [], toasts: [],
+        showScreen(id) { this.shown.push(id); }, showToast(m, t) { this.toasts.push([m, t]); }, reloadEvents: async () => false };
+    const el = new QuarterScreen(app).render();
+    el.querySelector('.q-retry').click();
+    await new Promise(r => setTimeout(r, 0));
+    assert.deepEqual(app.shown, []);
+    assert.equal(app.toasts.length, 1);
+});
+
+test('controller: content loaded but the id is unknown drops the event and saves; not loaded keeps it', () => {
+    const mk = loaded => {
+        const c = { ...content, eventsLoaded: loaded, events: loaded ? content.events : [] };
+        const rc = new RunController({ storage, market: marketEngine, content: c, now: () => 1_700_000_000_000 });
+        rc.start('airline', { seed: SEED.band2550 });
+        rc.run = { ...structuredClone(rc.run), pendingEvent: 'nope' };
+        return rc;
+    };
+    const warn = console.warn; console.warn = () => {};
+    try {
+        const loaded = mk(true);
+        assert.equal(loaded.currentRun().pendingEvent, null);
+        assert.equal(loaded.eventMissing(), false);
+        const failed = mk(false);
+        assert.equal(failed.currentRun().pendingEvent, 'nope');
+        assert.equal(failed.eventMissing(), true);
+    } finally { console.warn = warn; }
 });

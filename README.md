@@ -106,7 +106,7 @@ hedj-game-competition/
 │   └── responsive.css             # Mobile/tablet adaptations
 │
 ├── data/
-│   ├── industries.json            # Industry definitions (10+ industries)
+│   ├── industries.json            # Industry definitions (7 industries)
 │   ├── products.json              # Hedging instruments (forwards, options, swaps)
 │   ├── events.json                # Market shock event definitions
 │   ├── simple-events.json         # Simple-mode events (two choices each)
