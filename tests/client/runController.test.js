@@ -274,44 +274,75 @@ test('result quip selection follows the D1 rules', () => {
     assert.equal(key({}), 'calm');
 });
 
-test('default dials: band midpoint capped by the hedge limit, 0 with no policy, then the previous dials', () => {
+test('R65: Q1 dials all start at 0%, whatever the board', () => {
     const rc = controller();
     rc.start('airline', { seed: COMPLETE_SEED });
-    const set = (mandate, boardType) => { rc.run = { ...rc.run, mandate, boardType }; };
-    const fx = rc.run.exposures.find(e => e.type === 'fx' && e.unlockQuarter === 0).id;
-    const fuel = rc.run.exposures.find(e => e.type === 'commodity' && e.unlockQuarter === 0).id;
-
-    set({ min: 0.25, max: 0.5 }, 'band');
-    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0.5);
-    set({ min: 0.75, max: 1 }, 'band');
-    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0.5, 'capped at 50% before facilities');
-    assert.equal(rc.currentDecisionsDefaults().hedges[fuel], 0, 'commodity needs hedgeAccess');
-    rc.run = { ...rc.run, powerUps: { owned: ['facilities', 'hedgeAccess'], used: [] } };
-    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 1);
-    assert.equal(rc.currentDecisionsDefaults().hedges[fuel], 1);
-    set(null, 'none');
-    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0);
-    set({ min: 0, max: 0 }, 'noHedge');
-    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0);
-
-    set({ min: 0.5, max: 0.75 }, 'band');
-    const d = rc.currentDecisionsDefaults();
-    assert.deepEqual({ buyPowerUp: d.buyPowerUp, eventChoice: d.eventChoice, proposePolicy: d.proposePolicy },
-        { buyPowerUp: null, eventChoice: null, proposePolicy: null });
-    d.hedges[fx] = 0.25;
-    if (rc.run.pendingEvent) d.eventChoice = content.events.find(e => e.id === rc.run.pendingEvent).choices[0].id;
-    rc.playQuarter(d);
-    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0.25, 'after Q1 the previous dial is reused');
+    const set = (mandate, boardType, owned = []) => { rc.run = { ...rc.run, mandate, boardType, powerUps: { owned, used: [] } }; };
+    for (const [mandate, boardType, owned] of [
+        [{ min: 0.25, max: 0.5 }, 'band', []], [{ min: 0.75, max: 1 }, 'band', ['facilities', 'hedgeAccess']],
+        [null, 'none', []], [{ min: 0, max: 0 }, 'noHedge', []]
+    ]) {
+        set(mandate, boardType, owned);
+        const d = rc.currentDecisionsDefaults();
+        assert.deepEqual(Object.values(d.hedges), rc.run.exposures.filter(e => e.unlockQuarter === 0).map(() => 0), boardType);
+        assert.deepEqual({ buyPowerUp: d.buyPowerUp, eventChoice: d.eventChoice, proposePolicy: d.proposePolicy },
+            { buyPowerUp: null, eventChoice: null, proposePolicy: null });
+    }
 });
 
-test('after a policy is adopted the dials default to the new band', () => {
+test('R65: from Q2 each dial carries forward the ratio the player applied, capped by the hedge limit', () => {
+    const rc = controller();
+    rc.start('airline', { seed: COMPLETE_SEED });
+    rc.run = { ...rc.run, mandate: { min: 0.25, max: 0.5 }, boardType: 'band' };
+    const fx = rc.run.exposures.find(e => e.type === 'fx' && e.unlockQuarter === 0).id;
+    const fuel = rc.run.exposures.find(e => e.type === 'commodity' && e.unlockQuarter === 0).id;
+    const d = rc.currentDecisionsDefaults();
+    d.hedges[fx] = 0.25;
+    d.hedges[fuel] = 0.5;   // clamped to 0 by the engine: no hedgeAccess yet
+    if (rc.run.pendingEvent) d.eventChoice = content.events.find(e => e.id === rc.run.pendingEvent).choices[0].id;
+    rc.playQuarter(d);
+    const next = rc.currentDecisionsDefaults().hedges;
+    assert.equal(next[fx], 0.25, 'Q2 carries Q1 forward');
+    assert.equal(next[fuel], 0, 'the applied (clamped) ratio, not the requested one');
+});
+
+test('R65: an exposure that becomes active mid-run starts at 0%, while the others carry forward', () => {
+    const rc = controller();
+    rc.start('airline', { seed: COMPLETE_SEED });
+    const late = rc.run.exposures.find(e => e.type === 'fx' && e.unlockQuarter > 0);
+    const fx = rc.run.exposures.find(e => e.type === 'fx' && e.unlockQuarter === 0).id;
+    while (rc.run.quarter < late.unlockQuarter) {
+        // Keep the run going: an any-ratio policy, a calm board and plenty of cash.
+        rc.run = { ...rc.run, mandate: { min: 0, max: 1 }, boardType: 'band', boardMood: 100, cash: rc.run.startingCash };
+        const d = rc.currentDecisionsDefaults();
+        d.hedges[fx] = 0.5;
+        if (rc.run.pendingEvent) d.eventChoice = content.events.find(e => e.id === rc.run.pendingEvent).choices[0].id;
+        rc.playQuarter(d);
+        assert.equal(rc.run.status, 'playing');
+    }
+    const hedges = rc.currentDecisionsDefaults().hedges;
+    assert.ok(Object.hasOwn(hedges, late.id), 'the new exposure has a dial');
+    assert.equal(hedges[late.id], 0);
+    assert.equal(hedges[fx], 0.5);
+});
+
+test('R65: after the board adopts the policy the player proposed, the dials reset to its midpoint', () => {
     const rc = controller();
     rc.start('airline', { seed: NO_POLICY_SEED });
     const fx = rc.run.exposures.find(e => e.type === 'fx' && e.unlockQuarter === 0).id;
-    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0, 'no policy: no hedge');
-    rc.playQuarter(decide(rc));
+    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0, 'Q1 starts at 0');
+    const d = decide(rc);
+    d.hedges[fx] = 0.25;   // a ratio that would otherwise carry forward
+    rc.playQuarter(d);
+    assert.deepEqual(rc.run.history.at(-1).policyAdopted, { min: 0.5, max: 0.75 });
     assert.deepEqual(rc.run.mandate, { min: 0.5, max: 0.75 });
-    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0.5, '0.625 rounds to 0.75, capped at 0.5');
+    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0.5, 'midpoint 0.625 rounds to 0.75, capped at 0.5');
+    // The quarter after that carries forward again.
+    const d2 = rc.currentDecisionsDefaults();
+    d2.hedges[fx] = 0.25;
+    if (rc.run.pendingEvent) d2.eventChoice = content.events.find(e => e.id === rc.run.pendingEvent).choices[0].id;
+    rc.playQuarter(d2);
+    assert.equal(rc.currentDecisionsDefaults().hedges[fx], 0.25);
 });
 
 test('progress always includes the free unlocks, even from a pre-A9 save', () => {

@@ -114,8 +114,20 @@ test('the dials start at the RunController defaults', () => {
     assert.equal(pressed('fuel'), '0');
 });
 
-test('locked exposure: commodity dial is stuck at 0 with a one-line reason; hedgeAccess unlocks it', () => {
+test('R65: on a band board the Q1 dials start at 0, so tapping RUN untouched opens the off-policy prompt', () => {
     const { card, q, run, played } = setup(SEED.band2550);
+    const pressed = id => card(id).querySelector('[aria-checked="true"]').getAttribute('data-step');
+    assert.equal(pressed('usd-revenue'), '0');
+    assert.equal(pressed('fuel'), '0');
+    run.click();
+    assert.equal(played.length, 0);
+    assert.equal(q('.q-confirm').hidden, false);
+    assert.equal(q('.q-confirm p').textContent, OFF_POLICY_PROMPT);
+});
+
+test('locked exposure: commodity dial is stuck at 0 with a one-line reason; hedgeAccess unlocks it', () => {
+    const { card, q, run, played, step } = setup(SEED.band2550);
+    step('usd-revenue', 0.5).click();   // in the band, so RUN plays at once (R65: dials start at 0)
     const note = card('fuel').querySelector('.hd-note');
     assert.equal(note.hidden, false);
     assert.equal(note.textContent, "Your bank doesn't offer commodity hedging");
@@ -130,7 +142,8 @@ test('locked exposure: commodity dial is stuck at 0 with a one-line reason; hedg
 });
 
 test('power-up slot: cards show blurb, cost and hedjLine; one pick at a time; tap again to drop it', () => {
-    const { q, qa, card, run, played } = setup(SEED.band2550);
+    const { q, qa, card, run, played, step } = setup(SEED.band2550);
+    step('usd-revenue', 0.5).click();   // in the band, so RUN plays at once (R65: dials start at 0)
     const ids = qa('[data-powerup]').map(b => b.getAttribute('data-powerup'));
     // Visibility is locked on run 1. Airline's fuel hint puts Rate & Commodity Hedging first (R57).
     assert.deepEqual(ids, ['hedgeAccess', 'forecasting', 'facilities']);
@@ -159,7 +172,8 @@ test('forecasting card shows the next module text from levels[forecastLevel]', (
 
 test('an event card blocks RUN until one of its two choices is picked', () => {
     const ev = content.events.find(e => e.id === 'big_export_order');
-    const { q, qa, run, played } = setup(SEED.band2550, { patch: { pendingEvent: ev.id } });
+    const { q, qa, run, played, step } = setup(SEED.band2550, { patch: { pendingEvent: ev.id } });
+    step('usd-revenue', 0.5).click();   // in the band, so RUN plays at once (R65: dials start at 0)
     assert.equal(q('.q-event h2').textContent, ev.title);
     const choices = qa('[data-choice]');
     assert.deepEqual(choices.map(c => c.textContent), ev.choices.map(c => c.label));
@@ -330,13 +344,14 @@ test('offPolicyExposures mirrors the engine: clamps to the cap, skips unhedgeabl
 test('keyboard: arrow keys on a dial change the decision', () => {
     const { card, run, played } = setup(SEED.band2550);
     const radiogroup = card('usd-revenue').querySelector('[role="radiogroup"]');
-    key(radiogroup, 'ArrowLeft');
+    key(radiogroup, 'ArrowRight');   // from the Q1 default of 0 (R65) into the 25–50% band
     run.click();
     assert.equal(played[0].hedges['usd-revenue'], 0.25);
 });
 
 test('a failing playQuarter shows a toast and stays on the screen', () => {
-    const { rc, app, run } = setup(SEED.band2550);
+    const { rc, app, run, step } = setup(SEED.band2550);
+    step('usd-revenue', 0.5).click();   // in the band, so RUN plays at once (R65: dials start at 0)
     rc.playQuarter = () => { throw new Error('boom'); };
     const errors = [];
     const orig = console.error;
@@ -402,9 +417,10 @@ test('a pending event missing from the content is dropped, so the run cannot loc
     let screen;
     try { screen = setup(SEED.band2550, { patch: { pendingEvent: 'gone_from_events_json' } }); } finally { console.warn = warn; }
     assert.deepEqual(warnings, ['RunController: dropping unknown pending event gone_from_events_json']);
-    const { q, run, played } = screen;
+    const { q, run, played, step } = screen;
     assert.equal(q('.q-event'), null);
     assert.equal(run.disabled, false);
+    step('usd-revenue', 0.5).click();   // in the band, so RUN plays at once (R65: dials start at 0)
     run.click();
     assert.ok(played.length >= 1, 'the engine accepted the quarter');
 });
@@ -512,7 +528,8 @@ test('R53: a double tap on RUN cannot confirm an off-policy quarter (the prompt 
 });
 
 test('R53: RUN ignores taps in the first 600 ms after mount (a double tap from NEXT), then works', () => {
-    const { app, run, played, clock, q } = setup(SEED.band2550, { settle: false });
+    const { app, run, played, clock, q, step } = setup(SEED.band2550, { settle: false });
+    step('usd-revenue', 0.5).click();   // in the band (R65: dials start at 0); the dials are not tap-guarded
     run.click();
     clock.t = TAP_GUARD_MS - 1;
     run.click();
