@@ -27,3 +27,28 @@ test('backend deploy does not interpolate secrets or variables straight into the
 test('frontend config carries no event id (the backend EVENT_ID alone selects the board)', () => {
     assert.ok(!/eventId/.test(read('js/config.js')));
 });
+
+const frontendWf = () => read('.github/workflows/deploy-frontend.yml');
+
+test('frontend deploy has no PWA leftovers in its trigger paths (R55)', () => {
+    const wf = frontendWf();
+    assert.ok(!wf.includes('manifest.json') && !wf.includes('sw.js'));
+});
+
+test('frontend deploy keeps the dev-file excludes (R27)', () => {
+    const wf = frontendWf();
+    for (const ex of ['tests/*', 'docs/*', 'node_modules/*', 'package.json', 'package-lock.json', '.superpowers/*',
+        'Open Game.url', 'Individual industry sample images.png', 'backend/*', 'tools/*', '*.md']) {
+        assert.ok(wf.includes(`--exclude "${ex}"`), `missing exclude ${ex}`);
+    }
+});
+
+test('fonts ship as font/woff2 with a long immutable cache', () => {
+    const wf = frontendWf();
+    assert.ok(wf.includes('--exclude "assets/fonts/*.woff2"'), 'main sync must leave woff2 to the font step');
+    const fontStep = wf.split('Sync fonts')[1];
+    assert.ok(fontStep, 'missing a "Sync fonts" step');
+    assert.ok(fontStep.includes('--content-type "font/woff2"'));
+    assert.ok(fontStep.includes('max-age=31536000, immutable'));
+    assert.ok(fontStep.includes('--include "*.woff2"'));
+});
