@@ -2,20 +2,14 @@
 
 A response-headers policy to attach by hand to the competition distribution. It is not managed by the SAM stack.
 
-## PREREQUISITE: do not attach the CSP yet (cutover task H attaches it)
+## When to attach it
 
-Today `css/retro.css` has `@import url('https://fonts.googleapis.com/...')` for Press Start 2P and VT323. The CSP below
-allows only `'self'` for styles and fonts, so with it attached those fonts silently fail to load and the whole UI falls
-back to a system monospace font.
+The v3 site is ready for this policy (see "Readiness audit" at the bottom). Attach it during cutover, after the v3
+frontend is deployed and before the phone dry run, so the dry run also proves nothing is blocked
+(`docs/cutover.md`, section F).
 
-Do not attach the CSP until the later PWA task has:
-
-1. self-hosted the fonts (woff2 under `assets/`, `@font-face` in CSS), and
-2. removed the Google Fonts `@import`s and `<link>`s.
-
-The cutover task (H) attaches this policy, after the checklist at the bottom is clear. The other three headers (HSTS,
-`X-Content-Type-Options`, `Referrer-Policy`) have no such dependency and may be attached earlier by dropping the CSP
-entry from the config.
+Do **not** attach it while the old (v2) frontend is still live: the old pages load Google Fonts and have an inline
+script on `admin.html`, which this policy blocks.
 
 ## Policy
 
@@ -27,7 +21,13 @@ entry from the config.
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 
 `connect-src 'self'` works because the frontend calls the API same-origin at `/api` (a CloudFront behaviour to the API
-Gateway origin). `style-src 'unsafe-inline'` is needed for the existing inline `<style>` blocks.
+Gateway origin). `style-src 'unsafe-inline'` is still needed: `admin.html`, `stand.html` and `privacy.html` have
+inline `<style>` blocks, and the game's screens build markup with about 320 inline `style="…"` attributes. Removing
+`'unsafe-inline'` from `style-src` is a larger refactor and is not planned. It is low risk here because `script-src`
+stays strict.
+
+`nosniff` needs correct content types. The deploy workflow sets `application/javascript`, `text/css`,
+`application/json` and `font/woff2` explicitly.
 
 ## Steps
 
@@ -94,17 +94,27 @@ curl -sI https://competition.hedj.eu/ | grep -iE 'content-security|strict-transp
 
 Then load the game, `stand.html` and `admin.html` with the browser console open and confirm there are no CSP violations.
 
-## Blockers for task H (existing inline script and font loads)
+## Removing it (rollback)
 
-`script-src 'self'` blocks every inline `<script>` and every `on*=` attribute. Audit of the current pages:
+If anything breaks after attaching, set `ResponseHeadersPolicyId` back to empty (remove the key) on the same cache
+behaviours, using steps 3 and 4 with a fresh `ETag`. It takes effect in about a minute, with no cache invalidation
+needed. The policy itself can stay in the account; it costs nothing while detached.
 
-| Page | Finding | Needed for H |
+## Readiness audit (Task H, v3 branch)
+
+`script-src 'self'` blocks every inline `<script>` body, every `on*=` attribute and every `javascript:` URL.
+`font-src 'self'` and `style-src 'self' 'unsafe-inline'` block third-party fonts and stylesheets.
+
+| Page or area | Finding | Status |
 | --- | --- | --- |
-| `index.html` | One external module (`js/main.js`). No inline script, no `on*=` handlers. | Nothing. |
-| `privacy.html` | No script, no handlers. | Nothing. |
-| `stand.html` | External `js/stand.js` only. | Nothing. |
-| `admin.html` | One inline `<script>` block (~line 271) and inline handlers `onclick="login()"`, `onclick="downloadCSV()"`, `onclick="refresh()"`, plus the prize buttons added in E1-3 (`onclick="downloadPrize(...)"`). | **Blocker.** Move the script to `js/admin.js` and bind with `addEventListener`. Admin would otherwise be dead once the CSP is attached. |
-| `admin.html`, `privacy.html`, `stand.html` | `<link>` to `fonts.googleapis.com`. | Replace with the self-hosted fonts. |
-| `css/retro.css` | `@import` of Google Fonts (lines 7-8). | Replace with self-hosted `@font-face` (see prerequisite). |
+| `index.html` | One external module (`js/main.js`). No inline script, no handlers. | Ready |
+| `admin.html` | The inline script and its `onclick` handlers moved to `js/admin.js` (module, `addEventListener`). | Ready (Task H) |
+| `stand.html` | External `js/stand.js` only. Has an inline `<style>` block (allowed). | Ready |
+| `privacy.html` | No script. Inline `<style>` block and two `style=` attributes (allowed). | Ready |
+| Fonts | Self-hosted woff2 under `assets/fonts/` via `css/fonts.css` (Task G). No Google Fonts `@import` or `<link>` left. | Ready |
+| Markup built by `js/**` | No `on*=` attributes and no `javascript:` URLs. About 320 `style="…"` attributes (allowed by `'unsafe-inline'`). | Ready |
+| `eval`, `new Function`, string timers | None. | Ready |
+| Network | All API calls go to same-origin `/api`. The only absolute URLs are link targets (hedj.eu, dataprotection.ie). Navigation is not covered by this policy. | Ready |
+| Images | Same-origin files and canvas only. `data:` is allowed. | Ready |
 
-A grep of `js/**` found no inline `on*=` handlers in injected markup.
+`tests/client/csp.test.js` enforces the script rules on every shipped page and on all of `js/**`.
