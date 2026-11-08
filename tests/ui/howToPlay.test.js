@@ -11,9 +11,23 @@ class FakeStorage {
     removeItem(k) { this.m.delete(k); }
 }
 
+// The fake DOM has no Web Audio, so the first button sound makes SoundFX warn once and switch itself off.
+// That is the only console output these tests allow.
+const EXPECTED_WARNING = 'SoundFX: Web Audio not available';
 let dom;
-beforeEach(() => { dom = installFakeDom(); globalThis.localStorage = new FakeStorage(); storage.setStorageBackend(new FakeStorage()); });
-afterEach(() => { storage.setStorageBackend(null); delete globalThis.localStorage; dom.restore(); });
+let warnings;
+let realWarn;
+beforeEach(() => {
+    dom = installFakeDom(); globalThis.localStorage = new FakeStorage(); storage.setStorageBackend(new FakeStorage());
+    warnings = [];
+    realWarn = console.warn;
+    console.warn = (...a) => warnings.push(a.join(' '));
+});
+afterEach(() => {
+    console.warn = realWarn;
+    storage.setStorageBackend(null); delete globalThis.localStorage; dom.restore();
+    assert.deepEqual(warnings.filter(w => w !== EXPECTED_WARNING), [], 'unexpected console.warn output');
+});
 
 function make() {
     const app = { shown: [], toasts: [], showScreen(id) { this.shown.push(id); }, showToast(m) { this.toasts.push(m); } };

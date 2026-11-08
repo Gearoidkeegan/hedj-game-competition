@@ -92,10 +92,10 @@ classifyBreach({ inMandate, marketResult, startingCash }) -> { breach: 'none'|'l
 
 A severe breach is scored as a normal `'loss'` breach (A5 scoring is unchanged).
 
-## BALANCE (A3, `js/engine/sim/balance.js`; A5 points; A7 R34; A8 severeBreachLossPct R35; A9 R40–R44)
+## BALANCE (A3, `js/engine/sim/balance.js`; A5 points; A7 R34; A8 severeBreachLossPct R35; A9 R40–R44; H R57 baseOcfPct)
 
 ```js
-{ startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: 0.05, eventChance: 0.35,
+{ startMood: 60, fireThreshold: 10, redLinePct: 0.2, baseOcfPct: 0.04, eventChance: 0.35,
   boards: [{ type:'band', min:0.25, max:0.5, weight:0.2 }, { type:'band', min:0.5, max:0.75, weight:0.2 },
            { type:'band', min:0.75, max:1, weight:0.2 }, { type:'noHedge', min:0, max:0, weight:0.15 }, { type:'none', weight:0.25 }],
   mood: { inPolicyGood: 4, inPolicyBad: -2, luckyBreach: 0, breachLoss: -12,

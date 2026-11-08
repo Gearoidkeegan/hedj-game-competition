@@ -74,12 +74,37 @@
 //
 // fired rate by starting board (band / noHedge / none): unhedged 0.541 / 0.000 / 0.427; flat50 0.151 / 0.436 / 0.935.
 // Every criterion passes with >= 15% relative margin at n = 1000 and n = 300.
+//
+// Task H re-run (final content, n = 1000): the table above is reproduced exactly; every criterion passes; no change.
+// Why noPolicyDrift is a cliff: an unhedged player who never proposes a policy gets no other regular mood term on
+// the no-policy board, so mood after 8 quarters is startMood + 8 x drift + events + red-zone hits. At -6.25 that
+// is 60 - 50 = 10 = fireThreshold (firing is <=), so the run ends "fired" in Q8 unless an event lifted mood.
+// Sweep (none-board unhedged fired rate / fired in Q8): -6 0.317/0.248, -6.25 0.427/0.340, -6.5 0.538/0.397,
+// -7 0.798/0.435, -7.5 0.908/0.332. Policy players are never fired at any of these values.
+//
+// Task H fix round 1 (ruling R57, "smaller fuel book"): no one can hedge commodity in Q1 (hedgeAccess), and the
+// unhedged Q1 cash drop at p99 was 106% of starting cash for airline and 154% for energy. data/industries.json
+// now has airline fuel $200m -> $120m and energy oil $300m -> $135m a quarter, which brings the Q1 p99 drop to
+// 65% and 69%. Those two books held almost all the bankruptcies, so unhedged bankruptRate fell 0.056 -> 0.013,
+// under the R37 floor. Retuned: baseOcfPct 0.05 -> 0.04 (smaller cash cushion, R34 limit 0.10).
+// `node tools/simulate.js --n 1000`:
+//
+//  strategy   mean    p10    p25 median    p75    p90    max bankrupt  fired severe meanQ
+//  unhedged    476      0      0    161    767   1803   1986    0.020  0.425  0.154  7.19
+//    flat50    955      0     91    404   2057   2288   3152    0.009  0.399  0.096  6.59
+//    policy   2250   1798   1983   2218   2458   2819   4443    0.010  0.000  0.000  7.99
+//      full    861      0      0    440   1396   2498   5358    0.000  0.404  0.023  6.63
+//    random    673      0     83    359   1224   1837   3121    0.015  0.427  0.135  6.66
+//
+// fired rate by starting board (band / noHedge / none): unhedged 0.524 / 0.000 / 0.458; flat50 0.144 / 0.397 / 0.966.
+// Every criterion passes; the smallest margin is firedRate(unhedged) <= 0.50 at 15% (n = 1000); at n = 300 it is
+// bankruptRate(unhedged) 0.017 at 11%.
 
 export const BALANCE = {
     startMood: 60,
     fireThreshold: 10,
     redLinePct: 0.2,
-    baseOcfPct: 0.05,
+    baseOcfPct: 0.04,
     eventChance: 0.35,
     // A9 (R42): picked once per run in createRun by weight. 'none' is the immature no-policy board
     // (run.mandate null); 'noHedge' is a policy not to hedge ({0, 0}).

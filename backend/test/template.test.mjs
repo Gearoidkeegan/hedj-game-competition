@@ -18,6 +18,15 @@ test('CORS is not wildcard and allows only the two permitted origins', () => {
     assert.ok(!yaml.includes('localhost:3000'));
 });
 
+test('every DynamoDB table is retained on stack delete and on replacement', () => {
+    const tables = yaml.split(/\r?\n  (?=[A-Za-z]+:\r?\n)/).filter(b => /^\w+:\r?\n    Type: AWS::DynamoDB::Table/.test(b));
+    assert.deepEqual(tables.map(b => b.split(':')[0]), ['HCompPlayers', 'HCompScores', 'HCompBest', 'HCompAnalytics']);
+    for (const b of tables) {
+        assert.match(b, /\r?\n    DeletionPolicy: Retain\r?\n/, `${b.split(':')[0]} DeletionPolicy`);
+        assert.match(b, /\r?\n    UpdateReplacePolicy: Retain\r?\n/, `${b.split(':')[0]} UpdateReplacePolicy`);
+    }
+});
+
 test('TTL enabled on players, scores and best', () => {
     assert.equal((yaml.match(/AttributeName: ttl\s+Enabled: true/g) || []).length, 3);
 });

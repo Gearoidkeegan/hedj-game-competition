@@ -215,7 +215,7 @@
     <div class="panel-title">ADMIN ACCESS</div>
     <div class="key-input-row">
         <input type="password" id="admin-key-input" placeholder="Enter admin key..." autocomplete="off">
-        <button onclick="login()">UNLOCK</button>
+        <button id="btn-login">UNLOCK</button>
     </div>
     <div id="auth-msg" class="msg error" style="margin-top:10px;display:none;"></div>
 </div>
@@ -249,18 +249,18 @@
             <div class="stat-box"><div class="stat-label">MULTI-DAY RATE</div><div class="stat-value green" id="m-multiday">—</div></div>
         </div>
         <div class="toolbar" style="margin-top:14px;">
-            <button class="btn-cyan" onclick="downloadPrize('simple','event')">PRIZE CSV: SIMPLE EVENT</button>
-            <button class="btn-cyan" onclick="downloadPrize('pro','event')">PRIZE CSV: PRO EVENT</button>
-            <button onclick="downloadPrize('simple','today')">SIMPLE TODAY</button>
-            <button onclick="downloadPrize('pro','today')">PRO TODAY</button>
+            <button class="btn-cyan" data-prize-mode="simple" data-prize-period="event">PRIZE CSV: SIMPLE EVENT</button>
+            <button class="btn-cyan" data-prize-mode="pro" data-prize-period="event">PRIZE CSV: PRO EVENT</button>
+            <button data-prize-mode="simple" data-prize-period="today">SIMPLE TODAY</button>
+            <button data-prize-mode="pro" data-prize-period="today">PRO TODAY</button>
         </div>
     </div>
 
     <div class="panel">
         <div class="panel-title">REGISTERED PLAYERS</div>
         <div class="toolbar">
-            <button class="btn-cyan" onclick="downloadCSV()">DOWNLOAD CSV</button>
-            <button onclick="refresh()">REFRESH</button>
+            <button class="btn-cyan" id="btn-download-csv">DOWNLOAD CSV</button>
+            <button id="btn-refresh">REFRESH</button>
             <span class="count-badge" id="player-count"></span>
         </div>
         <div id="players-msg" class="msg loading">LOADING...</div>
@@ -283,184 +283,6 @@
 
 </div>
 
-<script>
-    const API = '/api';
-    let adminKey = '';
-    let playersData = [];
-
-    function getStoredKey() {
-        try { return sessionStorage.getItem('hedj_admin_key') || ''; } catch { return ''; }
-    }
-
-    function storeKey(k) {
-        try { sessionStorage.setItem('hedj_admin_key', k); } catch {}
-    }
-
-    async function login() {
-        const input = document.getElementById('admin-key-input');
-        const key = input.value.trim();
-        if (!key) return;
-        adminKey = key;
-        storeKey(key);
-        await loadAll();
-    }
-
-    document.getElementById('admin-key-input').addEventListener('keydown', e => {
-        if (e.key === 'Enter') login();
-    });
-
-    async function apiFetch(path, headers = {}) {
-        const res = await fetch(API + path, {
-            headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey, ...headers }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-    }
-
-    async function loadAll() {
-        const authMsg = document.getElementById('auth-msg');
-        authMsg.style.display = 'none';
-        try {
-            const [analyticsData, playersResult, metrics] = await Promise.all([
-                apiFetch('/analytics'),
-                apiFetch('/admin/players'),
-                apiFetch('/admin/metrics').catch(err => (/40[13]/.test(err.message) ? Promise.reject(err) : {}))
-            ]);
-
-            // Unlock UI
-            document.getElementById('auth-section').style.display = 'none';
-            document.getElementById('data-section').style.display = 'block';
-
-            // Stats
-            const counts = analyticsData.counts || {};
-            document.getElementById('stat-visits').textContent =
-                (counts.visit || 0).toLocaleString();
-            document.getElementById('stat-plays').textContent =
-                (counts.play || 0).toLocaleString();
-
-            const pct = n => Math.round((n || 0) * 100) + '%';
-            document.getElementById('m-unique').textContent = (metrics.uniquePlayers || 0).toLocaleString();
-            document.getElementById('m-runs').textContent = (metrics.runsPerPlayer || 0).toFixed(1);
-            document.getElementById('m-return').textContent = pct(metrics.returnRate);
-            document.getElementById('m-multiday').textContent = pct(metrics.multiDayRate);
-
-            // Players
-            playersData = playersResult.players || [];
-            document.getElementById('stat-regs').textContent =
-                playersData.length.toLocaleString();
-            renderPlayers(playersData);
-
-        } catch (err) {
-            if (err.message.includes('401') || err.message.includes('403')) {
-                authMsg.textContent = 'INVALID ADMIN KEY';
-            } else {
-                authMsg.textContent = 'ERROR: ' + err.message;
-            }
-            authMsg.style.display = 'block';
-            adminKey = '';
-            storeKey('');
-        }
-    }
-
-    function renderPlayers(players) {
-        const tbody = document.getElementById('players-tbody');
-        const msg = document.getElementById('players-msg');
-        const wrap = document.getElementById('players-table-wrap');
-        const badge = document.getElementById('player-count');
-
-        badge.textContent = players.length + ' PLAYERS';
-
-        if (players.length === 0) {
-            msg.textContent = 'NO REGISTRATIONS YET';
-            msg.className = 'msg empty';
-            msg.style.display = 'block';
-            wrap.style.display = 'none';
-            return;
-        }
-
-        msg.style.display = 'none';
-        wrap.style.display = 'block';
-
-        tbody.innerHTML = players.map((p, i) => `
-            <tr>
-                <td class="muted">${i + 1}</td>
-                <td>${esc(p.playerName)}</td>
-                <td>${esc(p.email)}</td>
-                <td>${esc(p.company)}</td>
-                <td class="muted">${formatDate(p.registeredAt)}</td>
-                <td style="color:${p.marketingConsent ? 'var(--pnl-positive)' : 'var(--text-muted)'}">
-                    ${p.marketingConsent ? 'YES' : 'no'}
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    function esc(s) {
-        return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
-    function formatDate(iso) {
-        if (!iso) return '—';
-        try {
-            return new Date(iso).toLocaleString('en-IE', {
-                dateStyle: 'short', timeStyle: 'short'
-            });
-        } catch { return iso; }
-    }
-
-    function downloadCSV() {
-        if (!playersData.length) return;
-        const csvEscape = v => `"${(v || '').replace(/"/g, '""')}"`;
-        const rows = [
-            'Name,Email,Company,Registered At,Marketing Consent',
-            ...playersData.map(p =>
-                [p.playerName, p.email, p.company, p.registeredAt, p.marketingConsent ? 'Yes' : 'No'].map(csvEscape).join(','))
-        ].join('\r\n');
-        const blob = new Blob([rows], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `players-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
-    // The prize export needs the admin key header, so fetch it and save the response as a file.
-    async function downloadPrize(mode, period) {
-        if (!adminKey) return;
-        try {
-            const res = await fetch(`${API}/admin/prize?mode=${mode}&period=${period}&limit=10`, { headers: { 'x-admin-key': adminKey } });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const url = URL.createObjectURL(new Blob([await res.text()], { type: 'text/csv' }));
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `prize-${mode}-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (err) {
-            alert('Prize export failed: ' + err.message);
-        }
-    }
-
-    function refresh() {
-        if (!adminKey) return;
-        document.getElementById('stat-visits').textContent = '—';
-        document.getElementById('stat-plays').textContent = '—';
-        document.getElementById('stat-regs').textContent = '—';
-        document.getElementById('players-msg').textContent = 'LOADING...';
-        document.getElementById('players-msg').className = 'msg loading';
-        document.getElementById('players-msg').style.display = 'block';
-        document.getElementById('players-table-wrap').style.display = 'none';
-        loadAll();
-    }
-
-    // Auto-unlock if key is stored in session
-    const storedKey = getStoredKey();
-    if (storedKey) {
-        adminKey = storedKey;
-        document.getElementById('admin-key-input').value = storedKey;
-        loadAll();
-    }
-</script>
+<script type="module" src="js/admin.js"></script>
 </body>
 </html>

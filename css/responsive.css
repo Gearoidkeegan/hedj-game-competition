@@ -514,15 +514,6 @@
         overflow-y: auto;
     }
 
-    /* Attract mode */
-    .attract-overlay {
-        padding: 16px;
-    }
-
-    .attract-content {
-        max-width: 90vw;
-    }
-
     /* Character select */
     .character-select {
         gap: 8px;

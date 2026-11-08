@@ -132,7 +132,8 @@ test('locked exposure: commodity dial is stuck at 0 with a one-line reason; hedg
 test('power-up slot: cards show blurb, cost and hedjLine; one pick at a time; tap again to drop it', () => {
     const { q, qa, card, run, played } = setup(SEED.band2550);
     const ids = qa('[data-powerup]').map(b => b.getAttribute('data-powerup'));
-    assert.deepEqual(ids, ['forecasting', 'facilities', 'hedgeAccess'], 'visibility is locked on run 1');
+    // Visibility is locked on run 1. Airline's fuel hint puts Rate & Commodity Hedging first (R57).
+    assert.deepEqual(ids, ['hedgeAccess', 'forecasting', 'facilities']);
     const fc = q('[data-powerup="forecasting"]');
     assert.equal(fc.querySelector('.pu-blurb').textContent, content.powerups.forecasting.levels[0]);
     assert.equal(fc.querySelector('.pu-hedj').textContent, content.powerups.forecasting.hedjLine);
@@ -233,7 +234,8 @@ test('the mandate band is shaded on the dials: band, 0 for noHedge, none without
 });
 
 test('R51: an unreachable band shows the conflict on the dial and puts facilities first, highlighted', () => {
-    const { card, qa, q } = setup(SEED.band75100);
+    // hedgeAccess already owned, so airline's fuel hint (R57) doesn't take the first slot.
+    const { card, qa, q } = setup(SEED.band75100, { patch: { powerUps: { owned: ['hedgeAccess'], used: [] } } });
     const note = card('usd-revenue').querySelector('.hd-note');
     assert.equal(note.textContent, 'Your board wants 75–100%; your bank lines cap you at 50%');
     const first = qa('[data-powerup]')[0];
@@ -242,6 +244,41 @@ test('R51: an unreachable band shows the conflict on the dial and puts facilitie
     assert.ok(first.textContent.includes("Your board's policy needs this"));
     q('[data-powerup="facilities"]').click();
     assert.equal(note.hidden, true, 'buying facilities clears the conflict');
+});
+
+test('R57: a commodity book the bank cannot hedge yet puts Rate & Commodity Hedging first, with a one-line hint', () => {
+    const hintFor = id => content.industries.find(i => i.id === id).commodityRiskHint;
+    for (const id of ['airline', 'energy']) {
+        const hint = hintFor(id);
+        assert.ok(hint && hint.length <= 90, `${id} hint is one short line`);
+        const { qa } = setup(1, { industry: id });
+        const first = qa('[data-powerup]')[0];
+        assert.equal(first.getAttribute('data-powerup'), 'hedgeAccess', id);
+        assert.ok(first.classList.contains('is-urgent'), id);
+        assert.equal(first.querySelector('.pu-urgent').textContent, hint, id);
+        assert.equal(qa('.pu-urgent').length, 1, `${id}: the hint shows once, on that card only`);
+    }
+    assert.equal(hintFor('airline'), "Fuel is your biggest risk. Your bank can't hedge it yet.");
+});
+
+test('R57: the hedging card goes ahead of R51 facilities; facilities stays highlighted, second', () => {
+    const { qa } = setup(SEED.band75100);
+    const cards = qa('[data-powerup]');
+    assert.deepEqual(cards.map(b => b.getAttribute('data-powerup')).slice(0, 2), ['hedgeAccess', 'facilities']);
+    assert.ok(cards[1].classList.contains('is-urgent'));
+    assert.ok(cards[1].textContent.includes("Your board's policy needs this"));
+});
+
+test('R57: no hint and the usual order once hedging is bought, or for an industry without a commodity hint', () => {
+    const owned = setup(SEED.band2550, { patch: { powerUps: { owned: ['hedgeAccess'], used: [] } } });
+    assert.equal(owned.qa('.pu-urgent').length, 0);
+    assert.deepEqual(owned.qa('[data-powerup]').map(b => b.getAttribute('data-powerup')), ['forecasting', 'facilities']);
+    for (const id of ['agrifoods', 'construction', 'pharma']) {
+        assert.equal(content.industries.find(i => i.id === id).commodityRiskHint, undefined, id);
+        const s = setup(1, { industry: id });
+        assert.notEqual(s.qa('[data-powerup]')[0].getAttribute('data-powerup'), 'hedgeAccess', id);
+        assert.equal(s.qa('.pu-urgent').length, s.screen.capConflict ? 1 : 0, id);
+    }
 });
 
 test('R51: off-policy decisions need a confirm tap before RUN; ADJUST cancels', () => {
@@ -359,7 +396,13 @@ test('R51: facilities is shown greyed out, with the reason, when the board needs
 });
 
 test('a pending event missing from the content is dropped, so the run cannot lock', () => {
-    const { q, run, played } = setup(SEED.band2550, { patch: { pendingEvent: 'gone_from_events_json' } });
+    const warnings = [];
+    const warn = console.warn;
+    console.warn = (...a) => warnings.push(a.join(' '));
+    let screen;
+    try { screen = setup(SEED.band2550, { patch: { pendingEvent: 'gone_from_events_json' } }); } finally { console.warn = warn; }
+    assert.deepEqual(warnings, ['RunController: dropping unknown pending event gone_from_events_json']);
+    const { q, run, played } = screen;
     assert.equal(q('.q-event'), null);
     assert.equal(run.disabled, false);
     run.click();
