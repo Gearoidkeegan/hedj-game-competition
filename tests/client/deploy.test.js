@@ -1,4 +1,4 @@
-// Deploy wiring checks (Task H, R56): one workflow deploys the backend, then the frontend; every backend
+// Deploy wiring checks (Task H, R56, R58): every run deploys the backend, then the frontend; every backend
 // parameter is passed; the frontend carries no copy of the event id.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,21 +28,23 @@ test('deploys never overlap, and a manual run can pick both, backend or frontend
     assert.match(w, /id-token: write/);
 });
 
-test('change detection uses plain git diff against event.before, with a both-changed fallback', () => {
-    const c = job('changes');
-    assert.ok(!/uses: (?!actions\/checkout)/.test(c), 'no third-party action for change detection');
-    assert.ok(c.includes('github.event.before') && c.includes('git diff --name-only'));
-    assert.ok(c.includes('0000000000000000000000000000000000000000'));
-    assert.ok(c.includes('workflow_dispatch'));
+test('no change detection: every run deploys the backend, then the frontend (R58)', () => {
+    // A queued run that a newer push replaces must not lose its backend change, so nothing is diffed.
+    const w = wf();
+    assert.ok(!/\n  changes:/.test(w), 'no change-detection job');
+    assert.ok(!w.includes('git diff') && !w.includes('github.event.before'));
+    assert.match(w, /push:\s*\r?\n\s+branches:[\s\S]*?paths:/, 'the trigger-level paths filter stays');
+    const b = job('backend');
+    assert.match(b, /if: github\.event_name == 'push' \|\| inputs\.target != 'frontend'/);
+    assert.ok(b.includes('--no-fail-on-empty-changeset'), 'an unchanged backend is a cheap no-op');
 });
 
 test('the frontend waits for the backend and never runs after a failed or cancelled backend deploy', () => {
     const f = job('frontend');
-    assert.match(f, /needs: \[changes, backend\]/);
+    assert.match(f, /needs: backend\r?\n/);
     assert.ok(f.includes('always()'));
-    assert.ok(f.includes("needs.changes.outputs.frontend == 'true'"));
+    assert.ok(f.includes("(github.event_name == 'push' || inputs.target != 'backend')"));
     assert.ok(f.includes("(needs.backend.result == 'success' || needs.backend.result == 'skipped')"));
-    assert.match(job('backend'), /if: needs\.changes\.outputs\.backend == 'true'/);
 });
 
 test('backend deploy passes EventId, EventEndIso and TokenTtlHours from repository variables', () => {

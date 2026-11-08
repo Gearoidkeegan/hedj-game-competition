@@ -4,10 +4,11 @@ This checklist replaces the live v2 competition game with v3. Work through it to
 go. Commands are for Git Bash or any POSIX shell, with the AWS CLI signed in to the competition account
 (`eu-north-1`), and `gh` signed in to the GitHub repo.
 
-**How deploys work now.** There is one workflow, `.github/workflows/deploy.yml`. A single merge to `main` deploys the
-**backend first, then the frontend**. The frontend job only runs if the backend job succeeded or had nothing to do. It
-never runs after a failed or cancelled backend deploy. Two deploys never overlap. You can also run it by hand: Actions →
-"Deploy Competition (backend, then frontend)" → Run workflow → `both`, `backend` or `frontend`.
+**How deploys work now.** There is one workflow, `.github/workflows/deploy.yml`. Every push to `main` that touches the
+site or `backend/` deploys the **backend first, then the frontend**, whatever changed. An unchanged backend is a quick
+no-op and the site sync is idempotent. The frontend job never runs after a failed or cancelled backend deploy. Two
+deploys never overlap. You can also run it by hand: Actions → "Deploy Competition (backend, then frontend)" → Run
+workflow → `both`, `backend` or `frontend`.
 
 Names used below:
 

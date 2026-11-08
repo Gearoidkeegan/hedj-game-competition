@@ -1,7 +1,9 @@
 name: Deploy Competition (backend, then frontend)
 
 # One workflow so the frontend never goes live before the API it needs (R56).
-# A push to main deploys the backend first (if backend/ changed), then the frontend (if the site changed).
+# Every push to main deploys the backend first, then the frontend (R58). Nothing is diffed: a queued run that a
+# newer push replaces would otherwise lose its backend change. An unchanged backend is a cheap no-op
+# (--no-fail-on-empty-changeset) and the frontend sync is idempotent.
 # The frontend is skipped if the backend deploy fails or is cancelled.
 
 on:
@@ -39,52 +41,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  changes:
-    name: Detect changes
-    runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.detect.outputs.backend }}
-      frontend: ${{ steps.detect.outputs.frontend }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Detect changed paths
-        id: detect
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          TARGET: ${{ inputs.target }}
-          BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.sha }}
-        run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            case "${TARGET:-both}" in
-              backend)  backend=true;  frontend=false ;;
-              frontend) backend=false; frontend=true ;;
-              *)        backend=true;  frontend=true ;;
-            esac
-          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
-               || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            # New branch, or a force push whose old head is gone: deploy both.
-            backend=true; frontend=true
-          else
-            files=$(git diff --name-only "$BEFORE" "$AFTER")
-            backend=false; frontend=false
-            if printf '%s\n' "$files" | grep -Eq '^backend/'; then backend=true; fi
-            if printf '%s\n' "$files" | grep -Eq '^((index|admin|privacy|stand)\.html$|css/|js/|data/|assets/)'; then
-              frontend=true
-            fi
-          fi
-          echo "backend=$backend" >> "$GITHUB_OUTPUT"
-          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
-          echo "Deploy backend: $backend, frontend: $frontend"
-
   backend:
     name: Backend (SAM build + deploy)
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    # Every push; a manual run unless it picked "frontend".
+    if: github.event_name == 'push' || inputs.target != 'frontend'
     runs-on: ubuntu-latest
 
     steps:
@@ -167,13 +127,12 @@ jobs:
 
   frontend:
     name: Frontend (S3 + CloudFront)
-    needs: [changes, backend]
-    # always() lets this job run when the backend job was skipped; it still never runs after a failed or
-    # cancelled backend deploy.
+    needs: backend
+    # Every push; a manual run unless it picked "backend". always() lets this job run when a manual run skipped
+    # the backend job; it still never runs after a failed or cancelled backend deploy.
     if: >-
       always()
-      && needs.changes.result == 'success'
-      && needs.changes.outputs.frontend == 'true'
+      && (github.event_name == 'push' || inputs.target != 'backend')
       && (needs.backend.result == 'success' || needs.backend.result == 'skipped')
     runs-on: ubuntu-latest
 
