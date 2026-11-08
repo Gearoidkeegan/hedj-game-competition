@@ -315,3 +315,72 @@ test('industry: BACK returns to the title', () => {
     t.q('.ind-back').click();
     assert.deepEqual(app.shown, ['title']);
 });
+
+// ── B4 follow-ups (B2 review minors) ─────────────────────────────────────
+
+test('title: an expired registration shows no unlocks, and a crisis cannot start', async () => {
+    const app = makeApp();
+    storage.saveRegistration({ ...ANN, gameToken: 't', gameTokenExpiry: Date.now() - 1000 });
+    storage.saveProgress(ANN.email, { ...emptyProgress(), runs: 9,
+        unlocked: [...emptyProgress().unlocked, 'mode:pro', 'crisis:gfc2008'] });
+    const t = mountTitle(app);
+    assert.equal(t.q('.t-pro').disabled, true);
+    assert.equal(t.q('.t-crises-btn').disabled, true);
+    await t.screen.startCrisis('gfc2008');
+    assert.equal(app.runController.run, null);
+    assert.deepEqual(app.shown, []);
+    t.screen.unmount();
+});
+
+test('title: the sound label starts from soundFX.enabled', async () => {
+    const { soundFX } = await import('../../js/ui/SoundFX.js');
+    const before = soundFX.enabled;
+    try {
+        soundFX.enabled = false;
+        const app = makeApp();
+        register(ANN);
+        const t = mountTitle(app);
+        assert.equal(t.q('.t-sound').textContent, 'SOUND OFF');
+        assert.equal(t.q('.t-sound').getAttribute('aria-label'), 'Sound off');
+        t.screen.unmount();
+    } finally { soundFX.enabled = before; }
+});
+
+test('title: the leaderboard modal closes on Escape and on unmount, and returns focus', async () => {
+    const app = makeApp();
+    register(ANN);
+    const api = fakeApi({ entries: [{ rank: 1, playerName: 'Zed', company: '', score: 5 }] });
+    const t = mountTitle(app, api);
+    const modals = () => dom.document.body.querySelectorAll('.v3-modal');
+    const press = k => (dom.document.listeners.get('keydown') || []).slice().forEach(fn => fn({ key: k }));
+    const opener = t.q('.t-lb');
+    opener.focus();
+    await t.screen.showLeaderboard();
+    assert.equal(modals().length, 1);
+    press('Enter');
+    assert.equal(modals().length, 1, 'other keys leave it open');
+    press('Escape');
+    assert.equal(modals().length, 0);
+    assert.equal(dom.document.activeElement, opener, 'focus returns to the opener');
+    assert.equal((dom.document.listeners.get('keydown') || []).length, 0, 'no listener left behind');
+    await t.screen.showLeaderboard();
+    assert.equal(modals().length, 1);
+    t.screen.unmount();
+    assert.equal(modals().length, 0);
+    assert.equal((dom.document.listeners.get('keydown') || []).length, 0);
+});
+
+test('industry: BACK during a pending start does not navigate to the quarter later', async () => {
+    const app = makeApp();
+    register(ANN);
+    let ready;
+    app.marketReady = new Promise(r => { ready = r; });
+    const t = mountIndustry(app);
+    const pick = t.screen.pick('airline');
+    await settle();
+    t.q('.ind-back').click();
+    t.screen.unmount();
+    ready();
+    await pick;
+    assert.deepEqual(app.shown, ['title']);
+});

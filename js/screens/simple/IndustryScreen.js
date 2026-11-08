@@ -16,9 +16,11 @@ export class IndustryScreen {
         this.el = null;
         this.busy = false;
         this.cards = new Map();
+        this.visit = 0;   // changes whenever the screen is rebuilt or left, so a late start can't navigate
     }
 
     render() {
+        this.visit++;
         const industries = this.app.content?.industries || [];
         const unlocked = new Set(this.app.runController?.progress().unlocked || []);
         this.busy = false;
@@ -37,7 +39,9 @@ export class IndustryScreen {
 
     mount() {}
 
-    unmount() {}
+    unmount() {
+        this.visit++;
+    }
 
     _card(ind, open) {
         const risks = (ind.exposures || []).map(e => exposureTitle(e)).join(', ');
@@ -60,6 +64,7 @@ export class IndustryScreen {
         const entry = this.cards.get(industryId);
         if (this.busy || !entry?.open) return;
         this.busy = true;
+        const visit = this.visit;
         for (const c of this.cards.values()) c.card.disabled = true;
         entry.nameEl.textContent = 'Opening the books…';
         try {
@@ -72,6 +77,6 @@ export class IndustryScreen {
             this.busy = false;
             return;
         }
-        this.app.showScreen('quarter');
+        if (visit === this.visit) this.app.showScreen('quarter');   // BACK during the start: stay where the player went
     }
 }

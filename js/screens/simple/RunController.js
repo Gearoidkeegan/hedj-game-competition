@@ -325,6 +325,30 @@ export class RunController {
         return this.progress().unlocked.filter(id => id.startsWith('powerup:')).map(id => id.slice('powerup:'.length));
     }
 
+    // The run in progress for the registered player, or null (R39: goes through the player check, never reads
+    // `run` raw). A pending event that is not in the content is dropped (and the drop saved) ONLY when the events
+    // loaded successfully (`content.eventsLoaded`), e.g. a resumed save after events.json changed. If the events
+    // never loaded the run is left untouched; see `eventMissing()`.
+    currentRun() {
+        this._checkPlayer();
+        if (this.run?.pendingEvent && this.content.eventsLoaded && !this._hasEvent(this.run.pendingEvent)) {
+            console.warn(`RunController: dropping unknown pending event ${this.run.pendingEvent}`);
+            this.run = { ...this.run, pendingEvent: null };
+            this._save();
+        }
+        return this.run;
+    }
+
+    _hasEvent(id) {
+        return (this.content.events || []).some(e => e.id === id);
+    }
+
+    // True when the run waits on an event whose definition isn't available (content failed to load): retry the load.
+    eventMissing() {
+        const id = this.run?.pendingEvent;
+        return !!id && !this._hasEvent(id);
+    }
+
     // Whether the current run may buy `id` now: unlocked, not owned or used up, offered, affordable.
     canBuy(id) {
         return canBuyPowerUp(this._requireRun(), id, this.unlockedPowerUps());

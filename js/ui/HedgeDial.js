@@ -9,7 +9,7 @@
 //   dial.setLockedReason(text)
 //   dial.destroy()
 //
-// Each detent is a button of at least 44px (css/v3.css). The track is a single tab stop with role="slider":
+// Each detent is a button of at least 44px (css/v3.css). The track is a radiogroup of five role="radio" buttons:
 // arrow keys move one detent, Home/End jump to 0 and the cap. Steps above `max` are locked (disabled and
 // hatched); `lockedReason` explains a dial whose cap is 0. The mandate band is shaded: none for a no-policy board
 // (mandate null), the 0 step for a "not to hedge" board ({0,0}), otherwise every step inside {min,max}.
@@ -36,12 +36,11 @@ export class HedgeDial {
         this._value = Math.min(snap(value), this.max);
 
         this.steps = DETENTS.map(step => h('button', {
-            class: 'hd-step', type: 'button', tabindex: '-1', 'data-step': String(step),
+            class: 'hd-step', type: 'button', role: 'radio', tabindex: '-1', 'data-step': String(step),
             on: { click: () => this._pick(step) }
         }, h('span', { class: 'hd-step-label', text: pct(step) })));
         this.track = h('div', {
-            class: 'hd-track', role: 'slider', tabindex: '0', 'aria-label': label,
-            'aria-valuemin': '0', 'aria-valuemax': '100'
+            class: 'hd-track', role: 'radiogroup', 'aria-label': label
         }, this.steps);
         this.note = h('p', { class: 'hd-note', hidden: true });
         this.root = h('div', { class: 'hedge-dial' }, this.track, this.note);
@@ -108,6 +107,7 @@ export class HedgeDial {
         if (next === null) return;
         e.preventDefault();
         this._set(Math.max(0, Math.min(this.max, next)));
+        this.steps[DETENTS.indexOf(this._value)]?.focus?.();   // roving focus follows the selection
     }
 
     _inBand(step) {
@@ -125,11 +125,10 @@ export class HedgeDial {
             btn.classList.toggle('is-on', step === v);
             btn.classList.toggle('is-filled', step <= v + EPS && step > 0);
             btn.classList.toggle('is-band', this._inBand(step));
-            btn.setAttribute('aria-pressed', String(step === v));
+            btn.setAttribute('aria-checked', String(step === v));
+            btn.setAttribute('tabindex', step === v ? '0' : '-1');   // roving tabindex: one tab stop, on the checked radio
             btn.setAttribute('aria-label', locked ? `${pct(step)}, locked` : pct(step));
         });
-        this.track.setAttribute('aria-valuenow', String(Math.round(v * 100)));
-        this.track.setAttribute('aria-valuetext', `${pct(v)} hedged`);
         this.track.setAttribute('aria-disabled', String(this.max === 0));
 
         const locked = this.max === 0;

@@ -35,7 +35,7 @@ class App {
         this.productsData = null;
         this.gameMode = 'quickplay';
         // v3 Simple mode content and the run hub (set up in init)
-        this.content = { industries: [], events: [], quips: null, powerups: null };
+        this.content = { industries: [], events: [], eventsLoaded: false, quips: null, powerups: null };
         this.marketReady = Promise.resolve();
         this.runController = null;
         this.lastQuarter = null;   // the latest runController.playQuarter() result, for the result screen (B3)
@@ -83,6 +83,19 @@ class App {
         this.showScreen('title');
     }
 
+    // Retry for the quarter screen when the events failed to load. Resolves true when they are now available.
+    async reloadEvents() {
+        try {
+            const resp = await fetch('data/simple-events.json');
+            if (!resp.ok) return false;
+            this.content.events = (await resp.json())?.events || [];
+            this.content.eventsLoaded = true;
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     async loadData() {
         try {
             const [industriesResp, productsResp, quipsResp, simpleEventsResp, powerupsResp] = await Promise.all([
@@ -97,6 +110,7 @@ class App {
             this.content.industries = this.industriesData?.industries || [];
             this.content.quips = await quipsResp.json();
             this.content.events = (await simpleEventsResp.json())?.events || [];
+            this.content.eventsLoaded = true;
             this.content.powerups = await powerupsResp.json();
         } catch (e) {
             console.error('Failed to load game data:', e);
