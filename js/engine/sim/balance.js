@@ -74,6 +74,13 @@
 //
 // fired rate by starting board (band / noHedge / none): unhedged 0.541 / 0.000 / 0.427; flat50 0.151 / 0.436 / 0.935.
 // Every criterion passes with >= 15% relative margin at n = 1000 and n = 300.
+//
+// Task H re-run (final content, n = 1000): the table above is reproduced exactly; every criterion passes; no change.
+// Why noPolicyDrift is a cliff: an unhedged player who never proposes a policy gets no other regular mood term on
+// the no-policy board, so mood after 8 quarters is startMood + 8 x drift + events + red-zone hits. At -6.25 that
+// is 60 - 50 = 10 = fireThreshold (firing is <=), so the run ends "fired" in Q8 unless an event lifted mood.
+// Sweep (none-board unhedged fired rate / fired in Q8): -6 0.317/0.248, -6.25 0.427/0.340, -6.5 0.538/0.397,
+// -7 0.798/0.435, -7.5 0.908/0.332. Policy players are never fired at any of these values.
 
 export const BALANCE = {
     startMood: 60,
