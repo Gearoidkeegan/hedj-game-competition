@@ -224,7 +224,7 @@ name and email, or obvious test ones, so you can spot them in the CSV later. Ope
 - [ ] The score counts up; the title, the year card and the rank show.
 - [ ] Cutscenes fill the screen; a tap skips each one, and that tap doesn't also hit PLAY AGAIN. The personal-best
       scene plays before the bankrupt or fired one.
-- [ ] **Bankruptcy:** play an unhedged airline or energy run, or set `run.cash` very negative in the console before
+- [ ] **Bankruptcy:** play an unhedged energy or construction run, or set `run.cash` very negative in the console before
       RUN. The bankrupt screen shows and the score is still submitted, with a rank.
 - [ ] **Airplane mode at game over, then reconnect:** turn on airplane mode before the last RUN. The game over shows
       "Queued, will submit when online". Turn airplane mode off: the queued score submits by itself (or on the next
@@ -347,20 +347,23 @@ Answer these before the event. Each one is a copy change or a single number.
       - Rate & Commodity Hedging: "In real life, Hedj gives you interest-rate and commodity hedging many banks won't
         offer."
 - [ ] **K3. Firing rates** (`node tools/simulate.js --n 1000`, final content):
-      - A player who never hedges is fired in **43%** of runs: 54% on a band board, 43% on a no-policy board and 0% on
+      - A player who never hedges is fired in **43%** of runs: 52% on a band board, 46% on a no-policy board and 0% on
         a no-hedge board.
-      - A random dialler is fired in 43% of runs, someone who always hedges 100% in 42%, and someone who always hedges
+      - A random dialler is fired in 43% of runs, someone who always hedges 100% in 40%, and someone who always hedges
         50% in 40%.
       - A player who follows (or proposes) a policy is **never** fired.
       - On the no-policy board, a player who never proposes lands exactly on the firing line after 8 quarters, so
-        **34% of them are fired in the final quarter** itself. A slightly gentler −6 drift lowers that to 25%
-        (31% fired overall).
+        **37% of them are fired in the final quarter** itself. A slightly gentler −6 drift lowers that to 27%
+        (33% fired overall).
 
       Is being fired on the last tap the experience you want?
-- [ ] **K4. No-hedge-policy bankruptcy is about 14%.** A player who faithfully follows "our policy is not to hedge" goes
-      bankrupt in 14% of those runs (it is 2% on band boards), mostly on airline and energy, whose fuel and oil books
-      are large. Across all policy followers, bankruptcy is 3.5%: 9% for airline and 14% for energy. Fully hedged
-      airline players never went bankrupt. Keep it, as the "policy itself is the risk" lesson, or soften it?
+- [ ] **K4. No-hedge-policy bankruptcy is about 6%.** A player who faithfully follows "our policy is not to hedge" goes
+      bankrupt in 6% of those runs (0% on band boards), mostly on energy and construction. Across all policy
+      followers, bankruptcy is 1%. Ruling R57 already cut the airline fuel book ($200m → $120m a quarter) and the
+      energy oil book ($300m → $135m), so an unhedged first quarter now loses at most about two-thirds of starting cash
+      (p99 65% airline, 69% energy; it was 106% and 154%), and the base operating cash flow fell from 5% to 4% of
+      starting cash a quarter to keep some bankruptcy risk for players who never hedge. Keep the rest, as the "policy
+      itself is the risk" lesson, or soften it?
 - [ ] **K5. Optional content polish** (low priority):
       - Two event choices read against their quips: `coffee_queue` → take the call (variance ×1.1) and
         `bank_bearing_gifts` → take the tickets (×0.85).
