@@ -3,9 +3,7 @@
    RollerCoaster Tycoon-style retro theme
    ============================================ */
 
-/* Google Fonts - Pixel fonts */
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+/* Pixel fonts are self-hosted: see css/fonts.css (@font-face, font-display: swap) */
 
 /* ---- CSS Reset ---- */
 *, *::before, *::after {

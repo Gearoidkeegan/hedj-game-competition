@@ -1,0 +1,3 @@
+Press Start 2P and VT323 are licensed under the SIL Open Font License, Version 1.1.
+Full licence text: https://openfontlicense.org/ (copies in google/fonts: ofl/pressstart2p/OFL.txt, ofl/vt323/OFL.txt).
+PLACEHOLDER: replace with the verbatim OFL.txt files from the google/fonts repository when the woff2 files are added.
