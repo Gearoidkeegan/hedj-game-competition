@@ -324,8 +324,9 @@ Backend parameters (`backend/template.yaml`):
 Follow the prompts. On first deploy use `--guided`; subsequent deploys can omit it.
 
 In CI (`.github/workflows`) the parameters come from GitHub: `AdminKey` from the `COMP_ADMIN_KEY` secret, and
-`EventId`, `EventEndIso` and `TokenTtlHours` from the repository variables `COMP_EVENT_ID` (default `test`),
-`COMP_EVENT_END_ISO` (default empty) and `COMP_TOKEN_TTL_HOURS` (default `120`). See `docs/cutover.md`.
+`EventId`, `EventEndIso` and `TokenTtlHours` from the repository variables `COMP_EVENT_ID` (required on a push to
+`main`; a manual run falls back to `test`), `COMP_EVENT_END_ISO` (UTC, e.g. `2026-11-20T18:00:00Z`; default empty)
+and `COMP_TOKEN_TTL_HOURS` (default `120`). See `docs/cutover.md`.
 
 The deploy outputs the API Gateway URL. Use this as the CloudFront origin for `/api/*` routes.
 

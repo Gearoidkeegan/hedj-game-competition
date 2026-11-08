@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const path = rel => new URL(`../../${rel}`, import.meta.url);
 const read = rel => readFileSync(path(rel), 'utf8');
@@ -55,8 +56,70 @@ test('backend deploy passes EventId, EventEndIso and TokenTtlHours from reposito
     for (const p of ['AdminKey=', 'EventId=', 'EventEndIso=', 'TokenTtlHours=']) {
         assert.ok(b.includes(p), `parameter override ${p} missing`);
     }
-    assert.ok(/COMP_EVENT_ID \|\| 'test'/.test(b), 'EventId must fall back to test');
+    assert.ok(!/COMP_EVENT_ID \|\|/.test(b), 'no expression fallback: the script decides (a push never falls back)');
     assert.ok(/COMP_TOKEN_TTL_HOURS \|\| '120'/.test(b), 'TokenTtlHours must fall back to 120');
+});
+
+// The "SAM deploy" step's script, run in bash the way Actions runs it (bash -eo pipefail), with `sam` stubbed to
+// print one argument per line. Returns { status, out } where out holds the stub's output and any ::error:: line.
+const bashOk = spawnSync('bash', ['-c', 'date -u -d 2026-01-01T00:00Z >/dev/null'], { encoding: 'utf8' }).status === 0;
+function runSamDeploy(env) {
+    const step = job('backend').split('- name: SAM deploy')[1];
+    const lines = step.split(/run: \|\r?\n/)[1].split(/\r?\n/);
+    const body = [];
+    for (const line of lines) {
+        if (line.trim() && !line.startsWith(' '.repeat(10))) break;
+        body.push(line.slice(10));
+    }
+    const script = `sam() { printf '%s\\n' "$@"; }\n${body.join('\n')}`;
+    const base = { EVENT_NAME: 'push', ADMIN_KEY: 'k3y', EVENT_ID: 'expo', EVENT_END_ISO: '', TOKEN_TTL_HOURS: '120' };
+    const r = spawnSync('bash', ['-eo', 'pipefail', '-c', script], { env: { ...process.env, ...base, ...env }, encoding: 'utf8' });
+    return { status: r.status, out: r.stdout + r.stderr };
+}
+
+test('SAM deploy: every override is double-quoted, so SAM parses values with spaces or commas whole', { skip: !bashOk && 'no bash' }, () => {
+    const r = runSamDeploy({ ADMIN_KEY: "a b,c=d'e", EVENT_END_ISO: '2026-11-20T18:00:00Z' });
+    assert.equal(r.status, 0, r.out);
+    for (const p of ['AdminKey="a b,c=d\'e"', 'EventId="expo"', 'EventEndIso="2026-11-20T18:00:00Z"', 'TokenTtlHours="120"']) {
+        assert.ok(r.out.split(/\r?\n/).includes(p), `missing override ${p} in:\n${r.out}`);
+    }
+});
+
+test('SAM deploy: an unset end date is passed as EventEndIso=""', { skip: !bashOk && 'no bash' }, () => {
+    const r = runSamDeploy({ EVENT_END_ISO: '' });
+    assert.equal(r.status, 0, r.out);
+    assert.ok(r.out.split(/\r?\n/).includes('EventEndIso=""'), r.out);
+});
+
+test('SAM deploy: the end date must be strict ISO-8601 UTC', { skip: !bashOk && 'no bash' }, () => {
+    for (const ok of ['2026-11-20T18:00Z', '2026-11-20T18:00:00Z']) {
+        assert.equal(runSamDeploy({ EVENT_END_ISO: ok }).status, 0, ok);
+    }
+    for (const bad of ['tomorrow', 'next friday', '2026-11-20 18:00', '2026-11-20', '2026-11-20T18:00:00+01:00',
+        '2026-11-20T18:00:00.000Z', '2026-13-40T18:00Z', ' 2026-11-20T18:00Z', '2026-11-20T18:00Z\nx']) {
+        const r = runSamDeploy({ EVENT_END_ISO: bad });
+        assert.notEqual(r.status, 0, `accepted ${JSON.stringify(bad)}`);
+        assert.ok(r.out.includes('::error::COMP_EVENT_END_ISO'), r.out);
+        assert.ok(!r.out.includes('deploy'), 'sam never ran');
+    }
+});
+
+test('SAM deploy: an admin key SAM cannot carry inside quotes is refused', { skip: !bashOk && 'no bash' }, () => {
+    for (const bad of ['', 'a"b', 'a\\b']) {
+        const r = runSamDeploy({ ADMIN_KEY: bad });
+        assert.notEqual(r.status, 0, `accepted ${JSON.stringify(bad)}`);
+        assert.ok(r.out.includes('::error::COMP_ADMIN_KEY'), r.out);
+    }
+});
+
+test('SAM deploy: a push never falls back to the test event; a manual run may', { skip: !bashOk && 'no bash' }, () => {
+    const push = runSamDeploy({ EVENT_NAME: 'push', EVENT_ID: '' });
+    assert.notEqual(push.status, 0);
+    assert.ok(push.out.includes('::error::COMP_EVENT_ID'), push.out);
+    const manual = runSamDeploy({ EVENT_NAME: 'workflow_dispatch', EVENT_ID: '' });
+    assert.equal(manual.status, 0, manual.out);
+    assert.ok(manual.out.split(/\r?\n/).includes('EventId="test"'), manual.out);
+    assert.notEqual(runSamDeploy({ EVENT_ID: 'bad id' }).status, 0, 'event id with a space');
 });
 
 test('no secret or variable is interpolated straight into a shell script', () => {

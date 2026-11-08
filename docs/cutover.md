@@ -65,7 +65,8 @@ Names used below:
       gh secret list
       ```
       The IAM role's OIDC trust needs no change: it is the same repo and the same `main` branch, and only the workflow
-      file name changed.
+      file name changed. The admin key must not contain a double quote (`"`) or a backslash (`\`): the deploy passes
+      it to SAM inside double quotes and refuses such a key. Spaces, commas and other symbols are fine.
 - [ ] **B2. Set the event variables to test values first** (Settings → … → Variables):
       ```sh
       gh variable set COMP_EVENT_ID --body test
@@ -73,8 +74,10 @@ Names used below:
       gh variable delete COMP_EVENT_END_ISO 2>/dev/null || true   # empty for the test event
       gh variable list
       ```
-      If a variable is unset, the workflow uses `test`, empty and `120` anyway. The event id may only contain letters,
-      digits, `_` and `-` (up to 40 characters); the deploy refuses anything else.
+      `COMP_EVENT_ID` **must be set before you merge**: a push to `main` fails the backend job if it is unset (only a
+      manual run falls back to `test`). An unset TTL means `120` and an unset end date means "no end date". The event
+      id may only contain letters, digits, `_` and `-` (up to 40 characters), and the end date must be UTC in the form
+      `2026-11-20T18:00:00Z` (or `…T18:00Z`); the deploy refuses anything else.
 - [ ] **B3. Note:** there is no event id in the frontend. The backend's `EventId` alone selects the leaderboard, so the
       two can never disagree.
 
@@ -249,11 +252,15 @@ name and email, or obvious test ones, so you can spot them in the CSV later. Ope
 - [ ] **H1. Set the real values:**
       ```sh
       gh variable set COMP_EVENT_ID --body <event-id>               # e.g. hedj-expo-2026; letters, digits, _ and - only
-      gh variable set COMP_EVENT_END_ISO --body <end, ISO-8601>     # e.g. 2026-11-20T18:00:00Z
+      gh variable set COMP_EVENT_END_ISO --body <end, ISO-8601 UTC> # e.g. 2026-11-20T18:00:00Z (Z, no offset)
       gh variable set COMP_TOKEN_TTL_HOURS --body 120
       ```
       Once the event starts, don't change `COMP_EVENT_ID` again. A new id starts an empty leaderboard. Players and
       score rows expire 90 days after the end date.
+
+      **Never delete `COMP_EVENT_ID` after this point.** If it is unset, every push to `main` fails its backend job (and
+      so skips the frontend) instead of switching the live event to `test`. Only a manual run
+      (`gh workflow run deploy.yml`) falls back to `test`, so don't start one while the variable is missing.
 - [ ] **H2. Redeploy the backend only:**
       ```sh
       gh workflow run deploy.yml -f target=backend
