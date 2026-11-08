@@ -331,3 +331,160 @@ test('start needs a registered player', () => {
     globalThis.localStorage = new FakeStorage();
     assert.throws(() => controller().start('airline'), /registered/);
 });
+
+// ── Fix round 1: shared stand device (R39), late submissions, storage failures ──────────────
+
+const B_EMAIL = 'bob@x.com';
+function switchTo(email, name = 'Bob') {
+    storage.clearRegistration();   // "Not you?"
+    storage.saveRegistration({ playerName: name, email, company: 'Co', gameToken: `t-${email}`, gameTokenExpiry: T0 * 2 });
+}
+
+// Records which registered player each PUT was sent as; remote progress is per registered player.
+function recordingApi(remoteByEmail = {}) {
+    const api = fakeApi();
+    api.putsBy = [];
+    api.putRemoteProgress = async p => { api.putsBy.push({ as: storage.getRegistration()?.email, progress: p }); return p; };
+    api.getRemoteProgress = async () => remoteByEmail[storage.getRegistration()?.email] ?? null;
+    return api;
+}
+
+test('player switch after a finished run: B gets only the free unlocks, nothing of A is PUT as B', async () => {
+    const api = recordingApi();
+    const rc = controller(api);
+    rc.start('airline', { seed: COMPLETE_SEED });
+    await playOut(rc).at(-1).finished;
+    assert.ok(storage.getProgress(EMAIL).unlocked.includes('mode:pro'));
+
+    switchTo(B_EMAIL);
+    assert.equal(rc.resume(B_EMAIL), null);
+    assert.equal(rc.run, null);
+    assert.equal(rc.email, null);
+    assert.equal(rc.outcome, null);
+    assert.deepEqual(rc.progress(), emptyProgress());
+    assert.deepEqual(await rc.syncProgress(), emptyProgress());
+    assert.deepEqual(storage.getProgress(B_EMAIL), emptyProgress());
+    assert.deepEqual(api.putsBy.filter(p => p.as === B_EMAIL), []);
+});
+
+test('player switch mid-run: B cannot resume or play A\'s run, and A\'s save is kept for A', () => {
+    const rc = controller(recordingApi());
+    rc.start('airline', { seed: COMPLETE_SEED });
+    rc.playQuarter(decide(rc));
+    rc.playQuarter(decide(rc));
+
+    switchTo(B_EMAIL);
+    assert.throws(() => rc.playQuarter({ hedges: {} }), /No run in progress/, 'detected without an explicit reset');
+    assert.equal(rc.run, null);
+    assert.equal(rc.resume(B_EMAIL), null);
+    assert.equal(rc.resume(EMAIL), null, 'A\'s email while B is registered gives nothing');
+    assert.equal(rc.resume(), null);
+    assert.deepEqual(rc.progress(), emptyProgress());
+    assert.equal(storage.loadRun(EMAIL).quarter, 2, 'A can still resume later');
+
+    switchTo(EMAIL, 'Ann');
+    assert.equal(controller().resume(EMAIL).quarter, 2);
+});
+
+test('syncProgress never writes A\'s progress under B, even when the player changes mid-request', async () => {
+    storage.saveProgress(EMAIL, { ...emptyProgress(), runs: 5, best: { simple: 2400, pro: 0 },
+        unlocked: [...emptyProgress().unlocked, 'mode:pro'], chairmenMet: ['musk'] });
+    const api = recordingApi();
+    let release;
+    api.getRemoteProgress = () => new Promise(r => { release = r; });
+    const rc = controller(api);
+    const pending = rc.syncProgress();
+    switchTo(B_EMAIL);
+    release({ ...emptyProgress(), runs: 9 });
+    const result = await pending;
+    assert.deepEqual(result, emptyProgress(), 'B is now registered: B\'s (empty) progress');
+    assert.deepEqual(storage.getProgress(B_EMAIL), emptyProgress());
+    assert.equal(storage.getProgress(EMAIL).runs, 5, 'A\'s local progress is untouched by the late response');
+});
+
+test('a submission that resolves after the player switched neither PUTs as B nor sets an outcome', async () => {
+    const api = recordingApi();
+    let release;
+    api.submitScore = () => new Promise(r => { release = r; });
+    const rc = controller(api);
+    rc.start('airline', { seed: COMPLETE_SEED });
+    const finished = playOut(rc).at(-1).finished;
+    switchTo(B_EMAIL);
+    rc.reset();
+    release({ rank: 3, best: 1, isBest: true });
+    const out = await finished;
+    assert.equal(out.rank, 3);
+    assert.equal(rc.outcome, null, 'the late result does not land on the reset controller');
+    assert.deepEqual(api.putsBy, [], 'no PUT once A is no longer registered');
+});
+
+test('a late submission from the last run does not overwrite the next run\'s outcome', async () => {
+    const api = fakeApi();
+    let release;
+    api.submitScore = () => new Promise(r => { release = r; });
+    const rc = controller(api);
+    rc.start('airline', { seed: COMPLETE_SEED });
+    const finished = playOut(rc).at(-1).finished;
+    rc.start('airline', { seed: NO_POLICY_SEED });   // PLAY AGAIN while the submit is pending
+    release({ rank: 3, best: 1, isBest: true });
+    await finished;
+    assert.equal(rc.outcome, null);
+    assert.equal(rc.run.quarter, 0);
+});
+
+test('a resumed controller produces the same quip and board reaction for the next quarter', () => {
+    const rc = controller();
+    rc.start('airline', { seed: NO_POLICY_SEED });
+    for (let i = 0; i < 3; i++) rc.playQuarter(decide(rc));
+    const reloaded = controller();
+    reloaded.resume(EMAIL);
+    const d = decide(rc);
+    const a = rc.playQuarter(d);
+    const b = reloaded.playQuarter(d);
+    assert.deepEqual(b.quip, a.quip);
+    assert.deepEqual(b.boardReaction, a.boardReaction);
+    assert.deepEqual(b.run, a.run);
+});
+
+test('a noHedge board intro shows 0%', () => {
+    const rc = controller();
+    rc.start('airline', { seed: COMPLETE_SEED });
+    rc.run = { ...rc.run, mandate: { min: 0, max: 0 }, boardType: 'noHedge' };
+    const intro = rc.boardIntro();
+    assert.equal(intro.band, '0%');
+    assert.ok(intro.line.length > 0 && !intro.line.includes('{band}'));
+    assert.ok(content.quips.boardIntro.noHedge.map(l => l.replaceAll('{band}', '0%')).includes(intro.line));
+});
+
+test('storage write failures are flagged on the outcome', async () => {
+    const failing = { ...storage, saveProgress: () => false, queueScore: () => false };
+    const rc = new RunController({ storage: failing, api: fakeApi({ fail: true }), market: marketEngine, content, now: () => T0 });
+    rc.start('airline', { seed: COMPLETE_SEED });
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+        const r = playOut(rc).at(-1);
+        assert.equal(rc.outcome.storageFailed, true);
+        assert.equal(rc.outcome.queued, false);
+        assert.equal((await r.finished).storageFailed, true);
+    } finally {
+        console.warn = warn;
+    }
+});
+
+test('a throw inside finish() does not lose the last quarter\'s result', () => {
+    const broken = { ...storage, saveProgress: () => { throw new Error('quota'); } };
+    const rc = new RunController({ storage: broken, api: fakeApi(), market: marketEngine, content, now: () => T0 });
+    rc.start('airline', { seed: COMPLETE_SEED });
+    const err = console.error;
+    console.error = () => {};
+    try {
+        const last = playOut(rc).at(-1);
+        assert.equal(last.summary.q, 8);
+        assert.ok(last.quip.text && last.boardReaction.line);
+        assert.equal(last.finished, null);
+        assert.match(last.finishError.message, /quota/);
+    } finally {
+        console.error = err;
+    }
+});
