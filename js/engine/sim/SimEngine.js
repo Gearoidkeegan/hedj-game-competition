@@ -143,7 +143,15 @@ export function simulateQuarter(run, decisions, market, content) {
         ({ run: next, quarterNotionalMult, quarterVarianceMult } = applyEventChoice(next, event, decisions.eventChoice));
     }
 
-    // 3. End rates at the next calendar quarter
+    // 3. End rates at the next calendar quarter. First (I4), an active exposure whose underlying had no data at
+    // the start year's Q1 has no rate yet: seed it from this quarter, the first with data (eligibleStartYears
+    // guarantees data from its unlock quarter), as Pro does in GameLoop.initRatesForNewExposures. No RNG draw.
+    const now = calendar(run.startYear, run.quarter);
+    for (const exp of activeExposures(next)) {
+        if (usableRate(next.rates[exp.underlying])) continue;
+        const r = market.getRate(exp.underlying, now.year, now.quarter);
+        if (usableRate(r)) next.rates[exp.underlying] = r;
+    }
     const end = calendar(run.startYear, run.quarter + 1);
     const endRates = {};
     for (const [u, r] of Object.entries(next.rates)) {
