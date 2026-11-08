@@ -287,6 +287,31 @@ name and email, or obvious test ones, so you can spot them in the CSV later. Ope
       Check that the log says `Deploying EventId=<event-id> …`.
 - [ ] **H3. Check:** the leaderboard is empty, both by curl (as in C4) and on the title screen. Test scores stay under
       the `test` event and don't show. Test registrations do stay in the players CSV, so ignore them.
+- [ ] **H4. One-off: give v2 rows an expiry.** v2 never wrote `ttl`, so players and scores from v2 who never play v3
+      are kept forever, against the privacy notice (deleted within 90 days of closing). v3 sets `ttl` only when a row
+      is written again. Run this once, after H1, with the same end date as `COMP_EVENT_END_ISO`. It only touches rows
+      that have no `ttl` (the condition makes a second run a no-op), and `aws dynamodb scan` follows the pages itself:
+      ```sh
+      END=2026-11-20T18:00:00Z   # = COMP_EVENT_END_ISO
+      TTL=$(( $(date -u -d "$END" +%s) + 90 * 86400 ))
+      for spec in Players:email Scores:scoreId; do
+        t="HComp${spec%%:*}-hedj-competition-backend"; k="${spec##*:}"
+        aws dynamodb scan --region eu-north-1 --table-name "$t" --projection-expression "$k" \
+          --filter-expression 'attribute_not_exists(#t)' --expression-attribute-names '{"#t":"ttl"}' \
+          --query "Items[].$k.S" --output text | tr '\t' '\n' | grep -v '^None$' | while IFS= read -r id; do
+            [ -n "$id" ] || continue
+            aws dynamodb update-item --region eu-north-1 --table-name "$t" \
+              --key "$(jq -nc --arg k "$k" --arg v "$id" '{($k): {S: $v}}')" \
+              --update-expression 'SET #t = :t' --condition-expression 'attribute_not_exists(#t)' \
+              --expression-attribute-names '{"#t":"ttl"}' --expression-attribute-values "{\":t\":{\"N\":\"$TTL\"}}"
+          done
+        echo "$t: rows still without ttl:"
+        aws dynamodb scan --region eu-north-1 --table-name "$t" --select COUNT \
+          --filter-expression 'attribute_not_exists(#t)' --expression-attribute-names '{"#t":"ttl"}' --query Count
+      done
+      ```
+      Expect `0` for both tables. (`date -d` is GNU date: Linux, or Git Bash on Windows. `jq` builds the key so an
+      email is never pasted into JSON by hand.)
 
 ## I. Print the QR code
 
