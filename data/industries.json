@@ -9,6 +9,7 @@
             "annualRevenue": 8000000000,
             "startingCash": 500000000,
             "scene": "airport",
+            "commodityRiskHint": "Fuel is your biggest risk. Your bank can't hedge it yet.",
             "exposures": [
                 {
                     "id": "fuel",
@@ -474,6 +475,7 @@
             "annualRevenue": 10000000000,
             "startingCash": 700000000,
             "scene": "energy_grid",
+            "commodityRiskHint": "The oil price is your biggest risk. Your bank can't hedge it yet.",
             "exposures": [
                 {
                     "id": "oil-production",

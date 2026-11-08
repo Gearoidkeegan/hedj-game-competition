@@ -207,7 +207,11 @@ name and email, or obvious test ones, so you can spot them in the CSV later. Ope
       The chairman sprite is clear at 64 px.
 - [ ] A quarter with no event takes 4 taps or fewer (RUN alone is 1; with an off-policy confirm, 2).
 - [ ] **On a 75–100% board before Bigger Bank Facilities:** the dial explains the 50% cap, the facilities card comes
-      first, and RUN asks "Outside the board's policy — run anyway?". Try an airline run.
+      first, and RUN asks "Outside the board's policy — run anyway?". Try a pharma or tech run.
+- [ ] **Airline and energy, first quarter:** the Rate & Commodity Hedging card comes first (ahead of facilities, which
+      is second on a 75–100% board) with the line "Fuel is your biggest risk. Your bank can't hedge it yet." (airline)
+      or "The oil price is your biggest risk. Your bank can't hedge it yet." (energy). The line fits on the card at
+      360 px, and it is gone once the card is bought.
 - [ ] An unaffordable power-up says why, and a screen reader still reads its reason.
 - [ ] **VoiceOver (iPhone) and TalkBack (Android) on the hedge dial:** one swipe stop for the dial, the selected step is
       announced, and swiping up or down changes it. On desktop: Tab reaches each dial once, the arrow keys move it, and

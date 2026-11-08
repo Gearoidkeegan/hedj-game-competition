@@ -292,13 +292,18 @@ export class QuarterScreen {
         // R51: facilities is the fix but can't be afforded: show it greyed out, with the reason.
         const poor = this.capConflict && !ids.includes('facilities') && this._facilitiesUnaffordable(run);
         if (poor) ids = ['facilities', ...ids];
+        // R57: the industry's biggest risk is a commodity book the bank can't hedge yet, so Rate & Commodity
+        // Hedging goes first, ahead of R51's facilities, with the industry's one-line hint.
+        const riskHint = this._commodityRiskHint(run, ids);
+        if (riskHint) ids = ['hedgeAccess', ...ids.filter(id => id !== 'hedgeAccess')];
         if (!ids.length) return null;
         this.powerBtns = ids.map(id => {
             const card = info[id] || {};
             const blurb = id === 'forecasting' && Array.isArray(card.levels)
                 ? card.levels[run.forecastLevel] ?? card.blurb
                 : card.blurb;
-            const urgent = this.capConflict && id === 'facilities';
+            const hinted = riskHint && id === 'hedgeAccess';
+            const urgent = (this.capConflict && id === 'facilities') || hinted;
             const cantAfford = poor && id === 'facilities';
             return h('button', {
                 class: `pu-card${urgent ? ' is-urgent' : ''}${cantAfford ? ' is-unaffordable' : ''}`, type: 'button',
@@ -308,7 +313,7 @@ export class QuarterScreen {
             h('span', { class: 'pu-head' },
                 h('span', { class: 'pu-name', text: card.name || id }),
                 h('span', { class: 'pu-cost', text: formatCash(powerUpCost(run, id), run.baseCurrency) })),
-            urgent ? h('span', { class: 'pu-urgent', text: "Your board's policy needs this" }) : null,
+            urgent ? h('span', { class: 'pu-urgent', text: hinted ? riskHint : "Your board's policy needs this" }) : null,
             cantAfford ? h('span', { class: 'pu-reason', text: `Can't afford it yet: you have ${formatCash(run.cash, run.baseCurrency)}` }) : null,
             blurb ? h('span', { class: 'pu-blurb', text: blurb }) : null,
             card.hedjLine ? h('span', { class: 'pu-hedj', text: card.hedjLine }) : null);
@@ -316,6 +321,15 @@ export class QuarterScreen {
         return h('section', { class: 'q-powerups', 'aria-label': 'Power-ups' },
             h('h2', { text: 'Power-up (one per quarter)' }),
             this.powerBtns);
+    }
+
+    // The industry's commodityRiskHint (data/industries.json: airline and energy, whose fuel and oil books are their
+    // biggest risk) while a commodity exposure is active and Rate & Commodity Hedging is on offer; null otherwise.
+    // Once bought, hedgeAccess is no longer offered, so the hint goes away.
+    _commodityRiskHint(run, offered) {
+        const hint = this.industry?.commodityRiskHint;
+        if (!hint || !offered.includes('hedgeAccess')) return null;
+        return activeExposures(run).some(e => e.type === 'commodity') ? hint : null;
     }
 
     _facilitiesUnaffordable(run) {
