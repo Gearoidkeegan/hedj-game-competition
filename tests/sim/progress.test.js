@@ -23,7 +23,10 @@ test('emptyProgress starts with the free unlocks', () => {
     assert.equal(p.version, 3);
     assert.equal(p.runs, 0);
     assert.deepEqual(p.best, { simple: 0, pro: 0 });
-    assert.deepEqual(p.unlocked, ['industry:airline', 'industry:agrifoods', 'industry:retail', 'powerup:forecasting']);
+    assert.deepEqual(p.unlocked, [
+        'industry:airline', 'industry:agrifoods', 'industry:retail',
+        'powerup:forecasting', 'powerup:facilities', 'powerup:hedgeAccess'
+    ]);
 });
 
 test('first completed run unlocks mode:pro', () => {
@@ -61,8 +64,8 @@ test('unlock thresholds are exact', () => {
     const high = (score) => run1(emptyProgress(), { score }).progress.unlocked;
     assert.ok(!high(1499).includes('industry:construction'));
     assert.ok(high(1500).includes('industry:construction'));
-    assert.ok(!high(1999).includes('powerup:options'));
-    assert.ok(high(2000).includes('powerup:options'));
+    // A9 (R44): the options power-up is gone from Simple, so it is never unlocked.
+    assert.ok(!high(10000).includes('powerup:options'));
     assert.ok(!high(2499).includes('industry:tech'));
     assert.ok(high(2500).includes('industry:tech'));
 });

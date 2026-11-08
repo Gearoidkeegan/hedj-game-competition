@@ -4,6 +4,7 @@ import { loadMarketData, loadIndustries } from '../helpers/loadData.js';
 import { marketEngine } from '../../js/engine/MarketEngine.js';
 import { exposureCashImpact } from '../../js/engine/sim/exposureMath.js';
 import { BALANCE } from '../../js/engine/sim/balance.js';
+import { applyPowerUp } from '../../js/engine/sim/powerUps.js';
 import { createRun, simulateQuarter, activeExposures, isRunOver, classifyBreach } from '../../js/engine/sim/SimEngine.js';
 
 marketEngine.loadFromObjects(loadMarketData());
@@ -21,16 +22,22 @@ function trendMarket(factor) {
     };
 }
 
+// A 25-50% band board, so the tests do not depend on the board the seed draws (A9: it may have no policy).
+const BAND_LOW = { min: 0.25, max: 0.5 };
 function newRun(market = marketEngine, extra = {}) {
-    return createRun({ industry: airline, seed: 12345, startedAt: 1700000000000, market, ...extra });
+    const run = createRun({ industry: airline, seed: 12345, startedAt: 1700000000000, market, ...extra });
+    return { ...run, mandate: BAND_LOW, boardType: 'band' };
 }
+
+// An in-policy hedge for whatever board the seed drew (0 on a no-policy or noHedge board).
+const policyHedge = run => (run.mandate ? run.mandate.min : 0);
 
 function hedgesAt(run, h) {
     return Object.fromEntries(run.exposures.map(e => [e.id, h]));
 }
 
 function decide(hedges, extra = {}) {
-    return { hedges, useOptions: false, buyPowerUp: null, eventChoice: null, ...extra };
+    return { hedges, buyPowerUp: null, eventChoice: null, ...extra };
 }
 
 function deepFreeze(o) {
@@ -42,8 +49,9 @@ function deepFreeze(o) {
 }
 
 test('createRun is deterministic', () => {
-    const a = newRun();
-    const b = newRun();
+    const make = () => createRun({ industry: airline, seed: 12345, startedAt: 1700000000000, market: marketEngine });
+    const a = make();
+    const b = make();
     assert.deepEqual(a, b);
     assert.equal(a.version, 3);
     assert.equal(a.status, 'playing');
@@ -52,7 +60,9 @@ test('createRun is deterministic', () => {
     assert.equal(a.cash, airline.startingCash);
     assert.equal(a.benchmarkCash, airline.startingCash);
     assert.equal(a.redLine, BALANCE.redLinePct * airline.startingCash);
-    assert.ok(BALANCE.mandates.some(m => m.min === a.mandate.min && m.max === a.mandate.max));
+    assert.ok(BALANCE.boards.some(m => m.type === a.boardType
+        && (a.mandate === null ? m.type === 'none' : m.min === a.mandate.min && m.max === a.mandate.max)));
+    assert.equal(a.forecastLevel, 0);
     assert.equal(a.rates.JETNWE, marketEngine.getRate('JETNWE', a.startYear, 1));
 });
 
@@ -75,7 +85,8 @@ test('all-zero hedges: playerDelta === benchmarkDelta', () => {
 //   |playerDelta − baseOcf| = |that residual|
 //   playerDelta − benchmarkDelta = Σ hedgeImpact
 test('100% forward: marketResult = Σ exposure impact on (realised − forecast); player − benchmark = Σ hedgeImpact', () => {
-    const run = newRun();
+    // 100% on every exposure needs facilities (cap) and hedgeAccess (fuel).
+    const run = applyPowerUp(applyPowerUp(newRun(), 'facilities'), 'hedgeAccess');
     const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 1)), marketEngine, content);
     const byId = Object.fromEntries(run.exposures.map(e => [e.id, e]));
     let residual = 0;
@@ -112,6 +123,7 @@ test('breach classification', () => {
 
     const loss = simulateQuarter(runUp, decide(hedgesAt(runUp, 0)), up, content).summary;
     assert.equal(loss.inMandate, false);
+    assert.equal(loss.policy, 'off');
     assert.ok(loss.marketResult < 0);
     assert.equal(loss.breach, 'loss');
 
@@ -123,6 +135,7 @@ test('breach classification', () => {
     for (const [run, market] of [[runUp, up], [runDown, down]]) {
         const s = simulateQuarter(run, decide(hedgesAt(run, run.mandate.min)), market, content).summary;
         assert.equal(s.inMandate, true);
+        assert.equal(s.policy, 'in');
         assert.equal(s.breach, 'none');
     }
 });
@@ -143,35 +156,21 @@ test('lucky breach is criticised less than a losing breach', () => {
     assert.equal(luckyChange, BALANCE.mood.luckyBreach + BALANCE.mood.beatBenchmark);
 });
 
-test('in-mandate quarter that beats the benchmark gains inMandate + beatBenchmark mood', () => {
+// A9 (R41): in policy, the board judges the outcome. The fuel exposure is not hedgeable yet.
+test('in-policy quarter: a loss that beats the benchmark gets inPolicyBad + beatBenchmark; a gain that lags gets inPolicyGood', () => {
     const down = trendMarket(0.9);
     const up = trendMarket(1.1);
     const run = newRun(up, { forcedYear: 2010 });
     const s = simulateQuarter(run, decide(hedgesAt(run, run.mandate.max)), up, content).summary;
     assert.equal(s.breach, 'none');
+    assert.ok(s.marketResult < 0);
     assert.ok(s.playerDelta >= s.benchmarkDelta);
-    assert.equal(s.boardMoodAfter - run.boardMood, BALANCE.mood.inMandate + BALANCE.mood.beatBenchmark);
+    assert.equal(s.boardMoodAfter - run.boardMood, BALANCE.mood.inPolicyBad + BALANCE.mood.beatBenchmark);
     const runD = newRun(down, { forcedYear: 2010 });
     const sd = simulateQuarter(runD, decide(hedgesAt(runD, runD.mandate.max)), down, content).summary;
+    assert.ok(sd.marketResult >= 0);
     assert.ok(sd.playerDelta < sd.benchmarkDelta);
-    assert.equal(sd.boardMoodAfter - runD.boardMood, BALANCE.mood.inMandate);
-});
-
-// A mild market (no severe quarter), so the two-strike rule is tested on its own.
-test('two losing breaches -> fired', () => {
-    const up = trendMarket(1.05);
-    let run = newRun(up, { forcedYear: 2010 });
-    const first = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
-    assert.equal(first.summary.breach, 'loss');
-    assert.equal(first.summary.severe, false);
-    assert.equal(first.run.status, 'playing');
-    run = first.run;
-    const second = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
-    assert.equal(second.summary.breach, 'loss');
-    assert.equal(second.summary.severe, false);
-    assert.ok(second.run.boardMood > BALANCE.fireThreshold, `mood ${second.run.boardMood}`);
-    assert.equal(second.run.status, 'fired');
-    assert.equal(isRunOver(second.run), true);
+    assert.equal(sd.boardMoodAfter - runD.boardMood, BALANCE.mood.inPolicyGood);
 });
 
 test('bankruptcy', () => {
@@ -184,28 +183,26 @@ test('bankruptcy', () => {
     assert.deepEqual(after.history[0], summary);
 });
 
-test('status precedence: bankrupt beats a 2nd losing breach in the same quarter', () => {
+test('status precedence: bankrupt beats a low board mood in the same quarter', () => {
     const up = trendMarket(1.1);
-    let run = newRun(up, { forcedYear: 2010 });
-    run = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content).run;
-    run = { ...run, cash: 1 };
+    const run = { ...newRun(up, { forcedYear: 2010 }), cash: 1, boardMood: 1 };
     const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
     assert.equal(summary.breach, 'loss');
-    assert.equal(after.history.filter(s => s.breach === 'loss').length, BALANCE.breachLossesToFire);
+    assert.ok(after.boardMood <= BALANCE.fireThreshold);
     assert.equal(after.status, 'bankrupt');
-    assert.equal(after.history.length, 2);
 });
 
-test('status precedence: a 2nd losing breach fires even with a happy board', () => {
+// R40: the two-strike rule is gone; a second (non-severe) losing breach on a happy board keeps the job.
+test('a 2nd losing breach no longer fires a happy board', () => {
     const up = trendMarket(1.05);
     let run = newRun(up, { forcedYear: 2010 });
     run = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content).run;
     run = { ...run, boardMood: 100 };
     const { run: after, summary } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
+    assert.equal(summary.breach, 'loss');
     assert.equal(summary.severe, false);
-    assert.ok(after.cash > 0);
-    assert.ok(after.boardMood > BALANCE.fireThreshold, `mood ${after.boardMood}`);
-    assert.equal(after.status, 'fired');
+    assert.equal(after.history.filter(s => s.breach === 'loss').length, 2);
+    assert.equal(after.status, 'playing');
 });
 
 test('classifyBreach: in band -> none, not severe', () => {
@@ -295,7 +292,9 @@ test('status precedence: bankrupt beats a severe losing breach in the same quart
 function playFull(seed) {
     let run = createRun({ industry: airline, seed, startedAt: 1, market: marketEngine });
     while (!isRunOver(run)) {
-        run = simulateQuarter(run, decide(hedgesAt(run, run.mandate.min)), marketEngine, content).run;
+        // hedgeAccess in Q1, so the fuel exposure is hedged in policy too.
+        const buyPowerUp = run.quarter === 0 ? 'hedgeAccess' : null;
+        run = simulateQuarter(run, decide(hedgesAt(run, policyHedge(run)), { buyPowerUp }), marketEngine, content).run;
     }
     return run;
 }
@@ -320,8 +319,9 @@ test('mood is clamped to 0..100 and a low mood fires', () => {
     const { run: after } = simulateQuarter(run, decide(hedgesAt(run, 0)), up, content);
     assert.equal(after.boardMood, 0);
     assert.equal(after.status, 'fired');
-    const high = { ...newRun(up, { forcedYear: 2010 }), boardMood: 99 };
-    const r2 = simulateQuarter(high, decide(hedgesAt(high, high.mandate.max)), up, content).run;
+    const down = trendMarket(0.9);
+    const high = { ...newRun(down, { forcedYear: 2010 }), boardMood: 99 };
+    const r2 = simulateQuarter(high, decide(hedgesAt(high, high.mandate.max)), down, content).run;
     assert.equal(r2.boardMood, 100);
 });
 
@@ -341,7 +341,7 @@ test('complete after 8', () => {
 
 test('IR realised notional equals forecast at q>=6 regardless of seed', () => {
     for (const seed of [1, 7, 12345, 999999, 0xDEADBEEF]) {
-        let run = createRun({ industry: airline, seed, startedAt: 1, market: marketEngine });
+        let run = { ...createRun({ industry: airline, seed, startedAt: 1, market: marketEngine }), mandate: BAND_LOW, boardType: 'band' };
         while (run.quarter < 8) {
             const before = run.quarter;
             const startRates = run.rates;

@@ -10,10 +10,15 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 export function quarterPoints(summary, startingCash) {
     const P = BALANCE.points;
     let pts = 0;
-    if (summary.breach === 'none') pts += P.inMandate;
+    // A9 (R43): the policy points are keyed on being in policy, not on breach === 'none', so a no-policy
+    // quarter (policy 'none', inMandate null, breach 'none', Simple or Pro) earns no policy or breach points.
+    // Summaries without a `policy` field fall back to inMandate === true.
+    const inPolicy = summary.policy !== undefined ? summary.policy === 'in' : summary.inMandate === true;
+    if (inPolicy) pts += P.inMandate;
     else if (summary.breach === 'lucky') pts += P.luckyBreach;
     else if (summary.breach === 'loss') pts += P.breachLoss;
     if (summary.cashAfter >= summary.redLine) pts += P.aboveRedLine;
+    if (summary.policyAdopted) pts += P.policyAdopted;
 
     const baseOcf = BALANCE.baseOcfPct * startingCash;
     const spread = Math.max(1, Math.abs(summary.benchmarkDelta - baseOcf));

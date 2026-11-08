@@ -35,6 +35,27 @@
 // share(full > median(mandate)) 0.261; share(random > median(mandate)) 0.027.
 // At n = 300 (the test): unhedged bankrupt 0.027, severe 0.270; random severe 0.143; flat50 severe 0.030.
 // gameOverTitles bands move by at most 0.3 points per band pooled vs A7, so their `min` values are unchanged.
+//
+// A9 (rulings R40-R44): board types (band / noHedge / none), proposing a policy, outcome-based mood,
+// results-based firing (the two-strike rule and breachLossesToFire are gone), power-ups forecasting (3 tiers),
+// visibility, facilities (cap 50% -> 100%, 10% borrowing buffer) and hedgeAccess (IR/commodity); options removed.
+// Strategies are redefined (mandate -> policy; see tools/simulate.js). New terms: boards, mood.inPolicyGood/
+// inPolicyBad/noPolicyHedgeLoss/noPolicyHedgeWin/policyAdopted, forecast, facilities, powerUpCosts,
+// points.policyAdopted. With notionalScale 6 and breachLoss -25, bankruptRate(policy) was 0.049 and
+// firedRate(unhedged) 0.475 (both under a 10% margin): the policy strategy follows a noHedge board unhedged,
+// and fuel/commodity books are unhedgeable until hedgeAccess. Retuned: notionalScale 6 -> 5,
+// mood.breachLoss -25 -> -22 (still the heaviest single term). `node tools/simulate.js --n 1000`:
+//
+//  strategy   mean    p10    p25 median    p75    p90    max bankrupt  fired severe meanQ
+//  unhedged    578      0      0    113   1030   1965   2040    0.054  0.422  0.155  6.37
+//    flat50    946      0      0    491   2032   2287   3152    0.044  0.502  0.093  6.31
+//    policy   2249   1870   2022   2217   2480   2902   5783    0.035  0.000  0.000  7.90
+//      full    876      0      0    290   1614   2543   7186    0.009  0.629  0.054  6.00
+//    random    702      0      0    491   1235   1823   3121    0.045  0.470  0.135  6.45
+//
+// fired rate by starting board (band / noHedge / none): unhedged 0.725 / 0.000 / 0.000; flat50 0.301 / 0.827 / 0.756.
+// Every criterion in tools/simulate.js criteria() passes with >= 16% relative margin (n = 1000) and >= 15% (n = 300).
+// Policy scores sit ~220 below the A8 mandate strategy, so new gameOverTitles mins are proposed to D3 (A9 report).
 
 export const BALANCE = {
     startMood: 60,
@@ -42,10 +63,27 @@ export const BALANCE = {
     redLinePct: 0.2,
     baseOcfPct: 0.05,
     eventChance: 0.35,
-    mandates: [{ min: 0.25, max: 0.5 }, { min: 0.5, max: 0.75 }, { min: 0.75, max: 1 }],
-    mood: { inMandate: 4, luckyBreach: -3, breachLoss: -25, beatBenchmark: 3, redZone: -12 },
-    breachLossesToFire: 2,
+    // A9 (R42): picked once per run in createRun by weight. 'none' is the immature no-policy board
+    // (run.mandate null); 'noHedge' is a policy not to hedge ({0, 0}).
+    boards: [
+        { type: 'band', min: 0.25, max: 0.5, weight: 0.2 },
+        { type: 'band', min: 0.5, max: 0.75, weight: 0.2 },
+        { type: 'band', min: 0.75, max: 1, weight: 0.2 },
+        { type: 'noHedge', min: 0, max: 0, weight: 0.15 },
+        { type: 'none', weight: 0.25 }
+    ],
+    mood: {
+        inPolicyGood: 4, inPolicyBad: -2, luckyBreach: 0, breachLoss: -22,
+        noPolicyHedgeLoss: -20, noPolicyHedgeWin: 1, policyAdopted: 10,
+        beatBenchmark: 3, redZone: -12
+    },
     severeBreachLossPct: 0.35,
-    notionalScale: 6,
-    points: { inMandate: 100, luckyBreach: 25, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 12, survival: 500 }
+    notionalScale: 5,
+    // A9 (R44): forecast surprise variance = baseVariance x (1 - accuracy) / 0.6, accuracy 0.4 + 0.2 x level.
+    forecast: { baseVariance: 0.4 },
+    // A9 (R44): before facilities each hedge ratio is capped at baseHedgeCap and there is no borrowing buffer.
+    facilities: { baseHedgeCap: 0.5, borrowPct: 0.1 },
+    // Fractions of starting cash. forecasting is per level (1st, 2nd, 3rd module).
+    powerUpCosts: { forecasting: [0.005, 0.01, 0.015], visibility: 0.005, facilities: 0.01, hedgeAccess: 0.01 },
+    points: { inMandate: 100, luckyBreach: 25, breachLoss: -300, aboveRedLine: 50, stability: 100, outperformPerPct: 12, survival: 500, policyAdopted: 100 }
 };

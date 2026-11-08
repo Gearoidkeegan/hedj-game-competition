@@ -40,7 +40,7 @@ test('bankrupt gets no survival bonus', () => {
 });
 
 test('total never negative', () => {
-    const h = history(0, 1000, { breach: 'loss', cashAfter: 0 });
+    const h = history(0, 1000, { breach: 'loss', inMandate: false, cashAfter: 0 });
     h[7].cashAfter = 0;
     const r = finalScore(input(h, { status: 'bankrupt', boardMood: 0 }));
     assert.ok(r.breakdown.outperformance < 0);
@@ -68,14 +68,14 @@ test('score is an integer', () => {
 
 test('lucky breach scores less than in-mandate, more than losing breach', () => {
     const none = quarterPoints(summary({ breach: 'none' }), START);
-    const lucky = quarterPoints(summary({ breach: 'lucky' }), START);
-    const loss = quarterPoints(summary({ breach: 'loss' }), START);
+    const lucky = quarterPoints(summary({ breach: 'lucky', inMandate: false }), START);
+    const loss = quarterPoints(summary({ breach: 'loss', inMandate: false }), START);
     assert.ok(none > lucky && lucky > loss);
 });
 
 test('a losing breach costs more than an in-mandate quarter earns', () => {
     // playerDelta far from baseOcf with benchmark at baseOcf-ish: stability 0 (|-100 - baseOcf| = 70 exceeds the spread of 30), below red line
-    const loss = quarterPoints(summary({ breach: 'loss', cashAfter: 100 }), START);
+    const loss = quarterPoints(summary({ breach: 'loss', inMandate: false, cashAfter: 100 }), START);
     assert.ok(loss < 0);
     assert.equal(loss, BALANCE.points.breachLoss);
 });
@@ -137,4 +137,22 @@ test('missing or non-finite boardMood defaults to startMood and is clamped, so t
     }
     assert.ok(Math.abs(finalScore(input(h, { boardMood: 500 })).breakdown.moodMultiplier - 1.2) < 1e-9);
     assert.ok(Math.abs(finalScore(input(h, { boardMood: -50 })).breakdown.moodMultiplier - 0.8) < 1e-9);
+});
+
+// A9 (R43): policy points are keyed on being in policy, not on breach === 'none'. A no-policy quarter
+// (Simple or Pro: policy 'none', inMandate null, breach 'none') earns no policy or breach points.
+test('a no-policy quarter earns no policy points; an in-policy one does', () => {
+    const base = { cashAfter: 100 }; // below the red line, stability 0
+    assert.equal(quarterPoints(summary({ ...base, policy: 'none', inMandate: null, breach: 'none' }), START), 0);
+    assert.equal(quarterPoints(summary({ ...base, inMandate: null, breach: 'none' }), START), 0, 'no policy field, inMandate null');
+    assert.equal(quarterPoints(summary({ ...base, policy: 'in', inMandate: true, breach: 'none' }), START), BALANCE.points.inMandate);
+    assert.equal(quarterPoints(summary({ ...base, inMandate: true, breach: 'none' }), START), BALANCE.points.inMandate, 'no policy field');
+    assert.equal(quarterPoints(summary({ ...base, policy: 'off', inMandate: false, breach: 'lucky' }), START), BALANCE.points.luckyBreach);
+    assert.equal(quarterPoints(summary({ ...base, policy: 'off', inMandate: false, breach: 'loss' }), START), BALANCE.points.breachLoss);
+});
+
+test('adopting a policy earns policyAdopted points once', () => {
+    const base = summary({ cashAfter: 100, policy: 'none', inMandate: null, breach: 'none' });
+    assert.equal(quarterPoints({ ...base, policyAdopted: { min: 0.5, max: 0.75 } }, START), BALANCE.points.policyAdopted);
+    assert.equal(quarterPoints({ ...base, policyAdopted: null }, START), 0);
 });
