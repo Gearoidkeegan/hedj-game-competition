@@ -42,9 +42,31 @@ jobs:
         working-directory: backend
         run: sam build --template template.yaml
 
+      # Event settings come from repository variables (Settings → Secrets and variables → Actions → Variables).
+      # Every parameter is always passed: SAM reuses the previous value of any parameter left out on an update,
+      # so omitting one would silently keep an old event live.
       - name: SAM deploy
         working-directory: backend
+        env:
+          ADMIN_KEY: ${{ secrets.COMP_ADMIN_KEY }}
+          EVENT_ID: ${{ vars.COMP_EVENT_ID || 'test' }}
+          EVENT_END_ISO: ${{ vars.COMP_EVENT_END_ISO }}
+          TOKEN_TTL_HOURS: ${{ vars.COMP_TOKEN_TTL_HOURS || '120' }}
         run: |
+          # The event id is part of every leaderboard key ("<event>#<mode>#<day>"), so keep it plain.
+          if ! printf '%s' "$EVENT_ID" | grep -Eq '^[A-Za-z0-9_-]{1,40}$'; then
+            echo "::error::COMP_EVENT_ID must be 1-40 letters, digits, '_' or '-' (got '$EVENT_ID')"; exit 1
+          fi
+          if ! printf '%s' "$TOKEN_TTL_HOURS" | grep -Eq '^[1-9][0-9]{0,3}$'; then
+            echo "::error::COMP_TOKEN_TTL_HOURS must be a whole number of hours (got '$TOKEN_TTL_HOURS')"; exit 1
+          fi
+          if [ -n "$EVENT_END_ISO" ] && ! date -u -d "$EVENT_END_ISO" >/dev/null 2>&1; then
+            echo "::error::COMP_EVENT_END_ISO must be an ISO-8601 date, e.g. 2026-11-20T18:00:00Z (got '$EVENT_END_ISO')"; exit 1
+          fi
+          # An empty end date is passed as "" so it clears any earlier value. The backend treats an empty or
+          # unparseable value as "no end date" and keeps rows 90 days after each write.
+          END_ARG="${EVENT_END_ISO:-\"\"}"
+          echo "Deploying EventId=$EVENT_ID EventEndIso=${EVENT_END_ISO:-<empty>} TokenTtlHours=$TOKEN_TTL_HOURS"
           sam deploy \
             --stack-name hedj-competition-backend \
             --resolve-s3 \
@@ -52,7 +74,11 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --region eu-north-1 \
-            --parameter-overrides AdminKey="${{ secrets.COMP_ADMIN_KEY }}"
+            --parameter-overrides \
+              "AdminKey=$ADMIN_KEY" \
+              "EventId=$EVENT_ID" \
+              "EventEndIso=$END_ARG" \
+              "TokenTtlHours=$TOKEN_TTL_HOURS"
 
       - name: Print API URL
         run: |

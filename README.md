@@ -302,6 +302,10 @@ Backend parameters (`backend/template.yaml`):
 
 Follow the prompts. On first deploy use `--guided`; subsequent deploys can omit it.
 
+In CI (`.github/workflows`) the parameters come from GitHub: `AdminKey` from the `COMP_ADMIN_KEY` secret, and
+`EventId`, `EventEndIso` and `TokenTtlHours` from the repository variables `COMP_EVENT_ID` (default `test`),
+`COMP_EVENT_END_ISO` (default empty) and `COMP_TOKEN_TTL_HOURS` (default `120`). See `docs/cutover.md`.
+
 The deploy outputs the API Gateway URL. Use this as the CloudFront origin for `/api/*` routes.
 
 ### DynamoDB Tables
@@ -317,7 +321,6 @@ The deploy outputs the API Gateway URL. Use this as the CloudFront origin for `/
 API Gateway is configured to accept requests from:
 - `https://competition.hedj.eu`
 - `http://localhost:8080`
-- `http://localhost:3000`
 
 Update `template.yaml` if the production domain changes.
 
@@ -345,12 +348,12 @@ Upload all files except `backend/` to the S3 bucket. Invalidate the CloudFront d
 ```javascript
 {
   apiBase: '/api',           // API Gateway base path (CloudFront rewrites /api/*)
-  competitionActive: true,   // Show registration gate and leaderboard features
   attractModeIdleMs: 300000  // Kiosk attract mode delay (5 minutes)
 }
 ```
 
-Set `competitionActive: false` to run the game without the registration gate (e.g. for internal demos).
+There is no event id in the frontend. The backend's `EventId` parameter alone selects the leaderboard, so
+switching event is a backend redeploy only.
 
 ### Admin Key
 
