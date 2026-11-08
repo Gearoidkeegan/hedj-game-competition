@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.js';
 import { getRegistration, getQueuedScores, removeQueuedScore } from './storage.js';
+import { isFinalRejection } from './scoreRejection.js';
 
 const TIMEOUT_MS = 10000;
 
@@ -95,7 +96,8 @@ export async function putRemoteProgress(progress) {
 
 let flushing = null;
 
-// Sends queued scores. Keeps an item on a network failure or 401 (and stops, to retry later), drops it on any other 4xx (401, 408, 429 and 5xx are kept).
+// Sends queued scores. Drops an item the server refuses for good (isFinalRejection: a 4xx other than 401, 408 and
+// 429) and moves on; on anything else (offline, 401, 408, 429, 5xx) keeps it and stops, to retry later.
 // Returns how many were sent. Only sends a player's scores while that same player is registered on this device.
 export function flushScoreQueue() {
     if (!flushing) {
@@ -115,7 +117,7 @@ async function doFlush() {
             removeQueuedScore(item.gameId);
             sent++;
         } catch (err) {
-            if (err.status >= 400 && err.status < 500 && ![401, 408, 429].includes(err.status)) {
+            if (isFinalRejection(err)) {
                 removeQueuedScore(item.gameId);
                 continue;
             }

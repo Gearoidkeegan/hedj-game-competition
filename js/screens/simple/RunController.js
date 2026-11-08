@@ -9,6 +9,7 @@ import { finalScore } from '../../engine/sim/score.js';
 import { applyRunToProgress, emptyProgress, mergeProgress, serialiseSave } from '../../engine/sim/progress.js';
 import { CRISES } from '../../engine/sim/crises.js';
 import { SeededRandom } from '../../utils/random.js';
+import { isFinalRejection, rejectionText } from '../../utils/scoreRejection.js';
 import { CHAIRMAN_SPRITES, spriteIdForMember } from '../../ui/pixel/sprites.js';
 
 // The chairman speaks instead of a board member in these quarters, and whenever the gap to the benchmark
@@ -400,8 +401,15 @@ export class RunController {
                 this.storage.removeQueuedScore(payload.gameId);
                 result.queued = false;
                 if (res && !res.duplicate && Number.isFinite(res.rank)) result.rank = res.rank;
-            } catch {
-                // Offline or rejected: it stays queued, and flushScoreQueue retries it (or drops a bad one).
+            } catch (err) {
+                // Refused for good (R63): drop it and say why. Otherwise (offline, 401, 408, 429, 5xx) it stays
+                // queued, and flushScoreQueue retries it.
+                if (isFinalRejection(err)) {
+                    this.storage.removeQueuedScore(payload.gameId);
+                    result.queued = false;
+                    result.rejected = true;
+                    result.rejectedReason = rejectionText(err.message);
+                }
             }
             if (typeof this.api.flushScoreQueue === 'function') {
                 Promise.resolve().then(() => this.api.flushScoreQueue()).catch(() => {});

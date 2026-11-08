@@ -161,6 +161,37 @@ test('offline at game over: the score stays queued and rank is null', async () =
     assert.deepEqual(storage.getQueuedScores().map(p => p.gameId), [rc.run.gameId]);
 });
 
+test('a score the server refuses for good is dropped from the queue and marked rejected (R63)', async () => {
+    const api = fakeApi();
+    api.submitScore = async () => { throw Object.assign(new Error('Run too short'), { status: 400 }); };
+    const rc = controller(api);
+    rc.start('airline', { seed: COMPLETE_SEED });
+    const out = await playOut(rc).at(-1).finished;
+    assert.equal(out.rejected, true);
+    assert.equal(out.rejectedReason, 'Score not accepted: run too short');
+    assert.equal(out.queued, false);
+    assert.equal(out.rank, null);
+    assert.deepEqual(storage.getQueuedScores(), [], 'a final rejection is not retried');
+    assert.equal(rc.outcome.rejected, true);
+    // The local personal best still records the run.
+    assert.equal(storage.getProgress(EMAIL).best.simple, out.score);
+});
+
+test('network errors, 401, 408, 429 and 5xx keep the score queued and are not shown as rejected', async () => {
+    for (const status of [0, 401, 408, 429, 500, 503]) {
+        storage.setStorageBackend(new FakeStorage());
+        storage.saveRegistration({ playerName: 'Ann', email: EMAIL, company: 'Co', gameToken: 't', gameTokenExpiry: T0 * 2 });
+        const api = fakeApi();
+        api.submitScore = async () => { throw Object.assign(new Error('x'), { status }); };
+        const rc = controller(api);
+        rc.start('airline', { seed: COMPLETE_SEED });
+        const out = await playOut(rc).at(-1).finished;
+        assert.equal(out.rejected, undefined, `status ${status}`);
+        assert.equal(out.queued, true, `status ${status}`);
+        assert.deepEqual(storage.getQueuedScores().map(p => p.gameId), [rc.run.gameId], `status ${status}`);
+    }
+});
+
 test('the run is deterministic: quips and the chairman never touch the simulation RNG', () => {
     const rc = controller();
     rc.start('airline', { seed: COMPLETE_SEED });
