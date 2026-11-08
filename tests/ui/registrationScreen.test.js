@@ -4,6 +4,7 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFakeDocument } from '../helpers/fakeDom.js';
 import { RegistrationScreen, NAME_ERROR, COMPANY_ERROR } from '../../js/screens/RegistrationScreen.js';
+import { getRegistration } from '../../js/utils/storage.js';
 
 class FakeStorage {
     constructor() { this.m = new Map(); }
@@ -86,4 +87,28 @@ test('typing a name the server would refuse shows an inline error under the fiel
     assert.equal(name.getAttribute('aria-invalid'), 'false');
     type('');
     assert.equal(nameError.style.display, 'none', 'an empty field is not an error until submit');
+});
+
+test('after registering, the client stores the name and company the server returns, not the typed ones (M1)', async () => {
+    const { screen, el } = mounted();
+    const shown = [];
+    screen.app = { showScreen: id => shown.push(id) };
+    globalThis.fetch = async () => ({
+        ok: true, status: 200,
+        json: async () => ({ gameToken: 'tok', expiresAt: 123, playerName: 'Ann', company: 'Acme Ltd' })
+    });
+    try {
+        el.querySelector('#reg-name').value = 'ann';
+        el.querySelector('#reg-email').value = 'ann@x.com';
+        el.querySelector('#reg-company').value = 'acme';
+        el.querySelector('#reg-consent').checked = true;
+        await screen.handleSubmit();
+    } finally {
+        delete globalThis.fetch;
+    }
+    const reg = getRegistration();
+    assert.equal(reg.playerName, 'Ann');
+    assert.equal(reg.company, 'Acme Ltd');
+    assert.equal(reg.gameToken, 'tok');
+    assert.deepEqual(shown, ['title']);
 });

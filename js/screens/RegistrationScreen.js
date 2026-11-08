@@ -152,10 +152,12 @@ export class RegistrationScreen {
 
         try {
             const result = await register(name, email, company, marketingConsent);
+            // The identity is set at first registration (R18, R25): keep what the server stored, which is what the
+            // boards show, rather than what was typed this time.
             saveRegistration({
-                playerName: name,
+                playerName: result?.playerName ?? name,
                 email,
-                company,
+                company: result?.company ?? company,
                 marketingConsent,
                 gameToken: result.gameToken,
                 gameTokenExpiry: result.expiresAt
