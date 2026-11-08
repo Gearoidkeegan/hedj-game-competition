@@ -19,30 +19,12 @@ import { RegistrationScreen } from './screens/RegistrationScreen.js';
 import { RunController } from './screens/simple/RunController.js';
 import { IndustryScreen } from './screens/simple/IndustryScreen.js';
 import { QuarterScreen } from './screens/simple/QuarterScreen.js';
+import { ResultScreen } from './screens/simple/ResultScreen.js';
 import * as api from './utils/api.js';
 import * as storage from './utils/storage.js';
 
-const { trackEvent, submitScore, flushScoreQueue } = api;
-const { getRegistration, getPendingScore, clearPendingScore } = storage;
-
-// Stand-in for the Simple result screen that B3 builds.
-class PlaceholderScreen {
-    constructor(app, name) {
-        this.app = app;
-        this.name = name;
-        this.el = null;
-    }
-
-    render() {
-        this.el = document.createElement('div');
-        this.el.className = 'screen active';
-        this.el.textContent = `${this.name.toUpperCase()}: coming soon`;
-        return this.el;
-    }
-
-    mount() {}
-    unmount() {}
-}
+const { trackEvent, flushScoreQueue } = api;
+const { getRegistration } = storage;
 
 class App {
     constructor() {
@@ -57,6 +39,7 @@ class App {
         this.marketReady = Promise.resolve();
         this.runController = null;
         this.lastQuarter = null;   // the latest runController.playQuarter() result, for the result screen (B3)
+        this.gameOverMode = null;  // 'simple' (set by the result screen) or 'pro' (the Pro game loop)
     }
 
     async init() {
@@ -73,7 +56,7 @@ class App {
             // Simple mode (v3)
             industry: new IndustryScreen(this),
             quarter: new QuarterScreen(this),
-            result: new PlaceholderScreen(this, 'result'),
+            result: new ResultScreen(this),
             gameover: new GameOverScreen(this),
             // Pro mode
             setup: new SetupScreen(this),
@@ -92,8 +75,7 @@ class App {
         // Track site visit (fire-and-forget)
         trackEvent('visit');
 
-        // Flush any pending score submission from a previous session
-        this.flushPendingScore();
+        // Send any scores queued while offline
         flushScoreQueue().catch(() => {});
         window.addEventListener('online', () => flushScoreQueue().catch(() => {}));
 
@@ -153,6 +135,7 @@ class App {
                 this.showScreen('summary');
                 break;
             case PHASE.GAMEOVER:
+                this.gameOverMode = 'pro';
                 this.showScreen('gameover');
                 break;
         }
@@ -183,19 +166,6 @@ class App {
             this.container.appendChild(screenEl);
             this.screens[screenId].mount();
             this.currentScreen = screenId;
-        }
-    }
-
-    async flushPendingScore() {
-        const pending = getPendingScore();
-        if (!pending) return;
-        const reg = getRegistration();
-        if (!reg?.gameToken || reg.gameTokenExpiry < Date.now()) return;
-        try {
-            await submitScore(pending);
-            clearPendingScore();
-        } catch {
-            // Will retry next visit
         }
     }
 
