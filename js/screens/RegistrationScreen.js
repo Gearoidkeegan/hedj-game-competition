@@ -192,7 +192,8 @@ export class RegistrationScreen {
         const el = this.el.querySelector('#reg-name-error');
         const value = input.value.trim();
         const bad = value !== '' && !validPlayerName(value);
-        el.textContent = bad ? NAME_ERROR : '';
+        const text = bad ? NAME_ERROR : '';
+        if (el.textContent !== text) el.textContent = text;   // only on change, so screen readers announce it once
         el.style.display = bad ? 'block' : 'none';
         input.setAttribute('aria-invalid', bad ? 'true' : 'false');
         return !bad;

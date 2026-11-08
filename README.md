@@ -49,7 +49,7 @@ At the end of a game, registered players are ranked on a global leaderboard and 
 | Layer | Technology |
 |---|---|
 | Frontend | Vanilla JavaScript (ES6 modules), HTML5, CSS3 |
-| Backend | AWS Lambda (Node.js 20) |
+| Backend | AWS Lambda (Node.js 22) |
 | Database | Amazon DynamoDB |
 | API | Amazon API Gateway (REST) |
 | Infrastructure | AWS SAM (CloudFormation) |
