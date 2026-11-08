@@ -32,8 +32,14 @@ export function toQuarterSummary(state, quarterResult) {
     const marketResult = benchmarkDelta + num(quarterResult.hedgePnL)
         - num(quarterResult.tradingCosts) - num(quarterResult.premiums);
     const playerDelta = num(quarterResult.netPnL);
-    const inMandate = quarterResult.inMandate === true;
-    const { breach, severe } = classifyBreach({ inMandate, marketResult, startingCash });
+    // R46: the legacy 'none' hedging policy has no mandate, so there is nothing to breach.
+    // (inMandate null must not reach classifyBreach: it is falsy and would count as off mandate.)
+    const noPolicy = !state.hedgingPolicy || state.hedgingPolicy.id === 'none';
+    const inMandate = noPolicy ? null : quarterResult.inMandate === true;
+    const policy = noPolicy ? 'none' : (inMandate ? 'in' : 'off');
+    const { breach, severe } = noPolicy
+        ? { breach: 'none', severe: false }
+        : classifyBreach({ inMandate, marketResult, startingCash });
 
     const prev = (state.quarterSummaries || []).at(-1);
     const cashAfter = (prev ? prev.cashAfter : startingCash) + playerDelta;
@@ -61,6 +67,7 @@ export function toQuarterSummary(state, quarterResult) {
 
     return {
         q: num(quarterResult.quarter) + 1,
+        policy,
         inMandate,
         playerDelta,
         benchmarkDelta,
@@ -78,7 +85,9 @@ export function toQuarterSummary(state, quarterResult) {
 }
 
 /**
- * Run status after the latest summary, in the Simple precedence (contract.md step 8).
+ * Run status after the latest summary (R40): bankrupt, then a severe off-policy loss fires at once, then
+ * board mood at or below the fire threshold (or walked out) fires, then complete at the last quarter.
+ * Losing breaches that are not severe never fire on their own; they cost points and board mood.
  * walkedOut: the legacy Pro burnout or board firing (GameState.burnedOut / firedByBoard) also ends the run as fired.
  */
 export function proStatus(history, { boardMood, maxQuarters, walkedOut = false }) {
@@ -86,7 +95,6 @@ export function proStatus(history, { boardMood, maxQuarters, walkedOut = false }
     if (!last) return 'playing';
     if (last.cashAfter <= 0) return 'bankrupt';
     if (last.severe) return 'fired';
-    if (history.filter(s => s.breach === 'loss').length >= BALANCE.breachLossesToFire) return 'fired';
     if (boardMood <= BALANCE.fireThreshold) return 'fired';
     if (walkedOut) return 'fired';
     if (last.q >= maxQuarters) return 'complete';

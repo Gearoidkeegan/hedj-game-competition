@@ -29,9 +29,22 @@ function formatExposureNotional(exp, notionalUSD) {
     return formatCurrency(n, '', true);
 }
 
+// A budget the dashboard can compare against. IR budgets may be zero or negative
+// (EURIBOR was below zero 2015-2021); other prices are positive.
+function hasUsableBudget(exp, budget) {
+    return Number.isFinite(budget) && (exp.type === 'ir' || budget > 0);
+}
+
+// Colour of a rate against its budget. A floating-rate payer (IR) is hurt by rising rates.
+function vsBudgetClass(exp, rate, budget) {
+    if (!hasUsableBudget(exp, budget)) return 'pnl-positive';
+    if (exp.type === 'ir') return rate <= budget ? 'pnl-positive' : 'pnl-negative';
+    return rate >= budget ? 'pnl-positive' : 'pnl-negative';
+}
+
 // Rate vs budget: percentage points for interest rates (decimals, 0.035 = 3.50%), percent change otherwise
 function formatVsBudget(exp, rate, budget) {
-    if (!(budget > 0)) return '0.00%';
+    if (!hasUsableBudget(exp, budget)) return '0.00%';
     if (exp.type === 'ir') {
         const pp = (rate - budget) * 100;
         return `${pp >= 0 ? '+' : ''}${pp.toFixed(2)}pp`;
@@ -368,7 +381,9 @@ export class DashboardScreen {
                 const decimals = exp.type === 'ir' ? 4 : (exp.underlying.includes('JPY') ? 2 : 4);
                 const isFx = exp.type === 'fx';
                 let rateClass;
-                if (exp.direction === 'buy') {
+                if (exp.type === 'ir') {
+                    rateClass = vsBudgetClass(exp, livePrice, budgetRate);
+                } else if (exp.direction === 'buy') {
                     rateClass = isFx
                         ? (livePrice >= budgetRate ? 'pnl-positive' : 'pnl-negative')
                         : (livePrice <= budgetRate ? 'pnl-positive' : 'pnl-negative');
@@ -397,10 +412,9 @@ export class DashboardScreen {
                     if (exp) {
                         const decimals = exp.type === 'ir' ? 4 : (exp.underlying.includes('JPY') ? 2 : 4);
                         const budget = state.budgetRates[underlying] || 0;
-                        const diff = budget > 0 ? (livePrice - budget) / budget : 0;
                         cells[1].textContent = formatRate(livePrice, decimals, exp.type);
                         cells[3].textContent = formatVsBudget(exp, livePrice, budget);
-                        cells[3].className = diff >= 0 ? 'pnl-positive' : 'pnl-negative';
+                        cells[3].className = vsBudgetClass(exp, livePrice, budget);
                     }
                 }
             }
@@ -1070,12 +1084,12 @@ export class DashboardScreen {
             const currentRate = state.currentRates[exp.underlying] || 0;
             const budgetRate = state.budgetRates[exp.underlying] || 0;
             const hedgeRatio = gameLoop.getHedgeRatio(exp.underlying);
-            const hasBudget = policy && policy.budgetRateType !== 'none' && budgetRate > 0;
+            const hasBudget = policy && policy.budgetRateType !== 'none' && hasUsableBudget(exp, budgetRate);
             // Rate colour: green if move is favourable, red if adverse.
             // FX EUR-cross: inverted relationship (higher rate = stronger EUR = bad for sell/good for buy).
             let rateClass = '';
             if (hasBudget && exp.type === 'ir') {
-                rateClass = currentRate <= budgetRate ? 'pnl-positive' : 'pnl-negative';
+                rateClass = vsBudgetClass(exp, currentRate, budgetRate);
             } else if (hasBudget) {
                 const isFx = exp.type === 'fx';
                 if (exp.direction === 'buy') {
@@ -1161,7 +1175,7 @@ export class DashboardScreen {
 
         const currentRate = state.currentRates[exp.underlying] || 0;
         const budgetRate = state.budgetRates[exp.underlying] || 0;
-        const hasBudget = policy && policy.budgetRateType !== 'none' && budgetRate > 0;
+        const hasBudget = policy && policy.budgetRateType !== 'none' && hasUsableBudget(exp, budgetRate);
         const decimals = exp.type === 'ir' ? 4 : (exp.underlying.includes('JPY') ? 2 : 4);
 
         // Per-tenor breakdown
@@ -1372,13 +1386,12 @@ export class DashboardScreen {
         for (const exp of state.exposures) {
             const current = state.currentRates[exp.underlying] || 0;
             const budget = state.budgetRates[exp.underlying] || 0;
-            const diff = budget > 0 ? (current - budget) / budget : 0;
             const decimals = exp.type === 'ir' ? 4 : (exp.underlying.includes('JPY') ? 2 : 4);
             html += `<tr>
                 <td><span class="exposure-type-badge ${exp.type}" style="margin-right:4px">${exp.type}</span>${exp.underlying}</td>
                 <td>${formatRate(current, decimals, exp.type)}</td>
                 <td style="color:var(--text-muted)">${formatRate(budget, decimals, exp.type)}</td>
-                <td class="${diff >= 0 ? 'pnl-positive' : 'pnl-negative'}">${formatVsBudget(exp, current, budget)}</td>
+                <td class="${vsBudgetClass(exp, current, budget)}">${formatVsBudget(exp, current, budget)}</td>
             </tr>`;
         }
         html += '</tbody></table>';

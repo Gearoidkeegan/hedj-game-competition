@@ -23,6 +23,7 @@ class GameLoopController {
 
     // Transition to decision phase (used when state is already initialized)
     beginDecisionPhase() {
+        this.ensureIrBudgetRates();
         this.setPhase(PHASE.DECISION);
     }
 
@@ -146,23 +147,32 @@ class GameLoopController {
         let cashImpact = 0;
         const details = [];
 
-        // Exposure P&L against the budget rate for each exposure (exposureCashImpact, A2).
-        // IR exposures use the start-of-game rate as budget: −(rate − budget) × notional × 0.25.
+        // Exposure P&L against a reference rate for each exposure (exposureCashImpact, A2):
+        // - with a budget policy, the budget rate; IR exposures budget at the start-of-game rate,
+        //   −(rate − budget) × notional × 0.25;
+        // - with no budget rate (policy 'none'), the start-of-quarter rate (R46), so the unhedged
+        //   benchmark and IR P&L still move with the market.
         // v2: Use realized notional (with forecast variance) instead of fixed quarterlyNotional
         const policy = state.hedgingPolicy;
         const hasBudgetRate = policy && policy.budgetRateType !== 'none';
 
         for (const exposure of state.exposures) {
-            const budgetRate = hasBudgetRate ? (state.budgetRates[exposure.underlying] || 0) : 0;
-            const currentRate = state.currentRates[exposure.underlying] || budgetRate;
+            const rawBudget = hasBudgetRate ? state.budgetRates[exposure.underlying] : undefined;
+            const budgetRate = Number.isFinite(rawBudget) ? rawBudget : 0;
+            const startRate = state.previousRates[exposure.underlying];
+            const referenceRate = hasBudgetRate ? rawBudget : startRate;
+            const currentRate = state.currentRates[exposure.underlying] ?? referenceRate;
             const forecastNotional = exposure.quarterlyNotional || 0;
             const realizedNotional = (state.realizedNotionals && state.realizedNotionals[exposure.id])
                 || forecastNotional;
 
+            // IR rates may be zero or negative (EURIBOR 2015-2021); other prices divide by the reference.
+            const usable = Number.isFinite(referenceRate) && Number.isFinite(currentRate)
+                && (exposure.type === 'ir' || referenceRate !== 0);
             let expPnL = 0;
-            if (hasBudgetRate && budgetRate !== 0) {
+            if (usable) {
                 // `+ 0` turns -0 into 0
-                expPnL = exposureCashImpact(exposure, budgetRate, currentRate, realizedNotional) + 0;
+                expPnL = exposureCashImpact(exposure, referenceRate, currentRate, realizedNotional) + 0;
             }
             exposurePnL += expPnL;
 
@@ -178,7 +188,8 @@ class GameLoopController {
                 description: exposure.description,
                 pnl: expPnL,
                 budgetRate,
-                startRate: state.previousRates[exposure.underlying],
+                referenceRate,
+                startRate,
                 currentRate,
                 forecastNotional,
                 realizedNotional,
@@ -455,7 +466,6 @@ class GameLoopController {
     // Pro end of game: score on v3 and hand over to the game-over screen.
     // GameOverScreen (B3) reads gameState.get().proResult = { mode: 'pro', status, score, history }.
     finishGame(status) {
-        gameState.update({ runStatus: status });
         const state = gameState.get();
         gameState.update({
             proResult: {
@@ -518,15 +528,19 @@ class GameLoopController {
 
     // IR exposures budget at the start-of-game rate (the first quarter of the hidden start year).
     // Without market data, the rate at the start of the quarter the exposure is first priced.
+    // IR rates can be zero or negative, so only a missing (non-finite) rate counts as unset.
+    // Policies without a budget rate ('none') get no IR budget either.
     ensureIrBudgetRates() {
         const state = gameState.get();
+        const policy = state.hedgingPolicy;
+        if (!policy || policy.budgetRateType === 'none') return;
         const budgetRates = { ...state.budgetRates };
         let changed = false;
         for (const exp of state.exposures) {
-            if (exp.type !== 'ir' || budgetRates[exp.underlying]) continue;
+            if (exp.type !== 'ir' || Number.isFinite(budgetRates[exp.underlying])) continue;
             let start = marketEngine.isLoaded() ? marketEngine.getRate(exp.underlying, state.startYear, 1) : null;
-            if (!start) start = state.previousRates[exp.underlying] || state.currentRates[exp.underlying];
-            if (!start) continue;
+            if (!Number.isFinite(start)) start = state.previousRates[exp.underlying] ?? state.currentRates[exp.underlying];
+            if (!Number.isFinite(start)) continue;
             budgetRates[exp.underlying] = start;
             changed = true;
         }

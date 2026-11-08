@@ -149,7 +149,7 @@ test('IR exposure P&L non-zero when EURIBOR moves', () => {
 });
 
 test('IR budget at unlock is the start-of-game rate', () => {
-    startPro({ policyId: 'none' });
+    startPro({ policyId: 'basic' }); // annual budget reset at Q5 must not move the IR budget
     assert.equal(gameState.get().exposures.some(e => e.type === 'ir'), false);
     for (let i = 0; i < 6; i++) playQuarter();
     assert.ok(gameState.get().exposures.some(e => e.id === 'floating-debt'), 'IR unlocked at Q6');
@@ -190,6 +190,35 @@ test('option premium is charged once: cash at booking, P&L in the booking quarte
     near(result.premiums, opt.premiumPaid);
     const held = gameState.get().hedgePortfolio.find(h => h.id === opt.id);
     assert.ok(held.currentMtm >= 0, `option MTM is intrinsic value only, got ${held.currentMtm}`);
+
+    // Hold to maturity, in the money: cash at maturity is the intrinsic value only (no second premium)
+    const s = gameState.get();
+    const strike = held.strike;
+    const end = strike * 1.2;
+    const base = s.budgetRates.JETNWE || strike;
+    const intrinsic = ((end - strike) / base) * held.notional;
+    const cashBefore = s.cashBalance;
+    const q2 = playQuarter({ JETNWE: end });
+    const settled = q2.details.find(d => d.type === 'hedge' && d.maturedThisQ);
+    near(settled.pnl, intrinsic, 'settlement value is intrinsic');
+    near(gameState.get().cashBalance - cashBefore, intrinsic, 'cash at maturity is intrinsic only');
+    assert.ok(intrinsic > 0);
+    assert.equal(q2.premiums, 0, 'no premium in the maturity quarter');
+});
+
+test("compliance is judged on the book before the quarter's hedges settle (tenor-1 band)", () => {
+    startPro();
+    gameState.update({
+        hedgingPolicy: {
+            id: 'tenor1', budgetRateType: 'fixed', hedgeHorizon: 1, minHedgeRatio: 0, maxHedgeRatio: 1,
+            tenorBands: [{ tenor: 1, min: 0.4, max: 0.6 }]
+        }
+    });
+    for (const exp of gameState.get().exposures) book(exp.id, { notional: exp.quarterlyNotional * 0.5, tenor: 1 });
+    const result = playQuarter();
+    assert.equal(result.inMandate, true, '50% maturing this quarter is inside the tenor-1 band');
+    assert.equal(gameState.get().hedgePortfolio.length, 0, 'and those hedges settled');
+    assert.equal(playQuarter().inMandate, false, 'an empty book is outside the band');
 });
 
 test('a swap settles quarterly and is not paid out again at maturity', () => {
@@ -225,14 +254,23 @@ test('toQuarterSummary benchmarkDelta equals sum of exposure details', () => {
 });
 
 test('toQuarterSummary classifies breaches with classifyBreach (pure)', () => {
-    const state = { startingCash: 1000, boardSatisfaction: 55, quarterSummaries: [], exposures: [], eventHistory: [] };
+    const state = {
+        startingCash: 1000, boardSatisfaction: 55, quarterSummaries: [], exposures: [], eventHistory: [],
+        hedgingPolicy: { id: 'basic' }
+    };
     const mk = (inMandate, exp, hedge, costs = 0, premiums = 0) => ({
         quarter: 0, inMandate, exposurePnL: exp, hedgePnL: hedge, tradingCosts: costs, premiums,
         netPnL: exp + hedge - costs - premiums,
         details: [{ type: 'exposure', exposureId: 'x', underlying: 'EURUSD', pnl: exp, startRate: 1, currentRate: 1.1, forecastNotional: 10, realizedNotional: 10 }]
     });
-    assert.equal(toQuarterSummary(state, mk(true, -500, 0)).breach, 'none');
-    assert.equal(toQuarterSummary(state, mk(false, 10, 0)).breach, 'lucky');
+    const inPolicy = toQuarterSummary(state, mk(true, -500, 0));
+    assert.equal(inPolicy.breach, 'none');
+    assert.equal(inPolicy.policy, 'in');
+    assert.equal(inPolicy.inMandate, true);
+    const lucky = toQuarterSummary(state, mk(false, 10, 0));
+    assert.equal(lucky.breach, 'lucky');
+    assert.equal(lucky.policy, 'off');
+    assert.equal(lucky.inMandate, false);
     const loss = toQuarterSummary(state, mk(false, -100, 0));
     assert.equal(loss.breach, 'loss');
     assert.equal(loss.severe, false);
@@ -245,13 +283,57 @@ test('toQuarterSummary classifies breaches with classifyBreach (pure)', () => {
     near(severe.lines[0].movePct, 10);
 });
 
-test('proStatus precedence: bankrupt, severe, second loss, mood, complete', () => {
+test('toQuarterSummary under the legacy none policy: no mandate, never a breach (R46, pure)', () => {
+    const quarterResult = {
+        quarter: 0, inMandate: true, exposurePnL: -900, hedgePnL: 0, tradingCosts: 0, premiums: 0, netPnL: -900,
+        details: [{ type: 'exposure', exposureId: 'x', underlying: 'EURUSD', pnl: -900 }]
+    };
+    for (const hedgingPolicy of [{ id: 'none' }, null]) {
+        const summary = toQuarterSummary({ startingCash: 1000, boardSatisfaction: 60, hedgingPolicy }, quarterResult);
+        assert.equal(summary.policy, 'none');
+        assert.equal(summary.inMandate, null);
+        assert.equal(summary.breach, 'none', 'a 90% loss is not a breach without a mandate');
+        assert.equal(summary.severe, false);
+        near(summary.marketResult, -900);
+        near(summary.benchmarkDelta, -900);
+    }
+});
+
+test('the none policy values exposures against the start-of-quarter rate (R46)', () => {
+    startPro({ policyId: 'none', unlockAll: true });
+    const s0 = gameState.get();
+    const fuelStart = s0.currentRates.JETNWE;
+    const irStart = s0.currentRates.EURIBOR;
+    const result = playQuarter({ JETNWE: fuelStart * 1.5, EURIBOR: irStart + 0.01 });
+    const s = gameState.get();
+    const fuel = result.details.find(d => d.exposureId === 'fuel');
+    const debt = result.details.find(d => d.exposureId === 'floating-debt');
+    near(fuel.referenceRate, fuelStart, 'reference is the start-of-quarter rate');
+    near(fuel.pnl, -0.5 * fuel.realizedNotional, 'fuel buyer loses on a 50% rise');
+    const notional = s.exposures.find(e => e.id === 'floating-debt').quarterlyNotional;
+    near(debt.pnl, -0.01 * notional * 0.25, 'IR P&L moves under no policy');
+    assert.equal(s.budgetRates.EURIBOR, undefined, 'no IR budget without a budget policy');
+
+    const summary = s.quarterSummaries.at(-1);
+    assert.ok(summary.benchmarkDelta < 0, `benchmark is non-zero, got ${summary.benchmarkDelta}`);
+    near(summary.benchmarkDelta, sum(result.details.filter(d => d.type === 'exposure').map(d => d.pnl)));
+    assert.equal(summary.policy, 'none');
+    assert.equal(summary.inMandate, null);
+    assert.equal(summary.breach, 'none');
+    assert.equal(summary.severe, false);
+    assert.equal(s.runStatus, 'playing', 'a big unhedged loss without a mandate does not fire');
+});
+
+test('proStatus precedence (R40): bankrupt, severe, mood, complete; plain losing breaches never fire', () => {
     const s = (over) => ({ q: 3, breach: 'none', severe: false, cashAfter: 100, ...over });
     const opts = { boardMood: 50, maxQuarters: 8 };
     assert.equal(proStatus([s({ cashAfter: 0, breach: 'loss', severe: true })], opts), 'bankrupt');
     assert.equal(proStatus([s({ breach: 'loss', severe: true })], opts), 'fired');
     assert.equal(proStatus([s({ breach: 'loss' })], opts), 'playing');
-    assert.equal(proStatus([s({ breach: 'loss' }), s({ breach: 'loss' })], opts), 'fired');
+    const losses = [s({ breach: 'loss' }), s({ breach: 'loss' }), s({ breach: 'loss' })];
+    assert.equal(proStatus(losses.slice(0, 2), opts), 'playing', 'two non-severe losing breaches do not fire');
+    assert.equal(proStatus(losses, opts), 'playing', 'nor do three');
+    assert.equal(proStatus([...losses, s({ q: 8, breach: 'loss' })], opts), 'complete');
     assert.equal(proStatus([s()], { ...opts, boardMood: BALANCE.fireThreshold }), 'fired');
     assert.equal(proStatus([s()], { ...opts, walkedOut: true }), 'fired');
     assert.equal(proStatus([s({ q: 8 })], opts), 'complete');
