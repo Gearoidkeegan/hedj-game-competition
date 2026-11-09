@@ -208,6 +208,7 @@ test('the result reveals itself over time; a tap skips the reveal, NEXT goes to 
     assert.ok(qa('.r-line').every(l => !l.hidden), 'a tap reveals every line');
     assert.equal(q('.r-board').hidden, false);
     assert.deepEqual(app.shown, [], 'the first tap only skips the reveal');
+    timers.advance(TAP_GUARD_MS);   // the reveal re-arms the tap guard (final review I2)
     q('.r-next').click();
     assert.deepEqual(app.shown, ['quarter']);
     q('.r-next').click();
@@ -344,6 +345,7 @@ test('a tap during the charts finishes them and shows the board, without advanci
     assert.equal(q('.r-board').hidden, false);
     assert.ok(screen.rows.every(r => !r.chart || r.chart.done), 'every chart finished');
     assert.equal(raf.pending, running - 1, 'the chart loop stopped');
+    timers.advance(TAP_GUARD_MS);   // the reveal re-arms the tap guard (final review I2)
     q('.r-body').click();
     assert.deepEqual(app.shown, ['quarter'], 'the next tap moves on');
 });
@@ -395,4 +397,71 @@ test('v3.1: no note without wrong focus, nor for a summary saved before v3.1', (
     const { q, el } = mountResult(appWith(rc, { ...result, summary: old }));
     assert.equal(q('.r-focus'), null);
     assert.ok(!el.textContent.includes('undefined') && !el.textContent.includes('NaN'));
+});
+
+// ── Final review I2 / I3 ───────────────────────────────────────────────────
+
+test('final I2: a fast double tap reveals but cannot also leave the quarter (the guard re-arms on reveal)', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    const { q, timers } = mountResult(app);
+    q('.r-body').click();
+    assert.equal(q('.r-board').hidden, false, 'tap 1 reveals');
+    q('.r-body').click();
+    q('.r-next').click();
+    assert.deepEqual(app.shown, [], 'tap 2 (body or NEXT) inside the guard window is dropped');
+    timers.advance(TAP_GUARD_MS);
+    q('.r-body').click();
+    assert.deepEqual(app.shown, ['quarter']);
+});
+
+test('final I2: a tap landing just as the board appears on its own does not advance', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    const { q, timers } = mountResult(app);
+    for (let i = 0; i < 400 && q('.r-board').hidden; i++) timers.advance(25);
+    assert.equal(q('.r-board').hidden, false, 'the board appeared naturally');
+    timers.advance(50);
+    q('.r-body').click();
+    assert.deepEqual(app.shown, [], 'a skip tap that lands as the board appears is dropped');
+    timers.advance(TAP_GUARD_MS);
+    q('.r-body').click();
+    assert.deepEqual(app.shown, ['quarter']);
+});
+
+test('final I3: showing the board scrolls it into view (nearest), naturally or on a tap; no throw without the API', () => {
+    const { rc, result } = playOne();
+    const calls = [];
+    const tapped = mountResult(appWith(rc, result));
+    tapped.q('.r-board').scrollIntoView = opts => calls.push(opts);
+    tapped.q('.r-body').click();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].block, 'nearest');
+    const natural = mountResult(appWith(rc, result));
+    const calls2 = [];
+    natural.q('.r-board').scrollIntoView = opts => calls2.push(opts);
+    for (let i = 0; i < 400 && natural.q('.r-board').hidden; i++) natural.timers.advance(25);
+    assert.equal(natural.q('.r-board').hidden, false);
+    assert.equal(calls2.length, 1);
+    // fakeDom elements have no scrollIntoView: the reveal must not throw.
+    const plain = mountResult(appWith(rc, result));
+    assert.doesNotThrow(() => plain.q('.r-body').click());
+    assert.equal(plain.q('.r-board').hidden, false);
+});
+
+test('final I3: with more than 3 exposure lines the charts are compact', () => {
+    const { rc, result } = playOne();
+    const few = mountResult(appWith(rc, result));
+    assert.equal(few.q('.r-lines').classList.contains('is-compact'), false);
+    const line = id => ({ exposureId: id, movePct: 1, exposureImpact: -1e6, hedgeImpact: 0, realisedNotional: 1, forecastNotional: 1, hedgeRatio: 0 });
+    const lines = result.run.exposures.map(e => line(e.id));
+    assert.ok(lines.length > 3);
+    const many = mountResult(appWith(rc, { ...result, summary: { ...result.summary, lines } }));
+    assert.equal(many.q('.r-lines').classList.contains('is-compact'), true);
+    many.q('.r-body').click();   // reveal: every chart mounts
+    const heights = many.qa('.r-chart canvas').map(c => c.style.height);
+    assert.ok(heights.length > 3);
+    assert.ok(heights.every(hh => hh === '56px'), heights.join(','));
+    few.q('.r-body').click();
+    assert.ok(few.qa('.r-chart canvas').every(c => c.style.height === '72px'));
 });

@@ -34,6 +34,9 @@ const BOARD_AFTER_MS = 500;         // board card after the last line
 const SPRITE_SCALE = 2;             // 32px sprites drawn at 64px
 const CHART_GRACE_MS = 300;       // slack before a stalled chart loop is forced to its end
 const NOISE = 0.5;                  // money below half a unit is no impact
+const COMPACT_AFTER = 3;            // more exposure lines than this: shorter charts, so the board stays near
+const CHART_PX = 72;                // result chart height (css .r-chart matches)
+const COMPACT_CHART_PX = 56;        // ...and with more than COMPACT_AFTER lines (css .r-lines.is-compact .r-chart)
 
 // The move of the exposure's foreign currency (or price, or rate) as the player feels it. FX rates are quoted
 // base/quote: when the exposure's currency is the quote (EURUSD for dollars), a rising rate is a weaker dollar.
@@ -173,7 +176,9 @@ export class ResultScreen {
         this.body = h('div', { class: 'q-body r-body', on: { click: this.tapGuard.wrap((e) => this._onTap(e)) } },
             h('div', { class: 'q-scene r-scene' }, this.sceneCanvas),
             quip?.text ? h('p', { class: 'r-quip', text: quip.text }) : null,
-            h('ul', { class: 'r-lines', 'aria-live': 'polite' }, this.rows.flatMap(r => (r.chart ? [r.line, r.chart.li] : [r.line]))),
+            // Final review I3: more than COMPACT_AFTER lines get shorter charts (css: .r-lines.is-compact).
+            h('ul', { class: `r-lines${this.rows.length > COMPACT_AFTER ? ' is-compact' : ''}`, 'aria-live': 'polite' },
+                this.rows.flatMap(r => (r.chart ? [r.line, r.chart.li] : [r.line]))),
             this.boardEl);
 
         this.nextBtn = h('button', { class: 'btn btn-gold q-run r-next', type: 'button', text: 'NEXT',
@@ -237,7 +242,20 @@ export class ResultScreen {
         if (this.revealed || !this.el) return;
         this.revealed = true;
         this.boardEl.hidden = false;
+        // Final review I2: re-arm the guard, so the next tap of a fast double tap (or a skip tap landing just as the
+        // board appears by itself) can't also leave the quarter before the board has been seen.
+        this.tapGuard.arm();
         if (this.avatarEl) paintAvatar(this.avatarEl, this.avatarEl.getAttribute('data-avatar'), this.moodAfter);
+        // Final review I3: the charts can push the board below the fold on a phone, so bring it into view.
+        if (typeof this.boardEl.scrollIntoView === 'function') {
+            try {
+                const media = this.env.matchMedia || globalThis.matchMedia;
+                const reduced = !!media?.('(prefers-reduced-motion: reduce)')?.matches;
+                this.boardEl.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+            } catch (err) {
+                console.warn('ResultScreen: scrollIntoView failed', err);
+            }
+        }
     }
 
     // Natural reveal: once the last line is up and every chart has finished playing.
@@ -281,6 +299,7 @@ export class ResultScreen {
         try {
             this.charts.push(mountPriceChart(c.host, {
                 ...c.series, hedgeRatio: c.hedge, tone: c.tone, label: c.label, env: this.env, ticker: this.ticker,
+                height: this.rows.length > COMPACT_AFTER ? COMPACT_CHART_PX : CHART_PX,
                 onDone: () => { c.done = true; this._maybeShowBoard(); }
             }));
         } catch (err) {
