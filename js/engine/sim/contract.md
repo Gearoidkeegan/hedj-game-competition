@@ -56,8 +56,14 @@ The proposal is adopted after the quarter resolves: this quarter is still judged
             hedgeRatio,     // A9: the ratio actually applied (after clamping)
             clamped }],     // A9: true when the requested ratio was above the allowed limit
   event: { id, choice } | null, powerUp: string|null,
-  policyAdopted: { min, max } | null }   // A9 (R43): the proposal adopted at the end of this quarter
+  policyAdopted: { min, max } | null,   // A9 (R43): the proposal adopted at the end of this quarter
+  riskCover: number|null,               // v3.1 Simple only: size-weighted share hedged (policyCover); null when nothing counts
+  wrongFocus: boolean,                  // v3.1 Simple only: the biggest exposure left open while a small one is hedged
+  exposureValues: { [exposureId]: number } }   // v3.1 Simple only: each active exposure's size this quarter
 ```
+
+Summaries saved before v3.1 (and every Pro summary) have no `riskCover`, `wrongFocus` or `exposureValues`; readers
+treat them as absent (`wrongFocus` falsy) and never require them.
 
 Interest rates in the market data are decimals (EURIBOR 0.034671 = 3.47%). The IR cash impact is
 `−(end − start) × notional × 0.25` (one quarter of interest for a floating-rate payer).
@@ -66,9 +72,23 @@ Interest rates in the market data are decimals (EURIBOR 0.034671 = 3.47%). The I
 `(end − start) × 100`. A zero or missing start rate (or missing end rate) is no move: `movePct`, `exposureImpact` and
 `hedgeImpact` are all 0.
 
-Policy compliance counts only active, hedgeable exposures with a non-zero notional; it is vacuously in policy when there
-are none. It uses the applied (clamped) ratio against the real band, even when the cap makes the band unreachable (75–100
-before `facilities` is off policy). The no-policy board's hedge result is `Σ lines[].hedgeImpact`.
+Policy compliance (v3.1, Simple) is size-weighted, through `policyCover` (below):
+
+- **Weight** `w`: `exposureValue(exp, startRate, forecastNotional)` (exposureMath.js), the size in the reporting currency
+  of this quarter's forecast notional (after the event's `notionalMult`). FX and commodity notionals are already
+  reporting-currency amounts, as `exposureCashImpact` treats them, so `w = |notional|`; floating debt is one quarter
+  of interest at the start rate, `w = |notional × rate × 0.25|`.
+- **Policy set** `P`: active exposures with forecast ≠ 0, `isHedgeable`, and a usable (finite) start rate (after the I4
+  seeding). Locked (not yet hedgeable) exposures keep a size for the screen but never count.
+- **Cover** `= Σ h·w / Σ w` over `P`, with `h` the applied (clamped) ratio. `null` when `P` is empty or `Σ w = 0`.
+- **wrongFocus**: within `P`, the largest-weight exposure `L` (the first one on a tie) has another `S` with
+  `w_L ≥ 2 × w_S` and `h_S − h_L ≥ 0.5` (with 1e-9 slack on the gap). Always false when cover is `null`.
+- **In policy** with a mandate: `cover === null` (vacuous), or `min − 1e-9 ≤ cover ≤ max + 1e-9` and not `wrongFocus`.
+  The real band is used even when the cap makes it unreachable (75–100 before `facilities` is off policy). A noHedge
+  board (`{0,0}`) needs cover 0, i.e. no hedge on anything that counts, as before.
+- **No-policy board:** `wrongFocus` is still reported and picks the board line; it changes nothing in the mood.
+
+Pro (`proAdapter.js`) keeps its own per-exposure compliance from GameLoop and emits none of the v3.1 fields. The no-policy board's hedge result is `Σ lines[].hedgeImpact`.
 Costs and premiums are never in `hedgeImpact`; the identity is `Σ (exposureImpact + hedgeImpact + costImpact) = marketResult`.
 Pro adds an `exposureId: 'other'` line for hedges with no exposure detail (`hedgeImpact`) and for costs (`costImpact`).
 
@@ -84,6 +104,11 @@ createRun({ industry, seed, startedAt, market, crisisId = null, forcedYear = nul
                                               // RNG order (run seed): start year (no draw with forcedYear), then the board
                                               // (one rng.weightedPick over BALANCE.boards)
 simulateQuarter(run, decisions, market, content) -> { run, summary }   // pure; content = { events: SimpleEvent[] }
+quarterStartRates(run, market) -> { [underlying]: number }   // run.rates plus the I4 seeding for this quarter (a copy, no RNG)
+policyCover(run, hedges, notionalMult = {}) -> { cover: number|null, wrongFocus: boolean, values: { [exposureId]: number } }
+                                              // v3.1: the shared policy check (see Policy compliance); run must carry this
+                                              // quarter's start rates and any power-up bought now. The quarter screen calls it
+                                              // with the same inputs, so its RISK COVERED meter matches the engine
 isRunOver(run) -> boolean                     // status !== 'playing'
 classifyBreach({ inMandate, marketResult, startingCash }) -> { breach: 'none'|'lucky'|'loss', severe: boolean }
                                               // A8: used by simulateQuarter; F1's Pro adapter imports it
@@ -269,6 +294,8 @@ Result-quip selection rules (B3):
 Board line selection (B1; D3 writes the lines). First match wins:
 
 1. `summary.policyAdopted` set → `policyAdopted` (the board welcomes the proposal).
+1a. `summary.wrongFocus === true` → `wrongFocus` (v3.1: the small thing hedged, the big one left open), on any board.
+   The chairman yields to it. Angry when the quarter was also a losing breach, otherwise neutral.
 2. `policy === 'none'` → `noPolicyHedgeLoss` if `Σ lines[].hedgeImpact < 0`; `noPolicyHedgeWin` if `> 0`; otherwise
    `noPolicyNudge` (no hedge: the board presses for a policy).
 3. `breach === 'loss'` → `breachLoss`. A heavy, scathing telling-off; the angry sprite always wins over other moods.
