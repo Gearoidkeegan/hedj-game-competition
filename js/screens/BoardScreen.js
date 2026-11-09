@@ -90,7 +90,7 @@ export class BoardScreen {
         this.el.innerHTML = `
             <div class="quarter-bar">
                 <span class="company-name">${state.industry?.name || 'Company'}</span>
-                <span class="quarter-label">BOARD REVIEW — ${formatQuarter(state.currentYearOffset, state.currentQuarter)}</span>
+                <span class="quarter-label">BOARD REVIEW: ${formatQuarter(state.currentYearOffset, state.currentQuarter)}</span>
                 <span id="board-stress-face"></span>
                 <span>
                     <span class="pixel-text" style="font-size:12px;color:var(--text-secondary)">QUARTERLY P&L</span>

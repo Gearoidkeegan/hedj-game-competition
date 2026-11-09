@@ -57,7 +57,7 @@ function jsStrings(src) {
         if (c === "'" || c === '"' || c === '`') {
             let j = i + 1, s = '';
             while (j < src.length && src[j] !== c) { if (src[j] === BS) { s += src[j + 1]; j += 2; } else { s += src[j++]; } }
-            out.push(s);
+            out.push(s.replace(/<!--[\s\S]*?-->/g, ' '));
             i = j + 1;
             continue;
         }
@@ -67,7 +67,9 @@ function jsStrings(src) {
 }
 
 function htmlText(src) {
-    return src.replace(/<!--[\s\S]*?-->/g, ' ').replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+    // <link> tags (favicon data URIs) are not copy.
+    const noLinks = src.split(String.fromCharCode(10)).filter(l => !l.includes('<link ')).join(' ');
+    return noLinks.replace(/<!--[\s\S]*?-->/g, ' ').replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
 }
 
 function collect() {
@@ -91,6 +93,10 @@ function offenders(test) {
 
 test('no em dashes in player-facing copy', () => {
     assert.deepEqual(offenders(s => { const i = s.indexOf('—'); return i >= 0 && 'em dash near "' + s.slice(Math.max(0, i - 40), i + 40).replace(/\s+/g, ' ') + '"'; }), []);
+});
+
+test('no emoji', () => {
+    assert.deepEqual(offenders(s => /\p{Emoji_Presentation}|️/u.test(s) && 'emoji'), []);
 });
 
 test('no banned words or phrases', () => {

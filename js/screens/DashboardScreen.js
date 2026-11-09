@@ -160,7 +160,7 @@ export class DashboardScreen {
                         <!-- Mobile exposure selector (hidden on desktop) -->
                         <div class="mobile-exposure-selector" id="mobile-exposure-selector">
                             <select id="mobile-exposure-select" class="mobile-exposure-dropdown">
-                                <option value="">— Select exposure —</option>
+                                <option value="">Select exposure</option>
                             </select>
                         </div>
 
@@ -356,7 +356,7 @@ export class DashboardScreen {
             }
         }, 500);
 
-        this.app.showToast('Quarter started — markets are live!', 'info');
+        this.app.showToast('Quarter started. Markets are live!', 'info');
     }
 
     /**
@@ -579,7 +579,7 @@ export class DashboardScreen {
         container.innerHTML = `
             <div class="panel-inset mb-8" style="border-color:var(--pnl-negative);">
                 <div class="readable-text" style="font-size:14px;color:var(--pnl-negative);text-align:center;padding:4px;">
-                    ✗ TRADING ERROR — Wrong direction!
+                    ✗ TRADING ERROR: wrong direction!
                 </div>
                 <div class="readable-text" style="font-size:12px;color:var(--text-muted);text-align:center;">
                     The board has been notified.
@@ -761,7 +761,7 @@ export class DashboardScreen {
 
         // Summary line
         let html = `<div style="font-family:var(--font-pixel);font-size:7px;color:var(--text-secondary);margin-bottom:4px;">
-            EXECUTE VIA BANK — ${formatCurrency(totalNewNotional, '', true)} notional
+            EXECUTE VIA BANK: ${formatCurrency(totalNewNotional, '', true)} notional
             ${changes.length > 1 ? ` (${changes.length} tenors)` : ''}
         </div>`;
 
@@ -961,7 +961,7 @@ export class DashboardScreen {
             if (!pickedBest && !requiresDiv) {
                 // Chose a worse price with no diversification reason — board unhappy
                 gameState.adjustSatisfaction(-2);
-                this.app.showToast(`${offer.bank.shortName}: hedges booked but not best price — board noticed`, 'warning');
+                this.app.showToast(`${offer.bank.shortName}: hedges booked but not best price, and the board noticed`, 'warning');
             } else if (pickedBest && requiresDiv) {
                 // Picked best price but policy requires diversification — check concentration
                 const bankTrades = (state.hedgePortfolio || []).filter(h => h.bankId === bankId && h.status === 'active');
@@ -969,7 +969,7 @@ export class DashboardScreen {
                 const concentration = totalActive.length > 0 ? bankTrades.length / totalActive.length : 0;
                 if (concentration > 0.6) {
                     gameState.adjustSatisfaction(-2);
-                    this.app.showToast(`${offer.bank.shortName}: best price, but too concentrated — diversify!`, 'warning');
+                    this.app.showToast(`${offer.bank.shortName}: best price, but too concentrated. Diversify!`, 'warning');
                 } else {
                     const premNote = totalPremium > 0 ? ` (premium: ${formatCurrency(totalPremium, '', true)})` : '';
                     this.app.showToast(`${offer.bank.shortName}: ${formatCurrency(totalNotionalBooked, '', true)} booked${premNote}`, 'success');
@@ -1240,7 +1240,7 @@ export class DashboardScreen {
         overlay.innerHTML = `
             <div class="exposure-detail-modal">
                 <div class="modal-header">
-                    <span>${exp.underlying} — ${exp.type.toUpperCase()}</span>
+                    <span>${exp.underlying}: ${exp.type.toUpperCase()}</span>
                     <button class="modal-close" id="close-exp-detail">X</button>
                 </div>
                 <div class="modal-body" style="overflow-y:auto;">
@@ -1309,10 +1309,10 @@ export class DashboardScreen {
         const select = this.el.querySelector('#mobile-exposure-select');
         if (!select) return;
         const state = gameState.get();
-        select.innerHTML = '<option value="">— Select exposure —</option>';
+        select.innerHTML = '<option value="">Select exposure</option>';
         for (const exp of state.exposures) {
             const hedgeRatio = gameLoop.getHedgeRatio(exp.underlying);
-            const label = `${exp.underlying} (${exp.type.toUpperCase()}) — ${formatPercent(hedgeRatio, 0)} hedged`;
+            const label = `${exp.underlying} (${exp.type.toUpperCase()}): ${formatPercent(hedgeRatio, 0)} hedged`;
             select.innerHTML += `<option value="${exp.underlying}">${label}</option>`;
         }
         // Sync with current selection
@@ -1449,7 +1449,7 @@ export class DashboardScreen {
                     <td>${formatCurrency(hedge.notional, '', true)}</td>
                     <td>${formatRate(hedge.contractRate, 4, hedge.assetClass)}</td>
                     <td class="${pnlClass(mtm)}">${formatPnL(mtm, state.industry?.baseCurrency)}</td>
-                    <td style="color:var(--text-muted);font-size:12px;">${bank?.shortName || '—'}</td>
+                    <td style="color:var(--text-muted);font-size:12px;">${bank?.shortName || '-'}</td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -1553,7 +1553,7 @@ export class DashboardScreen {
         // Determine sender and message based on exposure types
         const expSummary = newExposures.map(exp => {
             const typeLabel = exp.type === 'fx' ? 'FX' : exp.type === 'ir' ? 'Interest Rate' : 'Commodity';
-            return `<strong>${exp.underlying}</strong> — ${exp.description} (${typeLabel}, ${formatExposureNotional(exp)}/qtr)`;
+            return `<strong>${exp.underlying}</strong>: ${exp.description} (${typeLabel}, ${formatExposureNotional(exp)}/qtr)`;
         }).join('<br>');
 
         // Determine sender based on exposure types
@@ -1564,7 +1564,7 @@ export class DashboardScreen {
         let from = 'Operations Team';
         let category = 'operations';
         if (hasIR) {
-            from = 'CFO — Finance';
+            from = 'CFO, Finance';
             category = 'finance';
         } else if (hasRevenue && !hasCost) {
             from = 'Commercial Team';
@@ -1649,7 +1649,7 @@ export class DashboardScreen {
                     <span class="pixel-text" style="font-size:7px;color:var(--text-muted);">TOTAL SPENT: ${formatCurrency(tms.totalCost, '', true)}</span>
                 </div>
                 <button class="btn" id="btn-buy-tms" style="width:100%;font-size:10px;padding:6px;" ${!tms.canBuy ? 'disabled style="width:100%;font-size:10px;padding:6px;opacity:0.4;cursor:not-allowed;"' : ''}>
-                    INSTALL MODULE — ${formatCurrency(tms.moduleCost, '', true)}
+                    INSTALL MODULE: ${formatCurrency(tms.moduleCost, '', true)}
                 </button>
                 ${!tms.canBuy && tms.moduleCount >= tms.maxModules ? '<div class="pixel-text" style="font-size:7px;color:var(--pnl-positive);text-align:center;margin-top:3px;">All modules installed</div>' : ''}
                 ${!tms.canBuy && tms.moduleCount < tms.maxModules ? '<div class="pixel-text" style="font-size:7px;color:var(--pnl-negative);text-align:center;margin-top:3px;">Insufficient cash</div>' : ''}
@@ -1750,9 +1750,9 @@ export class DashboardScreen {
                 const result = tmsEngine.purchase();
                 if (result.success) {
                     const msg = result.boardReaction === 'positive'
-                        ? `TMS module ${result.moduleCount} installed — board impressed!`
+                        ? `TMS module ${result.moduleCount} installed. Board impressed!`
                         : result.boardReaction === 'negative'
-                        ? `TMS module ${result.moduleCount} installed — board concerned about spending`
+                        ? `TMS module ${result.moduleCount} installed. Board concerned about spending`
                         : `TMS module ${result.moduleCount} installed`;
                     const type = result.boardReaction === 'negative' ? 'warning' : 'success';
                     this.app.showToast(msg, type);
@@ -1873,7 +1873,7 @@ export class DashboardScreen {
 
         const rulesHtml = (policy.rules && policy.rules.length > 0)
             ? policy.rules.map(r => `<li style="margin-bottom:4px;">${r}</li>`).join('')
-            : '<li>No specific rules — full discretion</li>';
+            : '<li>No specific rules, full discretion</li>';
 
         // Build per-tenor compliance table if policy has tenor bands
         let tenorHtml = '';
