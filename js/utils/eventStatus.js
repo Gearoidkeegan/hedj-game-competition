@@ -94,6 +94,7 @@ export class EventMode {
     // True when the status should be asked again before it is used: the last check failed, it is older than
     // RECHECK_MS, or a cached start or end date has passed since it was fetched (a phone left open across either).
     isStale() {
+        if (this._inflight) return true;   // a second tap waits for the same answer, never goes on the old mode
         const now = this.now();
         if (!this.fresh || now - this.checkedAt >= RECHECK_MS) return true;
         const crossed = iso => {

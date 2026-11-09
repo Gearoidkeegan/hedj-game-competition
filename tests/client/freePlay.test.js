@@ -309,3 +309,24 @@ test('live mode is unchanged: the registered player submits and queues as before
     assert.equal(api.submitted.length, 1);
     assert.equal(api.submitted[0].email, ANN);
 });
+
+// FP re-review: a check in flight counts as stale, so a second tap (PRO during PLAY's check, or PLAY during the
+// title's own refresh) waits for the same answer instead of going ahead on the old mode.
+test('isStale: true while a check is in flight, even when the status was fresh', async () => {
+    let t = Date.parse('2026-11-20T10:00:00Z');
+    let release;
+    let held = false;
+    const em = new EventMode({
+        fetchEvent: () => held ? new Promise(r => { release = r; }) : Promise.resolve({ live: true, startIso: null, endIso: null }),
+        storage, now: () => t
+    });
+    await em.refresh();
+    assert.equal(em.isStale(), false);
+    held = true;
+    const pending = em.refresh();
+    assert.equal(em.isStale(), true, 'in flight');
+    release({ live: false, startIso: null, endIso: null });
+    await pending;
+    assert.equal(em.isStale(), false);
+    assert.equal(em.event.live, false);
+});
