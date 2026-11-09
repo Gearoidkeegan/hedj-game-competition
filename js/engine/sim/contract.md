@@ -83,7 +83,8 @@ Policy compliance (v3.1, Simple) is size-weighted, through `policyCover` (below)
   (after the I4 seeding). Locked (not yet hedgeable) exposures keep a size for the screen but never count; a weightless
   one (debt at a 0% rate) adds nothing to cover and is left out so it can't be wrong focus's "small one".
 - **Cover** `= Σ h·w / Σ w` over `P`, with `h` the applied (clamped) ratio. `null` when `P` is empty.
-- **wrongFocus**: within `P`, the largest-weight exposure `L` (the first one on a tie) has another `S` with
+- **wrongFocus**: within `P` minus floating debt (`ir` counts in cover but is never `L` or `S`, because its card shows
+  the principal, not the interest weight), the largest-weight exposure `L` (the first one on a tie) has another `S` with
   `w_L ≥ 2 × w_S` and `h_S − h_L ≥ 0.5` (with 1e-9 slack on the gap). Always false when cover is `null`, and always
   false on a noHedge board (`mandate.max === 0`), where any hedge is the breach and "hedge the big one" is wrong advice.
 - **In policy** with a mandate: `cover === null` (vacuous), or `min − 1e-9 ≤ cover ≤ max + 1e-9` and not `wrongFocus`.

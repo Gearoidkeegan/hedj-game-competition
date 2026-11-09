@@ -130,8 +130,8 @@ export function quarterStartRates(run, market) {
 //           the hedge ratio after clamping to maxHedgeRatio. null when P is empty. (A weightless exposure, such as
 //           debt at a 0% rate, adds nothing to cover, so leaving it out changes no cover; it just can't be "the small
 //           one" below.)
-//   wrongFocus: within P, the largest exposure L (first on a tie) has another S with w_L ≥ 2·w_S and h_S − h_L ≥ 0.5.
-//           Never on a noHedge board (run.mandate.max === 0): there any hedge is the breach, and "hedge the big one"
+//   wrongFocus: within P minus floating debt (ir), the largest exposure L (first on a tie) has another S with
+//           w_L ≥ 2·w_S and h_S − h_L ≥ 0.5. Never on a noHedge board (run.mandate.max === 0): there any hedge is the breach, and "hedge the big one"
 //           would be the wrong advice.
 // `run` must carry this quarter's start rates (quarterStartRates), its mandate, and any power-up bought this quarter.
 export function policyCover(run, hedges = {}, notionalMult = {}) {
@@ -145,15 +145,21 @@ export function policyCover(run, hedges = {}, notionalMult = {}) {
         values[exp.id] = w;
         if (forecast === 0 || !(w > 0) || !isHedgeable(run, exp)) continue;
         const requested = hedges[exp.id] ?? 0;
-        set.push({ w, h: Math.min(requested, maxHedgeRatio(run, exp)) });
+        set.push({ w, h: Math.min(requested, maxHedgeRatio(run, exp)), ir: exp.type === 'ir' });
     }
     if (!set.length) return { cover: null, wrongFocus: false, values };
     const total = set.reduce((s, x) => s + x.w, 0);
     const cover = set.reduce((s, x) => s + x.h * x.w, 0) / total;
-    const big = set.reduce((a, b) => (b.w > a.w ? b : a));
+    // Floating debt counts in cover but is never L or S: its card shows the principal (the interest weight would
+    // reveal the rate level), so "big" and "small" must mean what the player can see.
+    const focus = set.filter(x => !x.ir);
     const noHedgeBoard = !!run.mandate && run.mandate.max === 0;
-    const wrongFocus = !noHedgeBoard && set.some(x => x !== big
-        && big.w >= WRONG_FOCUS_SIZE * x.w && x.h - big.h >= WRONG_FOCUS_GAP - EPS);
+    let wrongFocus = false;
+    if (!noHedgeBoard && focus.length >= 2) {
+        const big = focus.reduce((a, b) => (b.w > a.w ? b : a));
+        wrongFocus = focus.some(x => x !== big
+            && big.w >= WRONG_FOCUS_SIZE * x.w && x.h - big.h >= WRONG_FOCUS_GAP - EPS);
+    }
     return { cover, wrongFocus, values };
 }
 

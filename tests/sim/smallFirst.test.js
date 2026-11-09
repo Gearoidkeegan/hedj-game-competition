@@ -31,11 +31,13 @@ test('smallFirst: the middle exposures sit at the band midpoint', () => {
     const run = withPowerUps(runFor('agrifoods', { quarter: 6 }), ['facilities', 'hedgeAccess']);
     const hedges = smallFirstHedges(run, 0.5, marketEngine);
     const { values } = policyCover({ ...run, rates: quarterStartRates(run, marketEngine) }, {});
-    const ids = Object.keys(values).filter(id => values[id] > 0).sort((a, b) => values[a] - values[b]);
+    // Floating debt is never "big" or "small" for wrong focus (final review I1), so it is ranked out and sits at mid.
+    const ids = Object.keys(values).filter(id => values[id] > 0 && id !== 'floating-debt').sort((a, b) => values[a] - values[b]);
     assert.ok(ids.length >= 3);
     assert.equal(hedges[ids[0]], 1, `smallest ${ids[0]}`);
     assert.equal(hedges[ids.at(-1)], 0, `largest ${ids.at(-1)}`);
     for (const id of ids.slice(1, -1)) assert.equal(hedges[id], 0.5, id);
+    assert.equal(hedges['floating-debt'], 0.5);
 });
 
 test('smallFirst: with fewer than two hedgeable exposures every dial is at the midpoint', () => {

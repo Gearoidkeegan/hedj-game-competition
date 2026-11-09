@@ -71,13 +71,14 @@ const hasIrOrCommodity = run => run.exposures.some(e => e.type === 'ir' || e.typ
 const owns = (run, id) => run.powerUps.owned.includes(id);
 const canBuy = (run, id) => canBuyPowerUp(run, id, POWER_UP_IDS);
 
-// smallFirst's dials (v3.1 diagnostic): `mid` everywhere, except the smallest-weight exposure in the policy set
-// (hedgeable, non-zero, weighed with the engine's own policyCover at this quarter's start rates) at 100% and the
+// smallFirst's dials (v3.1 diagnostic): `mid` everywhere, except the smallest-weight exposure in the wrong-focus set
+// (hedgeable, non-zero, not floating debt, weighed with the engine's own policyCover at this quarter's start rates)
+// at 100% and the
 // largest at 0. With fewer than two such exposures, every dial is at `mid`. `run` already has this quarter's power-up.
 export function smallFirstHedges(run, mid, market) {
     const { values } = policyCover({ ...run, rates: quarterStartRates(run, market) }, {});
     const set = activeExposures(run)
-        .filter(e => e.quarterlyNotional !== 0 && isHedgeable(run, e) && values[e.id] > 0)
+        .filter(e => e.type !== 'ir' && e.quarterlyNotional !== 0 && isHedgeable(run, e) && values[e.id] > 0)
         .sort((a, b) => values[a.id] - values[b.id]);
     const hedges = Object.fromEntries(run.exposures.map(e => [e.id, mid]));
     if (set.length >= 2) {

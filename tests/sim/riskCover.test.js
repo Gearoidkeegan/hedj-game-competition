@@ -278,3 +278,27 @@ test('fix 1 (minor 5): a weightless exposure (debt at a 0% rate) is left out, so
     assert.equal(r.cover, 0);
     assert.deepEqual(r.values, { USD: 300, debt: 0 });
 });
+
+// ── Final review I1 ─────────────────────────────────────────────────────────
+
+test('final I1: floating debt counts in cover but is never the big or the small one in the wrong-focus test', () => {
+    // Reviewer's repro: airline Q7, 50–75% band, debt 100%, fuel 75%, USD and GBP 50%.
+    let run = runOn({ min: 0.5, max: 0.75 }, { powerUps: ['facilities', 'hedgeAccess'] });
+    run = { ...run, quarter: 6 };
+    const hedges = { 'floating-debt': 1, fuel: 0.75, 'usd-revenue': 0.5, 'gbp-revenue': 0.5 };
+    const rated = { ...run, rates: quarterStartRates(run, mkt) };
+    const pc = policyCover(rated, hedges);
+    assert.ok(pc.values['floating-debt'] > 0, 'debt is weighed');
+    const v = pc.values;
+    const expected = (v['floating-debt'] + 0.75 * v.fuel + 0.5 * v['usd-revenue'] + 0.5 * v['gbp-revenue'])
+        / (v['floating-debt'] + v.fuel + v['usd-revenue'] + v['gbp-revenue']);
+    near(pc.cover, expected, 'debt still counts in cover');
+    assert.equal(pc.wrongFocus, false);
+    const { summary } = simulateQuarter(run, decide(hedges), mkt, content);
+    assert.equal(summary.wrongFocus, false);
+    assert.equal(summary.policy, 'in');
+    // FX and commodity still trigger it among themselves.
+    const fxOnly = policyCover({ ...rated, exposures: rated.exposures.map(e => (e.id === 'fuel' ? { ...e, quarterlyNotional: 100e6 } : e)) },
+        { ...hedges, fuel: 1, 'usd-revenue': 0.25 });
+    assert.equal(fxOnly.wrongFocus, true);
+});
