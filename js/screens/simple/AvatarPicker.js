@@ -36,12 +36,20 @@ export function needsAvatar(storage = realStorage) {
     return !!player && storedAvatar(storage, player) === null;
 }
 
-// A canvas showing the character, sized `cssPx` square and drawn at the device pixel ratio so it stays crisp.
-// Drawing is cosmetic: without a 2D context (tests) the canvas is simply left blank.
+// The whole-number drawing scale for a character shown `cssPx` wide at `dpr`: at least one device pixel per CSS
+// pixel. The canvas is 32 x scale square and CSS sizes it to cssPx (image-rendering: pixelated), so every source
+// pixel is the same whole number of device pixels and none is dropped.
+export function avatarScale(cssPx, dpr) {
+    const d = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+    const css = Number.isFinite(cssPx) && cssPx > 0 ? cssPx : AVATAR_SIZE;
+    return Math.max(1, Math.ceil((css * d) / AVATAR_SIZE));
+}
+
+// A canvas showing the character at an integer scale (avatarScale). Drawing is cosmetic: without a 2D context
+// (tests) the canvas is simply left blank.
 export function avatarCanvas(id, mood, cssPx, className = 'av-face', label = null) {
-    const g = globalThis;
-    const dpr = Math.min(3, Math.max(1, Number(g.devicePixelRatio) || 1));
-    const px = Math.round(cssPx * dpr);
+    const dpr = Math.min(3, Math.max(1, Number(globalThis.devicePixelRatio) || 1));
+    const px = AVATAR_SIZE * avatarScale(cssPx, dpr);
     const canvas = h('canvas', {
         class: className, width: String(px), height: String(px), 'data-avatar': id, 'data-mood': mood,
         role: label ? 'img' : null, 'aria-label': label, 'aria-hidden': label ? null : 'true'
@@ -59,9 +67,10 @@ export function paintAvatar(canvas, id, mood) {
         const ctx = canvas.getContext?.('2d');
         if (!ctx) return;
         const size = Number(canvas.getAttribute('width')) || Number(canvas.width) || AVATAR_SIZE;
+        const scale = Math.max(1, Math.floor(size / AVATAR_SIZE));   // whole number: avatarCanvas sizes it 32 x scale
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, size, size);
-        drawAvatar(ctx, id, mood, 0, 0, size / AVATAR_SIZE);
+        drawAvatar(ctx, id, mood, 0, 0, scale);
     } catch (err) {
         console.warn('Avatar unavailable', err);
     }

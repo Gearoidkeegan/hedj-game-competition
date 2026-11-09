@@ -11,7 +11,7 @@ import * as storage from '../../js/utils/storage.js';
 import { EventMode } from '../../js/utils/eventStatus.js';
 import { avatarMood } from '../../js/engine/sim/avatarMood.js';
 import { AVATARS, AVATAR_IDS, AVATAR_SIZE, AVATAR_EXPRESSIONS, isAvatarId, drawAvatar } from '../../js/ui/pixel/avatars.js';
-import { AvatarPicker, avatarPlayer, storedAvatar, needsAvatar } from '../../js/screens/simple/AvatarPicker.js';
+import { AvatarPicker, avatarPlayer, storedAvatar, needsAvatar, avatarScale, avatarCanvas } from '../../js/screens/simple/AvatarPicker.js';
 import { RunController } from '../../js/screens/simple/RunController.js';
 import { QuarterScreen } from '../../js/screens/simple/QuarterScreen.js';
 import { ResultScreen } from '../../js/screens/simple/ResultScreen.js';
@@ -518,4 +518,54 @@ test('industry: the second tap of a double tap on the picker cannot start a run'
     await new Promise(r => setTimeout(r, 0));
     assert.equal(app.runController.run?.industryId, 'airline');
     assert.deepEqual(app.shown, ['quarter']);
+});
+
+test('storage: a failed save wins over an older value still in the store', () => {
+    const old = new FakeStorage();
+    old.setItem('hedj_v3:erin@z.com:avatar', 'p1');
+    storage.setStorageBackend({ getItem: k => old.getItem(k), setItem: () => { throw new Error('quota'); }, removeItem: k => old.removeItem(k) });
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+        assert.equal(storage.saveAvatar('erin@z.com', 'p2'), false);
+    } finally { console.warn = warn; }
+    assert.equal(storage.getAvatar('erin@z.com'), 'p2');
+});
+
+// Crisp pixels (review Important 1): every avatar canvas is 32 x an integer scale, drawn at that scale, so each
+// source pixel is the same whole number of device pixels and none is dropped.
+test('avatar canvases draw at an integer scale with no row or column dropped (24px and 48px, DPR 1 to 3)', () => {
+    const saved = globalThis.devicePixelRatio;
+    try {
+        for (const css of [24, 48, 64]) {
+            for (const dpr of [1, 1.5, 2, 3]) {
+                const s = avatarScale(css, dpr);
+                assert.ok(Number.isInteger(s) && s >= 1, `${css}px @${dpr}: scale ${s}`);
+                assert.ok(32 * s >= css * dpr, `${css}px @${dpr}: at least one device pixel per CSS pixel`);
+                globalThis.devicePixelRatio = dpr;
+                const canvas = avatarCanvas('p1', 'angry', css);
+                assert.equal(canvas.getAttribute('width'), String(32 * s));
+                assert.equal(canvas.getAttribute('height'), String(32 * s));
+                for (const id of AVATAR_IDS) {
+                    const ctx = recordingContext();
+                    drawAvatar(ctx, id, 'angry', 0, 0, s);
+                    const rows = new Set();
+                    const cols = new Set();
+                    for (const [, x, y, w, hh] of rects(ctx)) {
+                        assert.ok(x % s === 0 && y % s === 0 && w % s === 0 && hh % s === 0, `${id} ${css}px @${dpr}: uneven pixel`);
+                        for (let c = x / s; c < (x + w) / s; c++) cols.add(c);
+                        for (let r = y / s; r < (y + hh) / s; r++) rows.add(r);
+                    }
+                    const face = AVATARS[id].faces.angry;
+                    const wantRows = face.map((row, r) => (/[^.]/.test(row) ? r : -1)).filter(r => r >= 0);
+                    const wantCols = [...Array(32).keys()].filter(c => face.some(row => row[c] !== '.'));
+                    assert.deepEqual([...rows].sort((a, b) => a - b), wantRows, `${id}: rows dropped`);
+                    assert.deepEqual([...cols].sort((a, b) => a - b), wantCols, `${id}: columns dropped`);
+                }
+            }
+        }
+    } finally {
+        if (saved === undefined) delete globalThis.devicePixelRatio;
+        else globalThis.devicePixelRatio = saved;
+    }
 });

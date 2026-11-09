@@ -145,11 +145,13 @@ const avatarFallback = new Map();
 
 export function getAvatar(email) {
     const key = playerKey(email, 'avatar');
+    // A pick that failed to save is newer than anything still in the store.
+    if (avatarFallback.has(key)) return avatarFallback.get(key);
     try {
         const v = store().getItem(key);
         if (typeof v === 'string' && v) return v;
     } catch { /* storage unavailable */ }
-    return avatarFallback.get(key) ?? null;
+    return null;
 }
 
 export function saveAvatar(email, avatarId) {
