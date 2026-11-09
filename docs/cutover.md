@@ -300,8 +300,19 @@ name and email, or obvious test ones, so you can spot them in the CSV later. Ope
       gh workflow run deploy.yml -f target=backend
       ```
       Check that the log says `Deploying EventId=<event-id> …`.
-- [ ] **H3. Check:** the leaderboard is empty, both by curl (as in C4) and on the title screen. Test scores stay under
-      the `test` event and don't show. Test registrations do stay in the players CSV, so ignore them.
+- [ ] **H3. Check:**
+      ```sh
+      curl -fsS "https://competition.hedj.eu/api/event"; echo
+      curl -fsS "https://competition.hedj.eu/api/leaderboard?mode=simple&period=event&limit=3"; echo
+      ```
+      - **Before the start:** `/api/event` says `"live":false` with your `startIso` and `endIso`. The title shows
+        PRACTICE MODE with the start date ("today at 09:00" on the day), PLAY goes straight to the industries without
+        registering, and there is no top 3 or rank. The stand shows "Next competition: …".
+      - **From the start:** `"live":true`. No reload is needed: a phone left open checks again at its next PLAY (it
+        shows CHECKING… briefly), and PLAY then asks for registration. The title's top 3 and the stand's boards
+        are empty.
+      - The leaderboard curl returns an empty list either way. Test scores stay under the `test` event and don't
+        show. Test registrations do stay in the players CSV, so ignore them.
 - [ ] **H4. One-off: give v2 rows an expiry.** v2 never wrote `ttl`, so players and scores from v2 who never play v3
       are kept forever, against the privacy notice (deleted within 90 days of closing). v3 sets `ttl` only when a row
       is written again. Run this once, after H1, with the same end date as `COMP_EVENT_END_ISO`. It only touches rows

@@ -26,7 +26,7 @@ import { EventMode, needsRegistration } from './utils/eventStatus.js';
 
 const { trackEvent, flushScoreQueue } = api;
 
-class App {
+export class App {
     constructor() {
         this.container = document.getElementById('screen-container');
         this.currentScreen = null;
@@ -93,15 +93,19 @@ class App {
         // on the title or the registration form; anywhere else it applies at the next title or run start, so a
         // run under way carries on as it began.
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) return;
-            this.eventMode.recheck().then(() => {
-                const stale = this.event.live === storage.isFreePlay();
-                if (stale && (this.currentScreen === 'title' || this.currentScreen === 'registration')) this.showScreen('title');
-            }).catch(() => {});
+            if (!document.hidden) this.onVisible();
         });
 
         // Always start at title screen
         this.showScreen('title');
+    }
+
+    // The tab is back in view (see init). Never rejects.
+    onVisible() {
+        return this.eventMode.recheck().then(() => {
+            const stale = this.event.live === storage.isFreePlay();
+            if (stale && (this.currentScreen === 'title' || this.currentScreen === 'registration')) this.showScreen('title');
+        }).catch(() => {});
     }
 
     // Retry for the quarter screen when the events failed to load. Resolves true when they are now available.
@@ -233,9 +237,11 @@ class App {
     }
 }
 
-// Boot the app
-const app = new App();
-app.init().catch(e => console.error('App init failed:', e));
+// Boot the app in a browser. Node tests import App without booting it (there is no `window` there).
+if (typeof window !== 'undefined') {
+    const app = new App();
+    app.init().catch(e => console.error('App init failed:', e));
 
-// Export for global access if needed
-window.treasuryApp = app;
+    // Export for global access if needed
+    window.treasuryApp = app;
+}
