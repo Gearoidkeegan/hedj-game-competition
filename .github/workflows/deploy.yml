@@ -81,32 +81,33 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           ADMIN_KEY: ${{ secrets.COMP_ADMIN_KEY }}
           EVENT_ID: ${{ vars.COMP_EVENT_ID }}
+          EVENT_START_ISO: ${{ vars.COMP_EVENT_START_ISO }}
           EVENT_END_ISO: ${{ vars.COMP_EVENT_END_ISO }}
           TOKEN_TTL_HOURS: ${{ vars.COMP_TOKEN_TTL_HOURS || '120' }}
         run: |
-          # A push never falls back to "test": if the variable were deleted after cutover, that would silently
-          # switch the live event to an empty board. A manual run may fall back.
-          if [ -z "$EVENT_ID" ]; then
-            if [ "$EVENT_NAME" = "push" ]; then
-              echo "::error::COMP_EVENT_ID is not set. Set it (docs/cutover.md H1) or run the workflow by hand to deploy the test event."; exit 1
-            fi
-            echo "::warning::COMP_EVENT_ID is not set; this manual run deploys the test event"
-            EVENT_ID=test
-          fi
+          # An unset COMP_EVENT_ID is free play (R66): EventId="" goes to the backend, which then opens no
+          # registration and takes no scores. Deleting the variable during an event closes the competition.
           # The event id is part of every leaderboard key ("<event>#<mode>#<day>"), so keep it plain.
-          if [[ ! "$EVENT_ID" =~ ^[A-Za-z0-9_-]{1,40}$ ]]; then
+          if [ -n "$EVENT_ID" ] && [[ ! "$EVENT_ID" =~ ^[A-Za-z0-9_-]{1,40}$ ]]; then
             echo "::error::COMP_EVENT_ID must be 1-40 letters, digits, '_' or '-' (got '$EVENT_ID')"; exit 1
           fi
           if [[ ! "$TOKEN_TTL_HOURS" =~ ^[1-9][0-9]{0,3}$ ]]; then
             echo "::error::COMP_TOKEN_TTL_HOURS must be a whole number of hours (got '$TOKEN_TTL_HOURS')"; exit 1
           fi
           # Strict ISO-8601 UTC only. `date -d` alone accepts "tomorrow" or a value with a space, which SAM would
-          # split or the backend would read as "no end date". The date check then rejects impossible dates.
-          if [ -n "$EVENT_END_ISO" ]; then
-            if [[ ! "$EVENT_END_ISO" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z$ ]] \
-               || ! date -u -d "$EVENT_END_ISO" >/dev/null 2>&1; then
-              echo "::error::COMP_EVENT_END_ISO must look like 2026-11-20T18:00:00Z or 2026-11-20T18:00Z, in UTC (got '$EVENT_END_ISO')"; exit 1
+          # split or the backend would read as "no date". The date check then rejects impossible dates.
+          for var in EVENT_START_ISO EVENT_END_ISO; do
+            value="${!var}"
+            if [ -n "$value" ]; then
+              if [[ ! "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z$ ]] \
+                 || ! date -u -d "$value" >/dev/null 2>&1; then
+                echo "::error::COMP_$var must look like 2026-11-20T18:00:00Z or 2026-11-20T18:00Z, in UTC (got '$value')"; exit 1
+              fi
             fi
+          done
+          if [ -n "$EVENT_START_ISO" ] && [ -n "$EVENT_END_ISO" ] \
+             && [ "$(date -u -d "$EVENT_START_ISO" +%s)" -ge "$(date -u -d "$EVENT_END_ISO" +%s)" ]; then
+            echo "::error::COMP_EVENT_START_ISO must be before COMP_EVENT_END_ISO (got '$EVENT_START_ISO' and '$EVENT_END_ISO')"; exit 1
           fi
           # Each override is passed as Key="value", so SAM keeps spaces, commas and '=' inside the value. A double
           # quote or a backslash can't be carried that way, so the admin key must not contain either.
@@ -116,10 +117,10 @@ jobs:
           case "$ADMIN_KEY" in
             *'"'* | *'\'*) echo "::error::COMP_ADMIN_KEY must not contain a double quote or a backslash"; exit 1 ;;
           esac
-          # An empty end date goes as EventEndIso="" so it clears any earlier value. The backend treats it as
-          # "no end date" and keeps rows 90 days after each write.
-          echo "Deploying EventId=$EVENT_ID EventEndIso=${EVENT_END_ISO:-<empty>} TokenTtlHours=$TOKEN_TTL_HOURS"
-          echo "DEPLOYED_EVENT_ID=$EVENT_ID" >> "${GITHUB_ENV:-/dev/null}"
+          # An empty id or date goes as Key="" so it clears any earlier value. The backend treats an empty date as
+          # "no date" (and then keeps rows 90 days after each write).
+          echo "Deploying EventId=${EVENT_ID:-(free play)} EventStartIso=${EVENT_START_ISO:-<empty>} EventEndIso=${EVENT_END_ISO:-<empty>} TokenTtlHours=$TOKEN_TTL_HOURS"
+          echo "DEPLOYED_EVENT_ID=${EVENT_ID:-(free play)}" >> "${GITHUB_ENV:-/dev/null}"
           sam deploy \
             --stack-name hedj-competition-backend \
             --resolve-s3 \
@@ -130,6 +131,7 @@ jobs:
             --parameter-overrides \
               "AdminKey=\"$ADMIN_KEY\"" \
               "EventId=\"$EVENT_ID\"" \
+              "EventStartIso=\"$EVENT_START_ISO\"" \
               "EventEndIso=\"$EVENT_END_ISO\"" \
               "TokenTtlHours=\"$TOKEN_TTL_HOURS\""
 
