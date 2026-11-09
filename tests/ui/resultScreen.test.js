@@ -188,7 +188,7 @@ test('renders the quarter: one line per exposure, the quip, the cash meter and a
     assert.equal(lines.length, result.summary.lines.length);
     for (const [i, l] of result.summary.lines.entries()) {
         assert.equal(lines[i].getAttribute('data-exposure'), l.exposureId);
-        assert.equal(lines[i].textContent, resultLine(result.run.exposures.find(e => e.id === l.exposureId), l, 'EUR'));
+        assert.equal(lines[i].querySelector('.r-line-text').textContent, resultLine(result.run.exposures.find(e => e.id === l.exposureId), l, 'EUR'));
     }
     assert.equal(q('.r-quip').textContent, result.quip.text);
     assert.ok(result.quip.text.length > 0);

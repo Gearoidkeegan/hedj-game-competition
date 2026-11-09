@@ -81,7 +81,7 @@ test('renders the cash meter, a 120px scene strip, one card per active exposure 
     const active = rc.run.exposures.filter(e => e.unlockQuarter <= 0).map(e => e.id);
     assert.deepEqual(qa('[data-exposure]').map(c => c.getAttribute('data-exposure')), active);
     assert.equal(card('fuel').querySelector('.exp-copy').textContent, 'You buy jet fuel in dollars');
-    assert.equal(card('usd-revenue').querySelector('.exp-forecast').textContent, 'Forecast accuracy 40%');
+    assert.equal(card('usd-revenue').querySelector('.exp-forecast').textContent, 'Forecast ±40%');
     assert.equal(run.textContent, 'RUN THE QUARTER');
     assert.equal(q('.q-quarter').textContent, 'Quarter 1 of 8');
     assert.equal(q('.q-policy').textContent, 'Board policy: cover 25–50% of your risk');
@@ -154,7 +154,7 @@ test('power-up slot: cards show blurb, cost and hedjLine; one pick at a time; ta
     assert.equal(fc.querySelector('.pu-cost').textContent, '€2.5m');
     fc.click();
     assert.equal(fc.getAttribute('aria-pressed'), 'true');
-    assert.equal(card('usd-revenue').querySelector('.exp-forecast').textContent, 'Forecast accuracy 40% → 60%');
+    assert.equal(card('usd-revenue').querySelector('.exp-forecast').textContent, 'Forecast ±40% → ±27%');
     q('[data-powerup="facilities"]').click();
     assert.equal(fc.getAttribute('aria-pressed'), 'false', 'picking another drops the first');
     assert.equal(card('usd-revenue').querySelector('[data-step="1"]').disabled, false, 'facilities lifts the cap at once');
@@ -168,7 +168,7 @@ test('power-up slot: cards show blurb, cost and hedjLine; one pick at a time; ta
 test('forecasting card shows the next module text from levels[forecastLevel]', () => {
     const { q } = setup(SEED.band2550, { patch: { forecastLevel: 1, powerUps: { owned: ['forecasting'], used: [] } } });
     assert.equal(q('[data-powerup="forecasting"] .pu-blurb').textContent, content.powerups.forecasting.levels[1]);
-    assert.equal(q('[data-exposure="usd-revenue"] .exp-forecast').textContent, 'Forecast accuracy 60%');
+    assert.equal(q('[data-exposure="usd-revenue"] .exp-forecast').textContent, 'Forecast ±27%');
 });
 
 test('an event card blocks RUN until one of its two choices is picked', () => {
