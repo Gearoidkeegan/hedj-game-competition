@@ -107,3 +107,49 @@ test('the admin key is only in the environment of the two functions that check i
         if (name !== 'AnalyticsFunction' && name !== 'AdminFunction') assert.ok(!b.includes('ADMIN_KEY'), name);
     }
 });
+
+// ── Free play (Task FP) ──────────────────────────────────────────────────
+
+test('EventStartIso is a parameter beside EventEndIso, passed to every function as EVENT_START_ISO', () => {
+    const params = yaml.split('Parameters:')[1].split('Globals:')[0];
+    assert.match(params, /\n  EventStartIso:\r?\n    Type: String\r?\n    Default: ''/);
+    assert.match(params, /\n  EventId:\r?\n    Type: String\r?\n    Default: ''/, 'an empty EventId is free play');
+    const globals = yaml.split('Globals:')[1].split('Resources:')[0];
+    assert.ok(globals.includes('EVENT_START_ISO: !Ref EventStartIso'));
+    assert.ok(globals.includes('EVENT_END_ISO: !Ref EventEndIso'));
+});
+
+test('GET /event: its own function on the public throttle, with no table access', () => {
+    const block = yaml.split('  EventFunction:')[1].split('Outputs:')[0].split(/\r?\n  [A-Z]\w+:\r?\n/)[0];
+    assert.ok(block.includes('Handler: handlers/event.handler'));
+    assert.match(block, /Path: \/event\s+Method: GET/);
+    assert.ok(!/Polic/.test(block), 'no policies: it reads no table');
+    assert.ok(!/HComp/.test(block));
+    assert.ok(!block.includes('ADMIN_KEY'));
+    const routes = yaml.split('RouteSettings:')[1].split('CorsConfiguration:')[0];
+    assert.ok(!routes.includes('/event'), 'the default public throttle, like /leaderboard');
+});
+
+// M5: a manual `sam deploy` gets the workflow's checks too, so a malformed date can't open the event at once or keep
+// it open for ever (an unparseable date counts as unset). Empty stays allowed: it is free play / no date.
+test('EventId, EventStartIso and EventEndIso carry the workflow regexes as AllowedPattern, empty allowed', () => {
+    const params = yaml.split('Parameters:')[1].split('Globals:')[0];
+    const pattern = name => {
+        const block = params.split(`\n  ${name}:`)[1].split(/\r?\n  [A-Z]\w+:\r?\n/)[0];
+        const m = block.match(/\n    AllowedPattern: '([^']+)'/);
+        assert.ok(m, `${name} has an AllowedPattern`);
+        assert.match(block, /\n    ConstraintDescription: \S/, `${name} explains its pattern`);
+        return new RegExp(m[1]);
+    };
+    const id = pattern('EventId');
+    for (const ok of ['', 'test', 'hedj-expo_2026', 'x'.repeat(40)]) assert.ok(id.test(ok), JSON.stringify(ok));
+    for (const bad of ['bad id', 'a#b', 'x'.repeat(41), 'é']) assert.ok(!id.test(bad), JSON.stringify(bad));
+    for (const name of ['EventStartIso', 'EventEndIso']) {
+        const re = pattern(name);
+        for (const ok of ['', '2026-11-20T18:00Z', '2026-11-20T18:00:00Z']) assert.ok(re.test(ok), `${name} ${ok}`);
+        for (const bad of ['tomorrow', '2026-11-20 18:00', '2026-11-20', '2026-11-20T18:00:00+01:00',
+            '2026-11-20T18:00:00.000Z', ' 2026-11-20T18:00Z']) {
+            assert.ok(!re.test(bad), `${name} ${JSON.stringify(bad)}`);
+        }
+    }
+});

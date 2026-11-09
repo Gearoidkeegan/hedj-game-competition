@@ -129,6 +129,16 @@ async function doFlush() {
     return sent;
 }
 
+// R66: { live, startIso, endIso } from the backend, which alone decides whether the competition is live.
+// A short timeout so a slow network never holds up the title; the caller falls back to the cached value.
+const EVENT_TIMEOUT_MS = 4000;
+
+export async function fetchEvent() {
+    const res = await fetch(`${CONFIG.apiBase}/event`, { cache: 'no-store', signal: AbortSignal.timeout(EVENT_TIMEOUT_MS) });
+    if (!res.ok) throw new ApiError(`HTTP ${res.status}`, res.status);
+    return res.json();
+}
+
 export async function fetchPlayCount() {
     const data = await apiFetch('/analytics');
     return data?.play || 0;

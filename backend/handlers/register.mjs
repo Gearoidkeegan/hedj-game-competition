@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { playerTokens } from '../lib/auth.mjs';
 import { json, parseBody, errorResponse, validName } from '../lib/http.mjs';
 import { validCompany, ttlSeconds } from '../lib/util.mjs';
+import { isLive } from '../lib/event.mjs';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEFAULT_TOKEN_TTL_HOURS = 120;
@@ -14,6 +15,8 @@ export function createHandler(deps) {
     const ttlHours = Number(env.TOKEN_TTL_HOURS) > 0 ? Number(env.TOKEN_TTL_HOURS) : DEFAULT_TOKEN_TTL_HOURS;
 
     return async function handler(event) {
+        // Free play (R66): no registration outside a live competition.
+        if (!isLive(env, now())) return json(403, { error: 'competition_closed' });
         let body;
         try {
             body = parseBody(event);

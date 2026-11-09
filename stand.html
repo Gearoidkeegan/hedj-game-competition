@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/fonts.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
         :root {
             --bg: #1a1a2e; --panel: #2d2d44; --border: #5a5a7a;
             --gold: #ffcc00; --cyan: #44ccdd; --text: #e8e8f0; --muted: #aaaacc;
@@ -15,6 +16,8 @@
         body { background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 32px; min-height: 100vh; padding: 24px 32px; }
         h1 { font-family: var(--pixel); font-size: 36px; color: var(--gold); text-align: center; letter-spacing: 4px; margin-bottom: 8px; }
         .sub { text-align: center; color: var(--muted); font-size: 28px; margin-bottom: 24px; }
+        .final { font-family: var(--pixel); font-size: 24px; color: var(--cyan); text-align: center; margin-bottom: 24px; }
+        .holding { text-align: center; color: var(--text); font-size: 40px; margin-top: 15vh; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
         .board { background: var(--panel); border: 4px solid var(--border); padding: 16px 24px; }
         .board h2 { font-family: var(--pixel); font-size: 20px; color: var(--cyan); margin-bottom: 16px; line-height: 1.4; }
@@ -32,11 +35,13 @@
 <body>
 <h1>TREASURY MANAGER</h1>
 <div class="sub" id="updated">Loading...</div>
-<div class="grid">
+<h2 class="final" id="final" hidden>FINAL RESULTS</h2>
+<p class="holding" id="holding" hidden></p>
+<div class="grid" id="grid-event">
     <section class="board"><h2>SIMPLE - EVENT TOP 10</h2><ol id="b-simple-event"></ol></section>
     <section class="board"><h2>PRO - EVENT TOP 10</h2><ol id="b-pro-event"></ol></section>
 </div>
-<div class="grid">
+<div class="grid" id="grid-today">
     <section class="board"><h2>SIMPLE - TODAY</h2><ol id="b-simple-today"></ol></section>
     <section class="board"><h2>PRO - TODAY</h2><ol id="b-pro-today"></ol></section>
 </div>

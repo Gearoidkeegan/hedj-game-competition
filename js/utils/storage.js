@@ -6,13 +6,34 @@ import { emptyProgress, mergeProgress, parseSave } from '../engine/sim/progress.
 const GUIDE_SEEN_KEY = 'hedj_has_seen_guide';
 const REGISTRATION_KEY = 'hedj_comp_registration';
 
+// ─── Free play (R66) ──────────────────────────────────────────────────────
+// Outside a live event the game runs as a local guest. The guest's run, progress and guide flag use the per-player
+// keys below under GUEST_PLAYER, which can never be an email (every registered email contains '@'), so they stay
+// apart from any registered player's on the same device. The app sets the mode (main.js, from GET /api/event) only
+// where no run is under way: the title, and the start of a run.
+
+export const GUEST_PLAYER = 'guest';
+let freePlay = false;
+
+export function setFreePlay(on) {
+    freePlay = !!on;
+}
+
+export function isFreePlay() {
+    return freePlay;
+}
+
 export function hasSeenGuide() {
+    if (freePlay) {
+        try { return store().getItem(playerKey(GUEST_PLAYER, 'guide')) === '1'; } catch { return false; }
+    }
     return localStorage.getItem(GUIDE_SEEN_KEY) === '1';
 }
 
 export function markGuideSeen() {
     try {
-        localStorage.setItem(GUIDE_SEEN_KEY, '1');
+        if (freePlay) store().setItem(playerKey(GUEST_PLAYER, 'guide'), '1');
+        else localStorage.setItem(GUIDE_SEEN_KEY, '1');
     } catch (e) {
         console.warn('Failed to mark guide seen:', e);
     }
@@ -130,4 +151,16 @@ export function queueScore(payload) {
 
 export function removeQueuedScore(gameId) {
     writeJson(QUEUE_KEY, getQueuedScores().filter(p => p.gameId !== gameId));
+}
+
+// The last GET /api/event answer, for when the next check fails (R66). Device-wide, not per player.
+const EVENT_CACHE_KEY = `${V3_PREFIX}_event`;
+
+export function getCachedEvent() {
+    const e = readJson(EVENT_CACHE_KEY);
+    return e && typeof e === 'object' && typeof e.live === 'boolean' ? e : null;
+}
+
+export function saveCachedEvent(event) {
+    return writeJson(EVENT_CACHE_KEY, event);
 }

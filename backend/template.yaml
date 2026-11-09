@@ -9,12 +9,23 @@ Parameters:
     Description: Secret key for the admin analytics GET endpoint
   EventId:
     Type: String
-    Default: test
-    Description: Identifier of the live event; selects the leaderboard partition
+    Default: ''
+    Description: Identifier of the event; selects the leaderboard partition. Empty = free play (no live event, nothing written).
+    # The same checks as .github/workflows/deploy.yml, so a manual deploy gets them too (empty allowed).
+    AllowedPattern: '^([A-Za-z0-9_-]{1,40})?$'
+    ConstraintDescription: 1-40 letters, digits, '_' or '-', or empty for free play
+  EventStartIso:
+    Type: String
+    Default: ''
+    Description: ISO-8601 event start (UTC). Registration and scores open at it (empty = open as soon as EventId is set).
+    AllowedPattern: '^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z)?$'
+    ConstraintDescription: UTC like 2026-11-20T18:00:00Z or 2026-11-20T18:00Z, or empty
   EventEndIso:
     Type: String
     Default: ''
-    Description: ISO-8601 event end; player and score rows expire 90 days after it (empty = 90 days after each write). Scores are not rejected after it.
+    Description: ISO-8601 event end (UTC). Registration and scores close at it, with a 2-hour grace for runs started before it; player and score rows expire 90 days after it (empty = no end, rows expire 90 days after each write).
+    AllowedPattern: '^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z)?$'
+    ConstraintDescription: UTC like 2026-11-20T18:00:00Z or 2026-11-20T18:00Z, or empty
   TokenTtlHours:
     Type: Number
     Default: 120
@@ -32,6 +43,7 @@ Globals:
         ANALYTICS_TABLE: !Ref HCompAnalytics
         BEST_TABLE: !Ref HCompBest
         EVENT_ID: !Ref EventId
+        EVENT_START_ISO: !Ref EventStartIso
         EVENT_END_ISO: !Ref EventEndIso
         TOKEN_TTL_HOURS: !Ref TokenTtlHours
         # The admin key is set only on AnalyticsFunction and AdminFunction, the two that check it (M6).
@@ -289,6 +301,20 @@ Resources:
             TableName: !Ref HCompPlayers
         - DynamoDBReadPolicy:
             TableName: !Ref HCompBest
+
+  EventFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/event.handler
+      Description: Whether the competition is live (free play otherwise); public, reads no table
+      Events:
+        GetEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /event
+            Method: GET
 
   ProgressFunction:
     Type: AWS::Serverless::Function

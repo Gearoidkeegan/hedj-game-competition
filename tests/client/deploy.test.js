@@ -48,15 +48,15 @@ test('the frontend waits for the backend and never runs after a failed or cancel
     assert.ok(f.includes("(needs.backend.result == 'success' || needs.backend.result == 'skipped')"));
 });
 
-test('backend deploy passes EventId, EventEndIso and TokenTtlHours from repository variables', () => {
+test('backend deploy passes EventId, EventStartIso, EventEndIso and TokenTtlHours from repository variables', () => {
     const b = job('backend');
-    for (const v of ['vars.COMP_EVENT_ID', 'vars.COMP_EVENT_END_ISO', 'vars.COMP_TOKEN_TTL_HOURS']) {
+    for (const v of ['vars.COMP_EVENT_ID', 'vars.COMP_EVENT_START_ISO', 'vars.COMP_EVENT_END_ISO', 'vars.COMP_TOKEN_TTL_HOURS']) {
         assert.ok(b.includes(v), `missing ${v}`);
     }
-    for (const p of ['AdminKey=', 'EventId=', 'EventEndIso=', 'TokenTtlHours=']) {
+    for (const p of ['AdminKey=', 'EventId=', 'EventStartIso=', 'EventEndIso=', 'TokenTtlHours=']) {
         assert.ok(b.includes(p), `parameter override ${p} missing`);
     }
-    assert.ok(!/COMP_EVENT_ID \|\|/.test(b), 'no expression fallback: the script decides (a push never falls back)');
+    assert.ok(!/COMP_EVENT_ID \|\|/.test(b), 'no expression fallback: an unset id is free play');
     assert.ok(/COMP_TOKEN_TTL_HOURS \|\| '120'/.test(b), 'TokenTtlHours must fall back to 120');
 });
 
@@ -72,36 +72,50 @@ function runSamDeploy(env) {
         body.push(line.slice(10));
     }
     const script = `sam() { printf '%s\\n' "$@"; }\n${body.join('\n')}`;
-    const base = { EVENT_NAME: 'push', ADMIN_KEY: 'k3y', EVENT_ID: 'expo', EVENT_END_ISO: '', TOKEN_TTL_HOURS: '120' };
+    const base = { EVENT_NAME: 'push', ADMIN_KEY: 'k3y', EVENT_ID: 'expo', EVENT_START_ISO: '', EVENT_END_ISO: '', TOKEN_TTL_HOURS: '120' };
     const r = spawnSync('bash', ['-eo', 'pipefail', '-c', script], { env: { ...process.env, ...base, ...env }, encoding: 'utf8' });
     return { status: r.status, out: r.stdout + r.stderr };
 }
 
 test('SAM deploy: every override is double-quoted, so SAM parses values with spaces or commas whole', { skip: !bashOk && 'no bash' }, () => {
-    const r = runSamDeploy({ ADMIN_KEY: "a b,c=d'e", EVENT_END_ISO: '2026-11-20T18:00:00Z' });
+    const r = runSamDeploy({ ADMIN_KEY: "a b,c=d'e", EVENT_START_ISO: '2026-11-19T08:00Z', EVENT_END_ISO: '2026-11-20T18:00:00Z' });
     assert.equal(r.status, 0, r.out);
-    for (const p of ['AdminKey="a b,c=d\'e"', 'EventId="expo"', 'EventEndIso="2026-11-20T18:00:00Z"', 'TokenTtlHours="120"']) {
+    for (const p of ['AdminKey="a b,c=d\'e"', 'EventId="expo"', 'EventStartIso="2026-11-19T08:00Z"',
+        'EventEndIso="2026-11-20T18:00:00Z"', 'TokenTtlHours="120"']) {
         assert.ok(r.out.split(/\r?\n/).includes(p), `missing override ${p} in:\n${r.out}`);
     }
 });
 
-test('SAM deploy: an unset end date is passed as EventEndIso=""', { skip: !bashOk && 'no bash' }, () => {
-    const r = runSamDeploy({ EVENT_END_ISO: '' });
+test('SAM deploy: unset dates are passed as EventStartIso="" and EventEndIso=""', { skip: !bashOk && 'no bash' }, () => {
+    const r = runSamDeploy({ EVENT_START_ISO: '', EVENT_END_ISO: '' });
     assert.equal(r.status, 0, r.out);
-    assert.ok(r.out.split(/\r?\n/).includes('EventEndIso=""'), r.out);
+    const lines = r.out.split(/\r?\n/);
+    assert.ok(lines.includes('EventStartIso=""') && lines.includes('EventEndIso=""'), r.out);
 });
 
-test('SAM deploy: the end date must be strict ISO-8601 UTC', { skip: !bashOk && 'no bash' }, () => {
-    for (const ok of ['2026-11-20T18:00Z', '2026-11-20T18:00:00Z']) {
-        assert.equal(runSamDeploy({ EVENT_END_ISO: ok }).status, 0, ok);
+test('SAM deploy: the start and end dates must be strict ISO-8601 UTC', { skip: !bashOk && 'no bash' }, () => {
+    for (const [name, variable] of [['EVENT_START_ISO', 'COMP_EVENT_START_ISO'], ['EVENT_END_ISO', 'COMP_EVENT_END_ISO']]) {
+        for (const ok of ['2026-11-20T18:00Z', '2026-11-20T18:00:00Z']) {
+            assert.equal(runSamDeploy({ [name]: ok }).status, 0, `${name}=${ok}`);
+        }
+        for (const bad of ['tomorrow', 'next friday', '2026-11-20 18:00', '2026-11-20', '2026-11-20T18:00:00+01:00',
+            '2026-11-20T18:00:00.000Z', '2026-13-40T18:00Z', ' 2026-11-20T18:00Z', '2026-11-20T18:00Z\nx']) {
+            const r = runSamDeploy({ [name]: bad });
+            assert.notEqual(r.status, 0, `${name} accepted ${JSON.stringify(bad)}`);
+            assert.ok(r.out.includes(`::error::${variable}`), r.out);
+            assert.ok(!r.out.includes('deploy'), 'sam never ran');
+        }
     }
-    for (const bad of ['tomorrow', 'next friday', '2026-11-20 18:00', '2026-11-20', '2026-11-20T18:00:00+01:00',
-        '2026-11-20T18:00:00.000Z', '2026-13-40T18:00Z', ' 2026-11-20T18:00Z', '2026-11-20T18:00Z\nx']) {
-        const r = runSamDeploy({ EVENT_END_ISO: bad });
-        assert.notEqual(r.status, 0, `accepted ${JSON.stringify(bad)}`);
-        assert.ok(r.out.includes('::error::COMP_EVENT_END_ISO'), r.out);
+});
+
+test('SAM deploy: with both dates set, the start must be before the end', { skip: !bashOk && 'no bash' }, () => {
+    for (const [start, end] of [['2026-11-20T18:00Z', '2026-11-20T18:00:00Z'], ['2026-11-21T09:00Z', '2026-11-20T18:00Z']]) {
+        const r = runSamDeploy({ EVENT_START_ISO: start, EVENT_END_ISO: end });
+        assert.notEqual(r.status, 0, `accepted ${start} .. ${end}`);
+        assert.ok(r.out.includes('::error::COMP_EVENT_START_ISO must be before COMP_EVENT_END_ISO'), r.out);
         assert.ok(!r.out.includes('deploy'), 'sam never ran');
     }
+    assert.equal(runSamDeploy({ EVENT_START_ISO: '2026-11-20T17:59Z', EVENT_END_ISO: '2026-11-20T18:00Z' }).status, 0);
 });
 
 test('SAM deploy: an admin key SAM cannot carry inside quotes is refused', { skip: !bashOk && 'no bash' }, () => {
@@ -112,14 +126,23 @@ test('SAM deploy: an admin key SAM cannot carry inside quotes is refused', { ski
     }
 });
 
-test('SAM deploy: a push never falls back to the test event; a manual run may', { skip: !bashOk && 'no bash' }, () => {
-    const push = runSamDeploy({ EVENT_NAME: 'push', EVENT_ID: '' });
-    assert.notEqual(push.status, 0);
-    assert.ok(push.out.includes('::error::COMP_EVENT_ID'), push.out);
-    const manual = runSamDeploy({ EVENT_NAME: 'workflow_dispatch', EVENT_ID: '' });
-    assert.equal(manual.status, 0, manual.out);
-    assert.ok(manual.out.split(/\r?\n/).includes('EventId="test"'), manual.out);
-    assert.notEqual(runSamDeploy({ EVENT_ID: 'bad id' }).status, 0, 'event id with a space');
+test('SAM deploy: an unset event id deploys free play (EventId="") on a push and a manual run alike (R66)', { skip: !bashOk && 'no bash' }, () => {
+    for (const EVENT_NAME of ['push', 'workflow_dispatch']) {
+        const r = runSamDeploy({ EVENT_NAME, EVENT_ID: '' });
+        assert.equal(r.status, 0, r.out);
+        const lines = r.out.split(/\r?\n/);
+        assert.ok(lines.includes('EventId=""'), r.out);
+        assert.ok(!lines.includes('EventId="test"'), 'no fallback to the test event');
+        assert.ok(lines.includes('Deploying EventId=(free play) EventStartIso=<empty> EventEndIso=<empty> TokenTtlHours=120'), r.out);
+    }
+    const set = runSamDeploy({ EVENT_ID: 'expo', EVENT_START_ISO: '2026-11-19T08:00Z', EVENT_END_ISO: '2026-11-20T18:00Z' });
+    assert.ok(set.out.split(/\r?\n/)
+        .includes('Deploying EventId=expo EventStartIso=2026-11-19T08:00Z EventEndIso=2026-11-20T18:00Z TokenTtlHours=120'), set.out);
+    for (const bad of ['bad id', 'a#b', 'x'.repeat(41)]) {
+        const r = runSamDeploy({ EVENT_ID: bad });
+        assert.notEqual(r.status, 0, `accepted event id ${JSON.stringify(bad)}`);
+        assert.ok(r.out.includes('::error::COMP_EVENT_ID'), r.out);
+    }
 });
 
 test('no secret or variable is interpolated straight into a shell script', () => {

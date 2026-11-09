@@ -3,6 +3,7 @@ import { DynamoDBDocumentClient, PutCommand, QueryCommand, GetCommand, UpdateCom
 import { json, parseBody, errorResponse, validName } from '../lib/http.mjs';
 import { loadPlayer } from '../lib/auth.mjs';
 import { validCompany, dublinDate, ttlSeconds } from '../lib/util.mjs';
+import { isLive, inScoreGrace } from '../lib/event.mjs';
 
 const SCORE_MAX = 10000;
 // A plausibility check, not anti-cheat (R19, R63): a run must last at least max(15 s, 3 s per quarter played).
@@ -13,7 +14,7 @@ const MODES = ['simple', 'pro'];
 
 export function createHandler(deps) {
     const { ddb, env, now } = deps;
-    const eventId = env.EVENT_ID || 'test';
+    const eventId = env.EVENT_ID;
 
     async function rankOf(board, score) {
         const result = await ddb.send(new QueryCommand({
@@ -48,6 +49,11 @@ export function createHandler(deps) {
             const body = parseBody(event);
             const { gameToken, gameId, email, mode, score, quartersPlayed, startedAt, industryId, playerName, company } = body;
             const nowMs = now();
+            // Free play (R66): closed outside a live competition, except a run started before the end and sent
+            // within the grace after it. An empty EVENT_ID is never live, so no row is written under it.
+            if (!isLive(env, nowMs) && !inScoreGrace(env, nowMs, startedAt)) {
+                return json(403, { error: 'competition_closed' });
+            }
 
             if (typeof gameId !== 'string' || !gameId || gameId.length > 64 || typeof email !== 'string') {
                 return json(400, { error: 'gameToken, gameId and email are required' });

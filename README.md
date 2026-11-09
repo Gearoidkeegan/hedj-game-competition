@@ -122,6 +122,7 @@ hedj-game-competition/
 │       ├── register.mjs           # POST /register
 │       ├── score.mjs              # POST /score
 │       ├── leaderboard.mjs        # GET /leaderboard
+│       ├── event.mjs              # GET /event (live or free play)
 │       ├── analytics.mjs          # POST/GET /analytics
 │       └── admin.mjs              # GET /admin/players
 │
@@ -225,6 +226,18 @@ loss, mood at or below 10 (or the legacy board walk-out), then complete.
 
 ## Competition Features
 
+### Live competition or free play
+
+The site stays up all year. The backend alone decides whether a competition is live: `EventId` is set, and now is
+after `EventStartIso` (if set) and before `EventEndIso` (if set). `GET /api/event` returns
+`{ live, startIso, endIso }`, and the switch happens by itself at the dates.
+
+- **Live:** players register, scores go to the event leaderboard, and prizes come from it (below).
+- **Free play** (any other time): anyone plays without registering, as a local guest whose personal best, unlocks
+  and saved run stay on the device. Nothing is submitted and no personal data is collected. The title and game over
+  say "Practice mode" (with the next start date when one is set), the last event's leaderboard stays viewable, and
+  the stand page shows its final results. Scores from runs started before the end are still accepted for 2 hours.
+
 ### Registration
 
 Before playing for the competition leaderboard, players complete a registration form collecting:
@@ -317,16 +330,17 @@ Backend parameters (`backend/template.yaml`):
 | Parameter | Purpose |
 |---|---|
 | `AdminKey` | Secret for the admin analytics endpoint |
-| `EventId` | The live event; selects the leaderboard partition (default `test`) |
-| `EventEndIso` | Event end (ISO-8601); player and score rows expire 90 days after it |
+| `EventId` | The event; selects the leaderboard partition (default empty: free play) |
+| `EventStartIso` | Event start (ISO-8601 UTC); registration and scores open at it (default empty: open at once) |
+| `EventEndIso` | Event end (ISO-8601 UTC); registration and scores close at it, and player and score rows expire 90 days after it |
 | `TokenTtlHours` | Game token lifetime in hours (default 120) |
 
 Follow the prompts. On first deploy use `--guided`; subsequent deploys can omit it.
 
 In CI (`.github/workflows`) the parameters come from GitHub: `AdminKey` from the `COMP_ADMIN_KEY` secret, and
-`EventId`, `EventEndIso` and `TokenTtlHours` from the repository variables `COMP_EVENT_ID` (required on a push to
-`main`; a manual run falls back to `test`), `COMP_EVENT_END_ISO` (UTC, e.g. `2026-11-20T18:00:00Z`; default empty)
-and `COMP_TOKEN_TTL_HOURS` (default `120`). See `docs/cutover.md`.
+`EventId`, `EventStartIso`, `EventEndIso` and `TokenTtlHours` from the repository variables `COMP_EVENT_ID` (unset
+means free play), `COMP_EVENT_START_ISO` and `COMP_EVENT_END_ISO` (UTC, e.g. `2026-11-20T18:00:00Z`; default empty;
+the start must be before the end) and `COMP_TOKEN_TTL_HOURS` (default `120`). See `docs/cutover.md`.
 
 The deploy outputs the API Gateway URL. Use this as the CloudFront origin for `/api/*` routes.
 
