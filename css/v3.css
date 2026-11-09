@@ -665,3 +665,28 @@
 .r-chart canvas, .exp-spark canvas { display: block; max-width: 100%; }
 .r-chart-caption { margin: 2px 0 0; font-size: 16px; color: var(--v3-gold); }
 .exp-spark { width: 100%; height: 24px; margin-top: 2px; }
+
+/* ---------- Player character (v3.1) ---------- */
+/* avatarCanvas: a fixed slot of the nominal size, the canvas centred in it. The canvas's own size is set inline to
+   (32 x scale / dpr) px, so device pixels map 1:1; it may overhang the slot slightly, never moving the layout. */
+.av-slot { display: inline-grid; place-items: center; flex: none; vertical-align: middle; }
+.av-slot canvas { display: block; image-rendering: pixelated; max-width: none; }
+.q-cash-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: center; }
+.go-ending .av-slot { display: grid; margin: 0 auto 6px; }
+.t-more-one { display: grid; }
+.t-more .t-character { display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* Picker: four pictures a row, a radio group; fits 360px wide. */
+.av-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.av-option {
+    display: grid;
+    place-items: center;
+    min-height: 44px;
+    padding: 4px;
+    background: var(--v3-panel);
+    border: 2px solid var(--v3-line);
+    cursor: pointer;
+}
+.av-option:hover { background: var(--v3-panel-2); }
+.av-option[aria-checked="true"] { border-color: var(--v3-gold); background: var(--v3-gold-soft); }
+.v3 .av-option:focus-visible { outline: 2px solid var(--v3-cyan); outline-offset: 2px; }

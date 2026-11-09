@@ -20,6 +20,7 @@ import { RunController } from './screens/simple/RunController.js';
 import { IndustryScreen } from './screens/simple/IndustryScreen.js';
 import { QuarterScreen } from './screens/simple/QuarterScreen.js';
 import { ResultScreen } from './screens/simple/ResultScreen.js';
+import { AvatarPicker, needsAvatar } from './screens/simple/AvatarPicker.js';
 import * as api from './utils/api.js';
 import * as storage from './utils/storage.js';
 import { EventMode, needsRegistration } from './utils/eventStatus.js';
@@ -67,6 +68,7 @@ export class App {
             industry: new IndustryScreen(this),
             quarter: new QuarterScreen(this),
             result: new ResultScreen(this),
+            avatar: new AvatarPicker(this),
             gameover: new GameOverScreen(this),
             // Pro mode
             setup: new SetupScreen(this),
@@ -203,6 +205,13 @@ export class App {
             // After registering, carry on to where the player was going.
             if (this.screens.registration) this.screens.registration.nextScreen = screenId;
             screenId = 'registration';
+        }
+
+        // v3.1: the character picker comes once, before the first Simple run: after registration (or free play's
+        // PLAY) and before the industry pick, while the current player has no valid character stored.
+        if (screenId === 'industry' && this.screens.avatar && needsAvatar(storage)) {
+            this.screens.avatar.nextScreen = 'industry';
+            screenId = 'avatar';
         }
 
         // Unmount current screen

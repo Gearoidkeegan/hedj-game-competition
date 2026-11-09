@@ -1,8 +1,11 @@
 // IndustryScreen: pick the company for a Simple run. Seven cards; locked ones are greyed out with their unlock rule.
 // Picking one waits for the market data (app.marketReady), starts the run and opens the quarter screen.
+// The cards ignore taps just after the screen opens (R53), so the second tap of a double tap on the character
+// picker (v3.1), which opens this screen, can't start a run.
 
 import { h } from '../../ui/dom.js';
 import { exposureTitle, unlockRuleText } from '../../ui/labels.js';
+import { createTapGuard } from '../../ui/tapGuard.js';
 
 // Starts a run once the market data has loaded (createRun throws without it). Shared with the title's crises.
 // M3: if the first load failed (flaky Wi-Fi), load it again now (app.loadMarket), so a retry can succeed instead
@@ -17,8 +20,10 @@ export async function startRun(app, industryId, opts = {}) {
 }
 
 export class IndustryScreen {
-    constructor(app) {
+    // env (tests): now, the tap guard's clock.
+    constructor(app, env = {}) {
         this.app = app;
+        this.tapGuard = createTapGuard({ now: env.now });
         this.el = null;
         this.busy = false;
         this.cards = new Map();
@@ -43,7 +48,9 @@ export class IndustryScreen {
         return this.el;
     }
 
-    mount() {}
+    mount() {
+        this.tapGuard.arm();
+    }
 
     unmount() {
         this.visit++;
@@ -55,7 +62,7 @@ export class IndustryScreen {
         const card = h('button', {
             class: `ind-card${open ? '' : ' is-locked'}`, type: 'button', 'data-industry': ind.id,
             disabled: !open, 'aria-disabled': open ? null : 'true',
-            on: { click: () => this.pick(ind.id) }
+            on: { click: this.tapGuard.wrap(() => this.pick(ind.id)) }
         },
         nameEl,
         h('span', { class: 'ind-desc', text: ind.description || '' }),
