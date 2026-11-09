@@ -35,8 +35,19 @@ const SPRITE_SCALE = 2;             // 32px sprites drawn at 64px
 const CHART_GRACE_MS = 300;       // slack before a stalled chart loop is forced to its end
 const NOISE = 0.5;                  // money below half a unit is no impact
 const COMPACT_AFTER = 3;            // more exposure lines than this: shorter charts, so the board stays near
-const CHART_PX = 72;                // result chart height (css .r-chart matches)
-const COMPACT_CHART_PX = 56;        // ...and with more than COMPACT_AFTER lines (css .r-lines.is-compact .r-chart)
+const CHART_PX = 110;               // result chart height (css .r-chart matches)
+const COMPACT_CHART_PX = 80;        // ...and with more than COMPACT_AFTER lines (css .r-lines.is-compact .r-chart)
+
+// v3.2 chart caption: the quarter's market result without and with the hedge, e.g.
+// "Unhedged -€9.0m · With 75% hedge -€2.3m".
+export function chartCaption(line, currency) {
+    const hedge = Number.isFinite(line?.hedgeRatio) ? line.hedgeRatio : 0;
+    if (!(hedge > 0)) return null;
+    const exposure = Number.isFinite(line?.exposureImpact) ? line.exposureImpact : 0;
+    const hedged = exposure + (Number.isFinite(line?.hedgeImpact) ? line.hedgeImpact : 0);
+    const signed = v => (Math.abs(v) < NOISE ? formatCash(0, currency) : `${v > 0 ? '+' : ''}${formatCash(v, currency)}`);
+    return `Unhedged ${signed(exposure)} · With ${Math.round(hedge * 100)}% hedge ${signed(hedged)}`;
+}
 
 // The move of the exposure's foreign currency (or price, or rate) as the player feels it. FX rates are quoted
 // base/quote: when the exposure's currency is the quote (EURUSD for dollars), a rising rate is a weaker dollar.
@@ -273,8 +284,9 @@ export class ResultScreen {
         if (!exposure || !market?.getDataset) return null;
         let series = null;
         try {
+            // v3.2: weekly closes when they have loaded (chart only), otherwise the monthly series.
             series = chartSeries(market.getDataset(exposure.underlying), run.startYear, (summary.q ?? run.quarter) - 1,
-                { invert: chartInverted(exposure) });
+                { invert: chartInverted(exposure), weekly: market.getWeekly?.(exposure.underlying) ?? null });
         } catch (err) {
             console.warn('ResultScreen: chart unavailable', err);
         }
@@ -282,10 +294,11 @@ export class ResultScreen {
         const hedge = Number.isFinite(l.hedgeRatio) ? l.hedgeRatio : 0;
         const impact = Number.isFinite(l.exposureImpact) ? l.exposureImpact : 0;
         const host = h('div', { class: 'r-chart', 'aria-hidden': 'true' });
+        const caption = chartCaption(l, run.baseCurrency);
         const li = h('li', { class: 'r-chart-row', hidden: true }, host,
-            hedge > 0 ? h('p', { class: 'r-chart-caption', text: `Hedged ${Math.round(hedge * 100)}%` }) : null);
+            caption ? h('p', { class: 'r-chart-caption', text: caption }) : null);
         return {
-            li, host, series, hedge,
+            li, host, series, hedge, scale: exposure.type === 'ir' ? 'pp' : 'pct',
             tone: impact <= -NOISE ? 'down' : impact >= NOISE ? 'up' : 'neutral',
             label: chartLabel(exposure, l.movePct)
         };
@@ -298,7 +311,7 @@ export class ResultScreen {
         c.li.hidden = false;
         try {
             this.charts.push(mountPriceChart(c.host, {
-                ...c.series, hedgeRatio: c.hedge, tone: c.tone, label: c.label, env: this.env, ticker: this.ticker,
+                ...c.series, hedgeRatio: c.hedge, tone: c.tone, label: c.label, scale: c.scale, env: this.env, ticker: this.ticker,
                 height: this.rows.length > COMPACT_AFTER ? COMPACT_CHART_PX : CHART_PX,
                 onDone: () => { c.done = true; this._maybeShowBoard(); }
             }));
