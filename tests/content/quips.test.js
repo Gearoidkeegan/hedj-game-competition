@@ -90,6 +90,74 @@ test('each parody chairman has at least 8 positive, 8 negative and 6 off-policy 
     }
 });
 
+// Fix round 1: the chairman's positive and negative lines also fire with no hedges at all (a no-policy board, or a
+// noHedge board at 0%), so they never presume hedges; and they fire on in-policy losses, so they blame the market
+// or the quarter, not the player's process.
+test('chairman positive and negative lines never presume the player hedged, or blame the process', () => {
+    const q = loadJson('data/quips.json');
+    const HEDGE_WORDS = /\b(hedg\w*|forwards?|confirmations?|term sheets?|positions?)\b/i;
+    const BLAME = /\b(process failure|new treasurer|thinking was messy|sloppy|your fault)\b/i;
+    for (const c of CHAIRMEN) {
+        for (const tone of ['positive', 'negative']) {
+            for (const l of q.chairman[c][tone]) {
+                assert.doesNotMatch(l, HEDGE_WORDS, `chairman.${c}.${tone}: ${l}`);
+                assert.doesNotMatch(l, BLAME, `chairman.${c}.${tone}: ${l}`);
+            }
+        }
+    }
+});
+
+// "Under" includes partial cover (30% against a 50% minimum), so no under line says the player hedged nothing.
+test('under-breach lines never assume zero cover', () => {
+    const q = loadJson('data/quips.json');
+    const ZERO = /\b(unhedged|no cover|nothing hedged)\b/i;
+    for (const p of PERSONALITIES) {
+        for (const k of ['underLucky', 'underLoss']) for (const l of q.board[p][k]) assert.doesNotMatch(l, ZERO, `board.${p}.${k}: ${l}`);
+    }
+    for (const c of CHAIRMEN) for (const l of q.chairman[c].offPolicy.under) assert.doesNotMatch(l, ZERO, `${c}: ${l}`);
+});
+
+// "Over" includes a few points above the cap and any hedge on a noHedge board.
+test('over-breach lines fit a small overage: no "more than you own" or "the wrong way round"', () => {
+    const q = loadJson('data/quips.json');
+    const BIG = /\b(more than you own|wrong way round|twice|three umbrellas|more burgers)\b/i;
+    for (const p of PERSONALITIES) {
+        for (const k of ['overLucky', 'overLoss']) for (const l of q.board[p][k]) assert.doesNotMatch(l, BIG, `board.${p}.${k}: ${l}`);
+    }
+    for (const c of CHAIRMEN) for (const l of q.chairman[c].offPolicy.over) assert.doesNotMatch(l, BIG, `${c}: ${l}`);
+});
+
+// The checklist: lines in a pool differ in shape. Within one off-policy pool no two lines open with the same two
+// words ("Below the" and "Under the" count as the same), and at most 3 lines open with a short label and a full stop.
+test('off-policy pools vary their openings and shapes', () => {
+    const q = loadJson('data/quips.json');
+    const opener = l => l.toLowerCase().replace(/[^a-z' -]/g, '').replace(/^under the/, 'below the')
+        .split(/\s+/).slice(0, 2).join(' ');
+    for (const c of CHAIRMEN) {
+        for (const dir of ['over', 'under']) {
+            const pool = q.chairman[c].offPolicy[dir];
+            const openers = pool.map(opener);
+            assert.equal(new Set(openers).size, openers.length, `chairman.${c}.offPolicy.${dir}: ${openers.join(' | ')}`);
+            const labelFirst = pool.filter(l => /^[^.?!]{1,30}[.?!] /.test(l)).length;
+            assert.ok(labelFirst <= 3, `chairman.${c}.offPolicy.${dir}: ${labelFirst} lines open with a short label`);
+        }
+    }
+});
+
+test('Steve Jobsworth says "One more thing" at most once per pool, and avoids three clipped fragments', () => {
+    const j = loadJson('data/quips.json').chairman.jobs;
+    for (const [name, pool] of [['positive', j.positive], ['negative', j.negative], ['over', j.offPolicy.over], ['under', j.offPolicy.under]]) {
+        assert.ok(pool.filter(l => /one more thing/i.test(l)).length <= 1, name);
+        for (const l of pool) assert.doesNotMatch(l, /^[^.]{1,20}\. [^.]{1,20}\. [^.]{1,20}\.$/, `${name}: ${l}`);
+    }
+});
+
+test('storm quips stay true for a hedged player whose hedge result was small', () => {
+    for (const l of loadJson('data/quips.json').result.storm) {
+        assert.doesNotMatch(l, /\b(a hedge would|unsigned|open exposure|nothing stood|very little stood)\b/i, l);
+    }
+});
+
 test('every line in quips.json is unique, so no two pools can show the same line in a run', () => {
     const seen = new Set();
     const dupes = [];

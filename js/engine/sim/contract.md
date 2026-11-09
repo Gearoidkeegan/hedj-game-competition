@@ -342,8 +342,12 @@ board member, in the tone `chairmanTone(key, outcome)` gives:
 - he yields to `policyAdopted`, `wrongFocus` and the losing breaches (`overLoss`, `underLoss`, `breachLoss`);
 - on `overLucky` and `underLucky` he speaks only an `offPolicy.over` or `offPolicy.under` line, which names the breach
   (neutral sprite); on Pro's direction-free `luckyBreach` he yields;
+- `redZone` is always `negative` (angry sprite), whatever the market did, so he never cheers beside a `nearBankrupt` quip;
 - otherwise `positive` (happy sprite) on a `good` quarter and `negative` (angry sprite) on a `bad` one; on a `flat` quarter
-  `negative` for `inPolicyBad`, `noPolicyHedgeLoss`, `redZone` and `moodDown`, `positive` for the rest.
+  `negative` for `inPolicyBad`, `noPolicyHedgeLoss` and `moodDown`, `positive` for the rest.
+- His `positive` and `negative` lines never presume hedges (they also fire with none, on a no-policy or noHedge board)
+  and never blame the player's process (they fire on in-policy losses); `negative` lines complain about the quarter or
+  the market. `offPolicy.under` lines fit partial cover, and `offPolicy.over` lines fit a few points over the cap.
 
 No repeats (v3.2): each pool (`result.<key>`, `board.<personality>.<key>`, `chairman.<id>.<tone>`,
 `chairman.<id>.offPolicy.<dir>`) has its own permutation, seeded by the run seed and the pool id (`linePick`), and a

@@ -39,7 +39,7 @@ const HAPPY_KEYS = new Set(['policyAdopted', 'moodUp']);
 // Breaches whose market result held up: the chairman may speak, but only an off-policy line.
 const OFF_POLICY_KEYS = new Set(['overLucky', 'underLucky', 'luckyBreach']);
 // On a flat quarter the chairman frowns at these board keys and approves of the rest.
-const FLAT_NEGATIVE_KEYS = new Set(['inPolicyBad', 'noPolicyHedgeLoss', 'redZone', 'moodDown']);
+const FLAT_NEGATIVE_KEYS = new Set(['inPolicyBad', 'noPolicyHedgeLoss', 'moodDown']);
 const TONE_EXPRESSION = Object.freeze({ positive: 'happy', negative: 'angry', offPolicy: 'neutral' });
 
 const sum = (lines, field) => (lines || []).reduce((s, l) => s + (Number.isFinite(l[field]) ? l[field] : 0), 0);
@@ -158,10 +158,12 @@ export function resultQuipKey(summary, startingCash) {
 }
 
 // The chairman's tone: null when he yields to the board line, 'offPolicy' on a breach whose market result held up,
-// otherwise 'positive' or 'negative' by the quarter (a flat quarter goes by the board key).
+// otherwise 'positive' or 'negative' by the quarter (a flat quarter goes by the board key). Cash under the red line
+// is always 'negative', whatever the market did, so he never cheers beside a nearBankrupt quip.
 export function chairmanTone(key, outcome) {
     if (CHAIRMAN_YIELDS_TO.includes(key)) return null;
     if (OFF_POLICY_KEYS.has(key)) return 'offPolicy';
+    if (key === 'redZone') return 'negative';
     if (outcome.quarter === 'good') return 'positive';
     if (outcome.quarter === 'bad') return 'negative';
     return FLAT_NEGATIVE_KEYS.has(key) ? 'negative' : 'positive';

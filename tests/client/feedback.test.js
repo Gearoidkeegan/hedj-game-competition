@@ -179,6 +179,23 @@ test('the chairman picks positive or negative lines by the outcome, with a match
     assert.equal(bad.expression, 'angry');
 });
 
+// Fix round 1: cash under the red line is bad news whatever the market did, so the chairman never cheers next to a
+// nearBankrupt quip.
+test('a red-zone quarter gets a negative chairman line even when the market was good', () => {
+    for (const q of ['good', 'flat', 'bad']) assert.equal(chairmanTone('redZone', { quarter: q }), 'negative', q);
+    const r = run();
+    const persona = chairmanFor(r.seed);
+    const s = summary({ q: 4, cashAfter: 0.1 * S, lines: [line({ exposureImpact: 0.02 * S })] });
+    assert.equal(outcomeFor(s, S, BAND).quarter, 'good');
+    const { quip, boardReaction: b } = feedback(r, s);
+    assert.equal(quip.key, 'nearBankrupt');
+    assert.equal(b.key, 'redZone');
+    assert.equal(b.speaker, 'chairman');
+    assert.equal(b.tone, 'negative');
+    assert.ok(quips.chairman[persona].negative.includes(b.line), b.line);
+    assert.equal(b.expression, 'angry');
+});
+
 // ── The user's two playtest cases ───────────────────────────────────────
 
 // Case 1: no hedge, a 50–75% board, the market made 2% of starting cash. Not "Uneventful", and the reaction says the
