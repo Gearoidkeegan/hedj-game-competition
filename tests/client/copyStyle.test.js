@@ -25,12 +25,6 @@ const DASH_ALLOWED = new Set(['js/ui/EraPopup.js']);
 const EMOJI_ALLOWED = new Set(['js/ui/EraPopup.js']);
 const HTML_FILES = ['index.html', 'stand.html', 'privacy.html', 'admin.html'];
 
-// TODO(Task 3a): remove this allow-list when Task 3a (Simple feedback rules, quips.json, sprites,
-// Simple screens, labels) merges. The controller removes it at merge so these files are then checked.
-const PENDING_3A = new Set([
-    'data/quips.json', 'js/ui/labels.js', 'js/ui/pixel/sprites.js',
-    ...fs.readdirSync(path.join(ROOT, 'js/screens/simple')).map(f => `js/screens/simple/${f}`),
-]);
 
 const BANNED = [
     'delve', 'leverage', 'seamless', 'seamlessly', 'robust', 'navigate', 'navigating', 'landscape', 'journey',
@@ -97,7 +91,7 @@ function collect() {
     for (const f of JSON_FILES) all.push({ file: f, kind: 'json', strings: jsonStrings(JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8'))) });
     for (const f of JS_FILES) all.push({ file: f, kind: 'js', strings: jsStrings(fs.readFileSync(path.join(ROOT, f), 'utf8')) });
     for (const f of HTML_FILES) all.push({ file: f, kind: 'html', strings: [htmlText(fs.readFileSync(path.join(ROOT, f), 'utf8'))] });
-    return all.filter(x => !PENDING_3A.has(x.file));
+    return all;
 }
 
 function offenders(test) {
@@ -134,7 +128,7 @@ test('no banned words or phrases', () => {
 
 test('"unlock" does not appear in data copy', () => {
     const bad = [];
-    for (const f of JSON_FILES.filter(f => !PENDING_3A.has(f))) {
+    for (const f of JSON_FILES) {
         for (const s of jsonStrings(JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8')))) {
             if (UNLOCK_RE.test(s)) bad.push(`${f}: ${s}`);
         }
