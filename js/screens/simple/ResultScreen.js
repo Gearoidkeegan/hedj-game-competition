@@ -2,6 +2,7 @@
 // RunController.playQuarter result):
 //   - the cash meter counts from last quarter's cash to the new figure;
 //   - the scene strip plays in the mood of this quarter's result;
+//   - v3.2: a facts line (the policy status) and the cash breakdown open the result, shown at once;
 //   - one line per exposure, "Dollar +6%. Your hedge saved €1.2m", revealed one by one;
 //   - one board member (or the chairman) with the expression and line RunController picked, plus the result quip;
 //   - the player's character (v3.1) beside the meter: the face from before the quarter, then, once everything is
@@ -17,7 +18,7 @@ import { SceneLoop } from '../../ui/pixel/Scene.js';
 import { drawSprite, CHAIRMAN_SPRITES } from '../../ui/pixel/sprites.js';
 import { isRunOver } from '../../engine/sim/SimEngine.js';
 import { BALANCE } from '../../engine/sim/balance.js';
-import { moveLabel } from '../../ui/labels.js';
+import { cashBreakdown, factsLine, moveLabel, volumeText } from '../../ui/labels.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
 import { sceneStateFor, LOW_MOOD, withAvatar } from './QuarterScreen.js';
@@ -76,6 +77,27 @@ export function impactText(line, currency) {
 
 export function resultLine(exposure, line, currency) {
     return `${moveText(exposure, line?.movePct)}. ${impactText(line, currency)}`;
+}
+
+// v3.2: the opening line, the quarter's policy status ("In policy: 62% of risk covered (board wants 50–75%)").
+function factsEl(summary, mandate) {
+    const off = (summary.policy ?? (summary.inMandate === false ? 'off' : null)) === 'off';
+    return h('p', { class: `r-facts${off ? ' is-warn' : ''}`, text: factsLine(summary, mandate) });
+}
+
+// v3.2: where the cash went, "Operations +€28.0m · Market +€12.0m · Hedges -€14.0m · Add-ons -€3.0m", then
+// "Cash +€23.0m". Each part stays whole and the dot stays with the part before it, so the line wraps cleanly.
+// Nothing for a summary saved before v3.2.
+function breakdownEl(summary, currency) {
+    const b = cashBreakdown(summary, currency);
+    if (!b) return null;
+    const tone = v => (v > 0 ? ' is-up' : v < 0 ? ' is-down' : '');
+    return h('section', { class: 'r-breakdown', 'aria-label': 'Where the cash went' },
+        h('p', { class: 'r-parts' }, b.parts.flatMap((p, i) => [
+            i > 0 ? h('span', { class: 'r-sep', 'aria-hidden': 'true', text: '\u00a0· ' }) : null,
+            h('span', { class: `r-part${tone(p.value)}`, 'data-part': p.key, text: p.text })
+        ])),
+        h('p', { class: `r-cash-total${tone(b.total.value)}`, text: b.total.text }));
 }
 
 function speakerName(reaction) {
@@ -152,8 +174,10 @@ export class ResultScreen {
             // The tone follows the net effect of the line (exposure plus hedge), not the hedge alone.
             const net = (Number.isFinite(l.exposureImpact) ? l.exposureImpact : 0) + (Number.isFinite(l.hedgeImpact) ? l.hedgeImpact : 0);
             const tone = net >= NOISE ? 'is-up' : net <= -NOISE ? 'is-down' : '';
-            const el = h('li', { class: `r-line ${tone}`.trim(), 'data-exposure': l.exposureId, hidden: true,
-                text: resultLine(exposure, l, run.baseCurrency) });
+            const volume = volumeText(exposure, l);   // v3.2: realised volume against forecast
+            const el = h('li', { class: `r-line ${tone}`.trim(), 'data-exposure': l.exposureId, hidden: true },
+                h('span', { class: 'r-line-text', text: resultLine(exposure, l, run.baseCurrency) }),
+                volume ? h('span', { class: 'r-volume', text: volume }) : null);
             this.lineEls.push(el);
             this.rows.push({ line: el, chart: this._chartRow(run, summary, exposure, l) });
         }
@@ -174,6 +198,8 @@ export class ResultScreen {
             summary.wrongFocus === true ? h('p', { class: 'r-focus', text: WRONG_FOCUS_RESULT }) : null));
 
         this.body = h('div', { class: 'q-body r-body', on: { click: this.tapGuard.wrap((e) => this._onTap(e)) } },
+            factsEl(summary, run.mandate),
+            breakdownEl(summary, run.baseCurrency),
             h('div', { class: 'q-scene r-scene' }, this.sceneCanvas),
             quip?.text ? h('p', { class: 'r-quip', text: quip.text }) : null,
             // Final review I3: more than COMPACT_AFTER lines get shorter charts (css: .r-lines.is-compact).

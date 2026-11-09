@@ -5,6 +5,8 @@ import { UNLOCK_RULES } from '../engine/sim/progress.js';
 import { CRISES } from '../engine/sim/crises.js';
 import { CHAIRMAN_SPRITES } from './pixel/sprites.js';
 import { formatCash } from '../utils/formatters.js';
+import { bandText } from '../screens/simple/RunController.js';
+import { coverPercent } from './RiskMeter.js';
 
 // What each unlock takes. tests/ui/labels.test.js checks these against UNLOCK_RULES, so they can't drift.
 export const UNLOCK_HINTS = Object.freeze({
@@ -118,4 +120,100 @@ export function lockedReason(e) {
     if (e.type === 'commodity') return "Your bank doesn't offer commodity hedging";
     if (e.type === 'ir') return "Your bank doesn't offer interest-rate hedging";
     return '';
+}
+
+// ── Cash clarity (v3.2) ───────────────────────────────────────────────────
+
+// "+€3.0m", "-€3.0m", "+€0".
+export function signedCash(v, currency) {
+    const n = Number.isFinite(v) && v !== 0 ? v : 0;
+    return `${n < 0 ? '' : '+'}${formatCash(n, currency)}`;
+}
+
+// A forecast range from forecastVariance (0.4 -> "±40%").
+export function forecastRangeText(variance) {
+    const v = Number.isFinite(variance) ? Math.max(0, variance) : 0;
+    return `±${Math.round(v * 100)}%`;
+}
+
+const VOLUME_ON_FORECAST = 0.02;   // a smaller miss reads as "on forecast"
+const OVER_HEDGE_EPS = 1e-9;       // float slack on h × forecast > realised
+
+// The volume result on a result line: "Volume 9% under forecast", "Volume 9% over forecast", "Volume on forecast",
+// with " (over-hedged)" when the hedge (ratio × forecast) was bigger than the volume that came in. Empty for floating
+// debt (the principal is contractual) and for lines without volumes (summaries saved before A9).
+export function volumeText(exposure, line) {
+    if (!exposure || exposure.type === 'ir') return '';
+    const forecast = Math.abs(line?.forecastNotional);
+    const realised = Math.abs(line?.realisedNotional);
+    if (!Number.isFinite(forecast) || !Number.isFinite(realised) || forecast === 0) return '';
+    const miss = realised / forecast - 1;
+    const text = Math.abs(miss) < VOLUME_ON_FORECAST
+        ? 'Volume on forecast'
+        : `Volume ${Math.round(Math.abs(miss) * 100)}% ${miss < 0 ? 'under' : 'over'} forecast`;
+    const h = Number.isFinite(line.hedgeRatio) ? line.hedgeRatio : 0;
+    const over = h * forecast > realised * (1 + OVER_HEDGE_EPS) + OVER_HEDGE_EPS;
+    return over && Math.abs(miss) >= VOLUME_ON_FORECAST ? `${text} (over-hedged)` : text;   // W3: only on a real miss
+}
+
+// The result screen's opening line: the board-policy status of the quarter, judged as the engine judged it.
+// `mandate` is the quarter's band (run.mandate; on a no-policy quarter it may be the one just adopted, which this
+// line never shows). Copes with summaries saved before v3.1 (no riskCover) and before A9 (inMandate only).
+export function factsLine(summary, mandate) {
+    const policy = summary?.policy
+        ?? (summary?.inMandate === true ? 'in' : summary?.inMandate === false ? 'off' : 'none');
+    if (policy === 'none' || !mandate) {
+        return summary?.policyAdopted ? 'Policy adopted from next quarter' : 'No board policy yet';
+    }
+    const band = bandText(mandate);
+    const cover = summary.riskCover;
+    const known = typeof cover === 'number' && Number.isFinite(cover);
+    if (policy === 'in') {
+        if (cover === null) return 'In policy: nothing you can hedge yet';
+        if (!known) return `In policy (board wants ${band})`;
+        return `In policy: ${coverPercent(cover, mandate)}% of risk covered (board wants ${band})`;
+    }
+    if (summary.wrongFocus === true) return 'Off policy: big exposure under-hedged';
+    if (!known) return `Off policy: board wants ${band}`;
+    return `Off policy: ${coverPercent(cover, mandate)}% hedged, board wants ${band}`;
+}
+
+const BREAKDOWN_FIELDS = ['cashBefore', 'cashAfter', 'ocf', 'exposureTotal', 'hedgeTotal', 'addOnCost'];
+
+// The money step formatCash shows at this size (0.01bn, 0.1m, 1k, 1).
+const displayStep = abs => (abs >= 1e9 ? 1e7 : abs >= 1e6 ? 1e5 : abs >= 1e3 ? 1e3 : 1);
+
+// The result screen's cash breakdown: Operations, Market (the move on the exposures), Hedges, Event and Add-ons,
+// signed, then "Cash +€23.0m". Zero parts are dropped, except Operations. The parts are rounded to what formatCash
+// shows (largest remainder), so the figures on screen add up to the total on screen. null for a summary saved
+// before v3.2, which has no parts.
+export function cashBreakdown(summary, currency) {
+    if (!summary || BREAKDOWN_FIELDS.some(k => !Number.isFinite(summary[k]))) return null;
+    const event = Number.isFinite(summary.eventCash) ? summary.eventCash : 0;
+    const raw = [
+        { key: 'ops', label: 'Operations', value: summary.ocf },
+        { key: 'market', label: 'Market', value: summary.exposureTotal },
+        { key: 'hedges', label: 'Hedges', value: summary.hedgeTotal },
+        { key: 'event', label: 'Event', value: event },
+        { key: 'addOns', label: 'Add-ons', value: -summary.addOnCost }
+    ];
+    const total = raw.reduce((s, p) => s + p.value, 0);
+    const step = displayStep(Math.max(Math.abs(total), ...raw.map(p => Math.abs(p.value))));
+    const units = raw.map(p => Math.floor(p.value / step));
+    let need = Math.round(total / step) - units.reduce((s, u) => s + u, 0);
+    const byRemainder = raw.map((p, i) => ({ i, rem: p.value / step - units[i] }))
+        .filter(x => x.rem > 0)
+        .sort((a, b) => b.rem - a.rem || a.i - b.i);
+    for (const { i } of byRemainder) {
+        if (need <= 0) break;
+        units[i] += 1;
+        need -= 1;
+    }
+    const totalUnits = units.reduce((s, u) => s + u, 0);
+    const parts = raw
+        .map((p, i) => ({ key: p.key, label: p.label, value: units[i] * step }))
+        .filter(p => p.key === 'ops' || p.value !== 0)
+        .map(p => ({ ...p, text: `${p.label} ${signedCash(p.value, currency)}` }));
+    const totalValue = totalUnits * step;
+    return { parts, total: { value: totalValue, text: `Cash ${signedCash(totalValue, currency)}` } };
 }

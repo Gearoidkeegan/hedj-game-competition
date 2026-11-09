@@ -12,10 +12,12 @@ import {
     activeExposures, coverInPolicy, isRunOver, policyCover, POLICY_OPTIONS, quarterStartRates
 } from '../../engine/sim/SimEngine.js';
 import {
-    applyPowerUp, forecastAccuracy, hedgeCap, isHedgeable, maxHedgeRatio, powerUpCost, POWER_UP_IDS
+    applyPowerUp, forecastVariance, hedgeCap, isHedgeable, maxHedgeRatio, powerUpCost, POWER_UP_IDS
 } from '../../engine/sim/powerUps.js';
 import { bandText, chairmanFor, cosmeticRng } from './RunController.js';
-import { exposureTitle, exposureCopy, exposureRisk, exposureSizeText, lockedReason } from '../../ui/labels.js';
+import {
+    exposureTitle, exposureCopy, exposureRisk, exposureSizeText, forecastRangeText, lockedReason
+} from '../../ui/labels.js';
 import { RiskMeter, coverPercent } from '../../ui/RiskMeter.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
@@ -31,8 +33,9 @@ export const AVATAR_PX = 48;   // the player's character beside the cash meter (
 const PERSONALITIES = ['aggressive', 'cautious', 'operational'];
 // Board mood below this shows in red (quarter and result screens).
 export const LOW_MOOD = 30;
+// v3.2: the cash meter's slide to the cash after a picked add-on (and back when it is dropped).
+export const PREVIEW_MS = 400;
 
-const pct = v => `${Math.round(v * 100)}%`;
 const clamp01 = v => Math.min(1, Math.max(0, v));
 
 // The run as the engine will see it this quarter: a power-up bought now applies to this quarter's hedges.
@@ -191,8 +194,9 @@ export class QuarterScreen {
     mount() {
         this.tapGuard.arm();
         if (!this.run) return;
-        this.meter = new CashMeter(this.meterHost, { currency: this.run.baseCurrency });
+        this.meter = new CashMeter(this.meterHost, { currency: this.run.baseCurrency, env: this.env });
         this.meter.set({ cash: this.run.cash, startingCash: this.run.startingCash, redLine: this.run.redLine });
+        this._previewCash(previewRun(this.run, this.decisions.buyPowerUp));
         const industryId = this.run.industryId;
         const sceneState = sceneStateFor(this.run);
         try {
@@ -431,6 +435,7 @@ export class QuarterScreen {
             b.setAttribute('aria-pressed', String(!!p && b.getAttribute('data-policy') === `${p.min}-${p.max}`));
         }
         for (const b of this.powerBtns || []) b.setAttribute('aria-pressed', String(b.getAttribute('data-powerup') === d.buyPowerUp));
+        this._previewCash(preview);
 
         // v3.1: one policy check drives the sizes, the RISK COVERED meter, the status and the confirm prompt.
         const check = this._check();
@@ -466,10 +471,22 @@ export class QuarterScreen {
         return policyCheck(this.run, this.decisions, this.app.content?.events || [], this.rc?.market);
     }
 
+    // v3.2: how far this quarter's volume may miss its forecast, as the engine draws it: forecastVariance, times the
+    // chosen event response's varianceMult. A Cash Forecasting module picked now shows as "±40% → ±27%".
     _forecastText(run, preview) {
-        const now = pct(forecastAccuracy(run));
-        const next = pct(forecastAccuracy(preview));
-        return now === next ? `Forecast accuracy ${now}` : `Forecast accuracy ${now} → ${next}`;
+        const mult = this.event?.choices?.find(c => c.id === this.decisions.eventChoice)?.effects?.varianceMult ?? 1;
+        const now = forecastRangeText(forecastVariance(run) * mult);
+        const next = forecastRangeText(forecastVariance(preview) * mult);
+        return now === next ? `Forecast ${now}` : `Forecast ${now} → ${next}`;
+    }
+
+    // v3.2: the meter shows the cash after a picked add-on (Cash Visibility's cash included), with the change as a
+    // tag, and slides back when the pick is dropped. Nothing happens until it is mounted or when the cash is unchanged.
+    _previewCash(preview) {
+        const run = this.run;
+        if (!this.meter || !run || this.meter.value === preview.cash) return;
+        this.meter.set({ cash: preview.cash, startingCash: run.startingCash, redLine: run.redLine, deltaFrom: run.cash },
+            PREVIEW_MS);
     }
 
     _onRun() {
