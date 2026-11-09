@@ -7,9 +7,13 @@
 // the normal submit (the server's 2-hour grace, or the R63 "competition has closed" rejection).
 
 export const FREE_PLAY = Object.freeze({ live: false, startIso: null, endIso: null });
-export const RECHECK_MS = 60_000;   // a tab coming back into view checks again at most once a minute
+// A good answer is reused for at most this long (and never past a cached start or end date); a tab coming back into
+// view also checks again at most once a minute.
+export const RECHECK_MS = 60_000;
 
 const DATE_FMT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Dublin' });
+const DAY_FMT = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Europe/Dublin' });
+const TIME_FMT = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Dublin' });
 const validIso = v => (typeof v === 'string' && Number.isFinite(Date.parse(v)) ? v : null);
 
 export function normaliseEvent(data) {
@@ -27,10 +31,16 @@ export function nextStartIso(event, nowMs) {
     return Number.isFinite(start) && start > nowMs ? event.startIso : null;
 }
 
+// When the next competition starts: "today at 09:00" on the day itself (Dublin time), "20 November 2026" before.
+export function nextCompetitionText(iso, nowMs) {
+    const start = new Date(iso);
+    return DAY_FMT.format(start) === DAY_FMT.format(new Date(nowMs)) ? `today at ${TIME_FMT.format(start)}` : formatEventDate(iso);
+}
+
 // The one line free play shows in place of a rank (90 characters or fewer).
 export function practiceLine(event, nowMs) {
     const next = nextStartIso(event, nowMs);
-    return next ? `Practice mode. Next competition: ${formatEventDate(next)}` : 'Practice mode. Play for prizes at the Hedj stand';
+    return next ? `Practice mode. Next competition: ${nextCompetitionText(next, nowMs)}` : 'Practice mode. Play for prizes at the Hedj stand';
 }
 
 // main.js's gate: starting a run (Simple industry pick or Pro setup) needs a valid registration, except in free play.
@@ -81,9 +91,22 @@ export class EventMode {
         return changed;
     }
 
-    // PLAY: when the last check failed, quietly try again (the event may be live after all), then apply the mode.
+    // True when the status should be asked again before it is used: the last check failed, it is older than
+    // RECHECK_MS, or a cached start or end date has passed since it was fetched (a phone left open across either).
+    isStale() {
+        const now = this.now();
+        if (!this.fresh || now - this.checkedAt >= RECHECK_MS) return true;
+        const crossed = iso => {
+            const t = Date.parse(iso ?? '');
+            return Number.isFinite(t) && this.checkedAt < t && now >= t;
+        };
+        return crossed(this.event.startIso) || crossed(this.event.endIso);
+    }
+
+    // PLAY, PLAY AGAIN and the title: ask again when stale (quietly; fetchEvent gives up after its 4 s timeout),
+    // then apply the mode. Returns true when the mode changed. Never rejects.
     async beforePlay() {
-        if (!this.fresh) await this.refresh();
+        if (this.isStale()) await this.refresh();
         return this.apply();
     }
 

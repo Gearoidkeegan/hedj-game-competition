@@ -164,6 +164,56 @@ test('free play switches to live after a quiet retry on PLAY; a fresh status is 
     assert.equal(calls, 2, 'fresh: no second fetch');
 });
 
+// I1: a good answer goes stale once a cached date has passed, or after RECHECK_MS, so a phone left open across the
+// start or the end switches at the next PLAY without a reload.
+test('isStale: after a failed check, after RECHECK_MS, or once now passes the cached start or end', async () => {
+    let t = Date.parse('2026-11-20T08:59:30Z');
+    const S = '2026-11-20T09:00:00Z';
+    const E = '2026-11-20T18:00:00Z';
+    let answer = new Error('offline');
+    const em = new EventMode({ fetchEvent: async () => { if (answer instanceof Error) throw answer; return answer; }, storage, now: () => t });
+    assert.equal(em.isStale(), true, 'never checked');
+    await em.refresh();
+    assert.equal(em.isStale(), true, 'the last check failed');
+    answer = { live: false, startIso: S, endIso: E };
+    await em.refresh();
+    assert.equal(em.isStale(), false);
+    t = Date.parse(S) - 1;
+    assert.equal(em.isStale(), false, 'just before the start');
+    t = Date.parse(S);
+    assert.equal(em.isStale(), true, 'the start has passed');
+    answer = { live: true, startIso: S, endIso: E };
+    await em.refresh();
+    assert.equal(em.isStale(), false);
+    t += RECHECK_MS - 1;
+    assert.equal(em.isStale(), false);
+    t += 1;
+    assert.equal(em.isStale(), true, 'older than RECHECK_MS');
+    await em.refresh();
+    t = Date.parse(E);
+    assert.equal(em.isStale(), true, 'the end has passed');
+});
+
+test('a phone left open across the start goes live at the next PLAY, and across the end goes back to free play', async () => {
+    const S = Date.parse('2026-11-20T09:00:00Z');
+    const E = Date.parse('2026-11-20T18:00:00Z');
+    let t = S - 30_000;
+    let calls = 0;
+    const server = () => ({ live: t >= S && t < E, startIso: new Date(S).toISOString(), endIso: new Date(E).toISOString() });
+    const em = new EventMode({ fetchEvent: async () => { calls++; return server(); }, storage, now: () => t });
+    await em.refresh();
+    em.apply();
+    assert.equal(storage.isFreePlay(), true, 'before the start');
+    t = S + 10_000;   // 40 s later: well inside RECHECK_MS, so only the crossing makes it stale
+    assert.equal(await em.beforePlay(), true);
+    assert.equal(storage.isFreePlay(), false, 'live from the start');
+    assert.equal(calls, 2);
+    t = E + 5_000;
+    assert.equal(await em.beforePlay(), true);
+    assert.equal(storage.isFreePlay(), true, 'free play from the end');
+    assert.equal(calls, 3);
+});
+
 test('recheck: at most once a minute', async () => {
     let t = T0;
     let answer = LIVE;
@@ -187,7 +237,14 @@ test('practiceLine: the next start date when one is ahead, the stand otherwise; 
     const past = practiceLine({ live: false, startIso: '2026-11-20T09:00:00Z', endIso: null }, Date.parse('2026-12-01T00:00:00Z'));
     assert.equal(past, 'Practice mode. Play for prizes at the Hedj stand');
     assert.equal(practiceLine(undefined, T0), past);
-    for (const s of [ahead, past]) assert.ok(s.length <= 90);
+    // M9: on the day of the start, "today" and the time in Dublin (GMT in November, IST in summer).
+    const today = practiceLine({ live: false, startIso: '2026-11-20T09:00:00Z', endIso: null }, Date.parse('2026-11-20T07:00:00Z'));
+    assert.equal(today, 'Practice mode. Next competition: today at 09:00');
+    const summer = practiceLine({ live: false, startIso: '2026-06-10T08:30:00Z', endIso: null }, Date.parse('2026-06-09T23:30:00Z'));
+    assert.equal(summer, 'Practice mode. Next competition: today at 09:30', 'already 10 June in Dublin');
+    const eve = practiceLine({ live: false, startIso: '2026-11-20T09:00:00Z', endIso: null }, Date.parse('2026-11-19T22:00:00Z'));
+    assert.equal(eve, 'Practice mode. Next competition: 20 November 2026', 'the day before');
+    for (const s of [ahead, past, today, summer]) assert.ok(s.length <= 90);
 });
 
 // ── RunController in free play ───────────────────────────────────────────

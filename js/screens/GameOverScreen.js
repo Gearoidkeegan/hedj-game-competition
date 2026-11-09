@@ -392,7 +392,7 @@ export class GameOverScreen {
         const v = this.view;
         if (v.practice && !v.crisisId) {
             // One line of 90 characters or fewer: a storage warning takes the place of the date.
-            this.rankEl.textContent = v.outcome?.storageFailed ? `Practice mode. ${STORAGE_FAILED}` : practiceLine(this.app.event, Date.now());
+            this.rankEl.textContent = v.outcome?.storageFailed ? `Practice mode. ${STORAGE_FAILED}` : practiceLine(this.app.event, this.app.eventMode?.now?.() ?? Date.now());
             return;
         }
         this.rankEl.textContent = v.crisisId || !v.ranked ? crisisText(v) : rankText(v.outcome);
@@ -424,19 +424,45 @@ export class GameOverScreen {
     // Simple: a new run of the same industry (the same crisis for a crisis run), straight to its first quarter.
     // An expired or missing token goes through showScreen('industry'), whose gate sends the player to register.
     // Pro: back to the Pro setup (showScreen applies the same gate).
+    // R66 (I1): first the event status is checked again when stale (CHECKING… on the button, at most the check's 4 s
+    // timeout). If the event opened or closed since this run started, the title shows the new mode instead.
     _playAgain() {
         if (this.busy || this.navigated || !this.view) return;
+        const em = this.app.eventMode;
+        if (typeof em?.beforePlay !== 'function') {
+            this._startAgain();
+            return;
+        }
+        this.busy = true;
+        this.againBtn.disabled = true;
+        if (em.isStale?.()) this.againBtn.textContent = 'CHECKING…';
+        const token = this.token;
+        Promise.resolve()
+            .then(() => em.beforePlay())
+            .catch(() => false)
+            .then((changed) => {
+                this.busy = false;
+                if (this.againBtn) {
+                    this.againBtn.disabled = false;
+                    this.againBtn.textContent = 'PLAY AGAIN';
+                }
+                if (this.navigated || this.token !== token) return;   // TITLE chosen, or the screen left
+                if (changed) {
+                    this.navigated = true;
+                    if (this.view?.mode === 'pro') gameState.reset();
+                    this.app.showScreen('title');
+                    return;
+                }
+                this._startAgain();
+            });
+    }
+
+    _startAgain() {
         const v = this.view;
         if (v.mode === 'pro') {
             this.navigated = true;
             gameState.reset();
             this.app.showScreen('setup');
-            return;
-        }
-        // R66: the event opened or closed since this run started. The title shows the new mode first.
-        if (this.app.eventMode?.apply()) {
-            this.navigated = true;
-            this.app.showScreen('title');
             return;
         }
         const reg = this.storage.getRegistration();

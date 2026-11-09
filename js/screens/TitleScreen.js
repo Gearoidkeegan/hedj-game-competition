@@ -71,6 +71,14 @@ export class TitleScreen {
     mount() {
         const id = ++this.mountId;
         const live = () => id === this.mountId;
+        // R66 (I1): a stale event status is checked again as the title shows; a changed mode redraws the title.
+        const em = this.app.eventMode;
+        if (typeof em?.isStale === 'function' && em.isStale()) {
+            Promise.resolve()
+                .then(() => em.refresh())
+                .then(() => { if (live() && em.apply()) this.app.showScreen('title'); })
+                .catch(() => {});
+        }
         if (this.free) {
             // Only whether the last event's board has entries: it decides if its LEADERBOARD button shows.
             Promise.resolve()
@@ -109,7 +117,7 @@ export class TitleScreen {
     _practiceLine() {
         return h('p', { class: 't-practice' },
             h('span', { class: 't-practice-tag', text: 'PRACTICE MODE' }),
-            h('span', { class: 't-practice-line', text: practiceLine(this.app.event, Date.now()) }));
+            h('span', { class: 't-practice-line', text: practiceLine(this.app.event, this.app.eventMode?.now?.() ?? Date.now()) }));
     }
 
     _menu() {
@@ -222,31 +230,41 @@ export class TitleScreen {
     }
 
     _play() {
-        this._afterEventCheck(() => this._viaGuide('industry'));
+        this._afterEventCheck('.t-play', () => this._viaGuide('industry'));
     }
 
     _pro() {
         this.app.gameMode = 'quickplay';
         // PRO was offered from the other mode's unlocks: if the mode changes, show the title again instead.
-        this._afterEventCheck(() => this._viaGuide('setup'), { titleIfChanged: true });
+        this._afterEventCheck('.t-pro', () => this._viaGuide('setup'), { titleIfChanged: true });
     }
 
-    // R66: when the last event check failed, quietly check again first; a live event then switches to live mode
-    // (and the run start sends the player to register).
-    _afterEventCheck(next, { titleIfChanged = false } = {}) {
+    // R66: when the event status is stale (the last check failed, it is over a minute old, or a cached start or end
+    // has passed), check again first, with CHECKING… on the button. The wait ends at the check's 4 s timeout. A
+    // switch to live then sends the player to register at the run start; a switch to free play starts a guest run.
+    _afterEventCheck(selector, next, { titleIfChanged = false } = {}) {
         const em = this.app.eventMode;
-        if (!em || em.fresh) {
-            next();
+        if (typeof em?.isStale !== 'function' || !em.isStale()) {
+            const changed = em?.apply?.() === true;
+            if (changed && titleIfChanged) this.app.showScreen('title');
+            else next();
             return;
         }
         if (this.checking) return;
         this.checking = true;
         const id = this.mountId;
+        const btn = this.el?.querySelector(selector);
+        const label = btn?.querySelector('.t-btn-main');
+        const text = label?.textContent;
+        if (btn) btn.disabled = true;
+        if (label) label.textContent = 'CHECKING…';
         Promise.resolve()
             .then(() => em.beforePlay())
             .catch(() => false)
             .then((changed) => {
                 this.checking = false;
+                if (btn) btn.disabled = false;
+                if (label) label.textContent = text;
                 if (id !== this.mountId) return;
                 if (changed && titleIfChanged) this.app.showScreen('title');
                 else next();

@@ -14,6 +14,7 @@ import { RunController } from '../../js/screens/simple/RunController.js';
 import { TitleScreen } from '../../js/screens/TitleScreen.js';
 import { GameOverScreen } from '../../js/screens/GameOverScreen.js';
 import { RegistrationScreen } from '../../js/screens/RegistrationScreen.js';
+import { startRun } from '../../js/screens/simple/IndustryScreen.js';
 import { TAP_GUARD_MS } from '../../js/ui/tapGuard.js';
 
 marketEngine.loadFromObjects(loadMarketData());
@@ -169,6 +170,8 @@ test('a failed event check is retried on PLAY, and a live event switches to live
     storage.markGuideSeen();
     globalThis.localStorage.setItem('hedj_has_seen_guide', '1');
     const t = mountTitle(app);
+    await settle();   // the title's own check (stale: the last one failed) fails too
+    assert.deepEqual(app.shown, []);
     answer = { live: true, startIso: null, endIso: null };
     t.q('.t-play').click();
     assert.deepEqual(app.shown, [], 'waits for the quiet retry');
@@ -178,6 +181,172 @@ test('a failed event check is retried on PLAY, and a live event switches to live
     assert.deepEqual(app.shown, ['industry']);
     assert.equal(needsRegistration('industry', storage, Date.now()), true, 'main.js sends the player to register');
     t.screen.unmount();
+});
+
+// ── I1: a phone left open across the start or the end ────────────────────
+
+const S = Date.parse('2026-11-20T09:00:00Z');
+const E = Date.parse('2026-11-20T18:00:00Z');
+
+// An EventMode on a fake clock whose server is live in [S, E). With clock.hold, the next answer waits for release().
+function clockedEventMode(t0) {
+    const clock = { t: t0, hold: false, release: null };
+    const answer = () => ({ live: clock.t >= S && clock.t < E, startIso: new Date(S).toISOString(), endIso: new Date(E).toISOString() });
+    const fetchEvent = () => (clock.hold
+        ? new Promise(r => { clock.release = () => r(answer()); })
+        : Promise.resolve(answer()));
+    const eventMode = new EventMode({ fetchEvent, storage, now: () => clock.t });
+    return { clock, eventMode };
+}
+
+function playToEnd(rc) {
+    while (!isRunOver(rc.run)) {
+        const d = rc.currentDecisionsDefaults();
+        if (rc.run.pendingEvent) d.eventChoice = content.events.find(e => e.id === rc.run.pendingEvent).choices[0].id;
+        rc.playQuarter(d);
+    }
+}
+
+function proFinished(contactEmail) {
+    const summary = {
+        q: 1, policy: 'in', inMandate: true, playerDelta: 1e6, benchmarkDelta: 1e6, marketResult: 1e6, breach: 'none',
+        severe: false, cashAfter: 101e6, benchmarkCashAfter: 101e6, redLine: 20e6, boardMoodAfter: 8, lines: [],
+        event: null, powerUp: null
+    };
+    gameState.update({
+        gameId: 'game_8', seed: 8, startedAt: 1_700_000_000_000, industryId: 'pharma', contactEmail,
+        industry: content.industries.find(i => i.id === 'pharma'), startYear: 2008, startingCash: 100e6,
+        boardSatisfaction: 8, quarterSummaries: [summary], runStatus: 'complete'
+    });
+    gameState.update({ proResult: { mode: 'pro', status: 'complete', score: scorePro(gameState.get()), history: [summary] } });
+}
+
+test('title left open across the start: PLAY says CHECKING, then starts live (registration gate)', async () => {
+    const { clock, eventMode } = clockedEventMode(S - 30_000);
+    await eventMode.refresh();
+    eventMode.apply();
+    const app = makeApp({ eventMode, get event() { return eventMode.event; } });
+    globalThis.localStorage.setItem('hedj_has_seen_guide', '1');
+    const t = mountTitle(app);
+    await settle();
+    assert.equal(t.q('.t-practice-line').textContent, 'Practice mode. Next competition: today at 09:00');
+    clock.t = S + 10_000;   // 40 s later: inside RECHECK_MS, so only the start date makes it stale
+    clock.hold = true;
+    t.q('.t-play').click();
+    assert.equal(t.q('.t-play .t-btn-main').textContent, 'CHECKING…');
+    assert.equal(t.q('.t-play').disabled, true);
+    t.q('.t-play').click();   // a repeat tap is ignored
+    await settle();   // the check is now waiting on the server
+    clock.release();
+    await settle();
+    assert.equal(t.q('.t-play .t-btn-main').textContent, 'PLAY');
+    assert.equal(t.q('.t-play').disabled, false);
+    assert.equal(storage.isFreePlay(), false);
+    assert.deepEqual(app.shown, ['industry']);
+    assert.equal(needsRegistration('industry', storage, clock.t), true, 'a live, registered run');
+    t.screen.unmount();
+});
+
+test('PLAY stops waiting when the check gives up (the 4 s timeout) and goes on with the cached mode', async () => {
+    let fail = false;
+    const eventMode = new EventMode({
+        fetchEvent: async () => { if (fail) throw Object.assign(new Error('timed out'), { name: 'TimeoutError' }); return { live: false }; },
+        storage
+    });
+    await eventMode.refresh();
+    eventMode.apply();
+    const app = makeApp({ eventMode, get event() { return eventMode.event; } });
+    storage.markGuideSeen();
+    const t = mountTitle(app);
+    await settle();
+    fail = true;
+    eventMode.checkedAt = -Infinity;   // stale
+    t.q('.t-play').click();
+    await settle();
+    assert.deepEqual(app.shown, ['industry']);
+    assert.equal(t.q('.t-play .t-btn-main').textContent, 'PLAY');
+    assert.equal(storage.isFreePlay(), true);
+    t.screen.unmount();
+});
+
+test('the title checks a stale status when it renders, and redraws if the mode changed', async () => {
+    const { clock, eventMode } = clockedEventMode(S - 30_000);
+    await eventMode.refresh();
+    eventMode.apply();
+    const app = makeApp({ eventMode, get event() { return eventMode.event; } });
+    clock.t = S + 1;
+    const t = mountTitle(app);
+    await settle();
+    assert.equal(storage.isFreePlay(), false);
+    assert.deepEqual(app.shown, ['title']);
+    t.screen.unmount();
+});
+
+test('game over left open across the end: PLAY AGAIN goes to the title, and the next PLAY is a guest run', async () => {
+    const { clock, eventMode } = clockedEventMode(E - 10 * 60_000);
+    await eventMode.refresh();
+    eventMode.apply();
+    assert.equal(storage.isFreePlay(), false);
+    register(ANN);
+    const api = fakeApi();
+    const rc = new RunController({ storage, api, market: marketEngine, content, now: () => clock.t });
+    const app = makeApp({ runController: rc, gameOverMode: 'simple', eventMode, get event() { return eventMode.event; } });
+    rc.start('airline', { seed: 3 });
+    playToEnd(rc);
+    const g = mountGameOver(app, api);
+    await settle();
+    clock.t = E + 1;
+    clock.hold = true;
+    g.q('.go-again').click();
+    assert.equal(g.q('.go-again').textContent, 'CHECKING…');
+    await settle();   // the check is now waiting on the server
+    clock.release();
+    await settle();
+    assert.deepEqual(app.shown, ['title']);
+    assert.equal(storage.isFreePlay(), true);
+
+    app.shown = [];
+    storage.markGuideSeen();
+    const t = mountTitle(app);
+    await settle();
+    t.q('.t-play').click();
+    assert.deepEqual(app.shown, ['industry']);
+    await startRun(app, 'airline');
+    assert.equal(rc.email, storage.GUEST_PLAYER, 'a guest run');
+    t.screen.unmount();
+});
+
+test('Pro PLAY AGAIN across the start goes to the title, not Pro setup (M2)', async () => {
+    const { clock, eventMode } = clockedEventMode(S - 30_000);
+    await eventMode.refresh();
+    eventMode.apply();
+    proFinished(storage.GUEST_PLAYER);
+    const app = makeApp({ gameOverMode: 'pro', eventMode, get event() { return eventMode.event; } });
+    const g = mountGameOver(app, fakeApi());
+    await settle();
+    clock.t = S + 5_000;
+    g.q('.go-again').click();
+    await settle();
+    assert.deepEqual(app.shown, ['title']);
+    assert.equal(storage.isFreePlay(), false);
+    assert.equal(gameState.get().proResult, null, 'the finished Pro game is cleared');
+});
+
+test('PLAY AGAIN with a current status and no change starts the next run as before', async () => {
+    const { eventMode } = clockedEventMode(S - 30_000);
+    await eventMode.refresh();
+    eventMode.apply();
+    const api = fakeApi();
+    const rc = new RunController({ storage, api, market: marketEngine, content, now: () => Date.now() });
+    const app = makeApp({ runController: rc, gameOverMode: 'simple', eventMode, get event() { return eventMode.event; } });
+    rc.start('airline', { seed: 3 });
+    playToEnd(rc);
+    const g = mountGameOver(app, api);
+    await settle();
+    g.q('.go-again').click();
+    assert.equal(g.q('.go-again').textContent, 'PLAY AGAIN', 'no CHECKING label when the status is current');
+    await settle();
+    assert.deepEqual(app.shown, ['quarter']);
 });
 
 // ── Game over ────────────────────────────────────────────────────────────

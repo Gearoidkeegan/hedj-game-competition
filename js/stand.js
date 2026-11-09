@@ -4,7 +4,7 @@
 // next start date or a holding message. If the event check fails it shows the boards as during an event.
 // initStand takes its browser dependencies as optional arguments so Node tests can drive it with a fake DOM.
 import { CONFIG } from './config.js';
-import { normaliseEvent, nextStartIso, formatEventDate } from './utils/eventStatus.js';
+import { normaliseEvent, nextStartIso, nextCompetitionText } from './utils/eventStatus.js';
 
 const REFRESH_MS = 30000;
 const FETCH_TIMEOUT_MS = 10000;
@@ -83,7 +83,7 @@ export function initStand(env = {}) {
         $('grid-event').hidden = closed && !hasFinal;
         $('grid-today').hidden = closed;
         const next = closed ? nextStartIso(event, now()) : null;
-        $('holding').textContent = next ? `Next competition: ${formatEventDate(next)}` : HOLDING_TEXT;
+        $('holding').textContent = next ? `Next competition: ${nextCompetitionText(next, now())}` : HOLDING_TEXT;
         $('holding').hidden = !closed || hasFinal;
     }
 

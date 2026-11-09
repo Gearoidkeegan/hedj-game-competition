@@ -71,6 +71,10 @@ test('not live and no board: the next start date, or the holding message', async
     assert.equal(next.$('grid-today').hidden, true);
     assert.equal(next.$('final').hidden, true);
 
+    const today = run({ event: { live: false, startIso: '2026-11-01T15:30:00Z', endIso: null } });
+    await today.stand.refresh();
+    assert.equal(today.$('holding').textContent, 'Next competition: today at 15:30', 'on the day itself (M9)');
+
     const none = run({ event: { live: false, startIso: null, endIso: null } });
     await none.stand.refresh();
     assert.equal(none.$('holding').textContent, HOLDING_TEXT);
