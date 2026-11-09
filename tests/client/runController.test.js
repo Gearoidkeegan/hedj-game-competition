@@ -277,6 +277,9 @@ test('v3.1 wrong focus: its own board line on any board, after a proposal; old s
     assert.equal(expressionFor('wrongFocus', { breach: 'lucky' }), 'neutral');
     assert.equal(expressionFor('wrongFocus', { breach: 'none' }), 'neutral');
     assert.equal(expressionFor('wrongFocus'), 'neutral');
+    // Fix round 1 (minor 4): a no-policy wrong-focus quarter that lost on the hedge takes the -20 hit: angry.
+    assert.equal(expressionFor('wrongFocus', { policy: 'none', breach: 'none', lines: [{ hedgeImpact: -5 }] }), 'angry');
+    assert.equal(expressionFor('wrongFocus', { policy: 'none', breach: 'none', lines: [{ hedgeImpact: 5 }] }), 'neutral');
 });
 
 test('v3.1 wrong focus: a Q1 wrong-focus quarter gets the board wrongFocus line, not the chairman', () => {

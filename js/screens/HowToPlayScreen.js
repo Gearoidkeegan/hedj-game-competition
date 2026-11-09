@@ -12,7 +12,7 @@ const mockRow = (label, value, cls = '') => h('div', { class: 'gd-row' },
 const dialMock = () => h('div', { class: 'gd-mock', 'aria-hidden': 'true' },
     h('div', { class: 'gd-dial' }, ['0%', '25%', '50%', '75%', '100%'].map((p, i) =>
         h('span', { class: `gd-step${i === 2 || i === 3 ? ' is-band' : ''}${i === 2 ? ' is-on' : ''}${i === 4 ? ' is-locked' : ''}`, text: p }))),
-    h('p', { class: 'gd-mock-note', text: 'Board policy: hedge 50–75%. Bank lines cap you at 50%.' }));
+    h('p', { class: 'gd-mock-note', text: 'Board policy: cover 50–75% of your risk. Bank lines cap you at 50%.' }));
 
 const cashMock = () => h('div', { class: 'gd-mock', 'aria-hidden': 'true' },
     h('div', { class: 'gd-meter' }, h('span', { class: 'gd-meter-fill' }), h('span', { class: 'gd-meter-red' })),
@@ -31,7 +31,8 @@ export const CARDS = [
         mock: dialMock,
         points: [
             'Each exposure has a dial: how much of it to hedge, 0% to 100%.',
-            'Your board may set a policy, a band like 50–75%. Stay inside it.',
+            'Your board may set a policy, a band like 50–75% of your risk. Stay inside it.',
+            "Bigger exposures count for more. Don't hedge a small one and leave the big one open.",
             'Some boards say their policy is not to hedge. Others have none: propose one.',
             'With no policy, the board judges each hedge on its own profit. Hardest to please.',
             'Bank lines cap you at 50%. Bigger Bank Facilities lifts that and adds a cushion.'

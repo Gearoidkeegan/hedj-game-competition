@@ -147,7 +147,7 @@
                 "You hedged the loose change and left the vault door open. Bold. Wrong, but bold.",
                 "Small thing locked down, big thing swinging in the wind. That's backwards, champ.",
                 "You guarded the petty cash and gambled the house. I like risk. Not that kind.",
-                "Fully hedged on the tiny one? The big one was the whole game, and you left it open.",
+                "Hedged up on the tiny one? The big one was the whole game, and you left it hanging.",
                 "Wrong target. Nobody gets a bonus for protecting the small stuff.",
                 "You hedged the side bet and let the main bet ride. Pick your fights better."
             ]
@@ -236,11 +236,11 @@
                 "Adopted. From next quarter, we may call things 'compliant' again."
             ],
             "wrongFocus": [
-                "The small exposure was covered. The large one was not. That is the wrong way round.",
+                "The small exposure got far more cover than the large one. That is the wrong way round.",
                 "You protected the minor risk and left the major one open. The minutes will note it.",
-                "Our largest exposure was left unhedged. Covering the small one does not offset that.",
-                "A seatbelt on the bicycle, none on the lorry. Please review your priorities.",
-                "The policy is about our total risk. The biggest exposure was left wide open.",
+                "Our largest exposure was barely hedged. Covering the small one does not offset that.",
+                "Seatbelts on the bicycle, barely any on the lorry. Please review your priorities.",
+                "The policy is about our total risk. The biggest exposure was left far too open.",
                 "Hedged where it mattered least, exposed where it mattered most. Unacceptable."
             ]
         },

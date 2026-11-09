@@ -66,9 +66,13 @@ export function boardLineKey(summary, moodBefore) {
 }
 
 // Sprite expression for a board line key. breachLoss is always angry; mixed and mild lines stay neutral.
-// wrongFocus follows the quarter: angry when it was also a losing breach (the angry sprite always wins), else neutral.
+// wrongFocus follows the quarter: angry when it was also a losing breach (the angry sprite always wins) or, on a
+// no-policy board, a hedge loss (the line it pre-empts is angry too); otherwise neutral.
 export function expressionFor(key, summary = null) {
-    if (key === 'wrongFocus') return summary?.breach === 'loss' ? 'angry' : 'neutral';
+    if (key === 'wrongFocus') {
+        const hedgeLoss = summary?.policy === 'none' && sum(summary.lines, 'hedgeImpact') < 0;
+        return summary?.breach === 'loss' || hedgeLoss ? 'angry' : 'neutral';
+    }
     if (ANGRY_KEYS.has(key)) return 'angry';
     if (HAPPY_KEYS.has(key)) return 'happy';
     return 'neutral';

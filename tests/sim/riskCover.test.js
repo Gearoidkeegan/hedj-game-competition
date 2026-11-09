@@ -9,6 +9,7 @@ import { quarterPoints } from '../../js/engine/sim/score.js';
 import { exposureValue } from '../../js/engine/sim/exposureMath.js';
 import { applyPowerUp } from '../../js/engine/sim/powerUps.js';
 import { createRun, simulateQuarter, policyCover, quarterStartRates } from '../../js/engine/sim/SimEngine.js';
+import { boardLineKey } from '../../js/screens/simple/RunController.js';
 
 marketEngine.loadFromObjects(loadMarketData());
 const airline = loadIndustries().find(i => i.id === 'airline');
@@ -245,4 +246,35 @@ test('determinism: the same seed and decisions give the same result', () => {
     const b = simulateQuarter(structuredClone(run), structuredClone(d), mkt, content);
     assert.deepEqual(a, b);
     assert.deepEqual(JSON.parse(JSON.stringify(a.summary)), a.summary, 'JSON round-trippable');
+});
+
+// ── Fix round 1 ────────────────────────────────────────────────────────────
+
+test('fix 1: a noHedge board never reports wrong focus (any hedge is the breach); a band board still does', () => {
+    const exps = [fx('USD', 300), fx('GBP', 100)];
+    const band = policyCover({ ...fakeRun(exps), mandate: { min: 0.25, max: 0.5 } }, { USD: 0, GBP: 1 });
+    assert.equal(band.wrongFocus, true);
+    const noHedge = policyCover({ ...fakeRun(exps), mandate: { min: 0, max: 0 } }, { USD: 0, GBP: 1 });
+    assert.equal(noHedge.wrongFocus, false);
+    assert.equal(noHedge.cover, 0.25, 'cover is still reported');
+    const none = policyCover({ ...fakeRun(exps), mandate: null }, { USD: 0, GBP: 1 });
+    assert.equal(none.wrongFocus, true, 'the no-policy board still gets the line');
+});
+
+test('fix 1: on a noHedge board the engine summary has no wrong focus and the quarter is off on cover alone', () => {
+    const run = runOn({ min: 0, max: 0 }, { powerUps: ['facilities', 'hedgeAccess'], fuel: 300e6 });
+    const { summary } = simulateQuarter(run, decide({ fuel: 1, 'usd-revenue': 0 }), mkt, content);
+    assert.equal(summary.wrongFocus, false);
+    assert.equal(summary.policy, 'off');
+    assert.ok(summary.riskCover > 0);
+    assert.notEqual(boardLineKey(summary, run.boardMood), 'wrongFocus');
+});
+
+test('fix 1 (minor 5): a weightless exposure (debt at a 0% rate) is left out, so it can never be the "small one"', () => {
+    const debt = { id: 'debt', type: 'ir', underlying: 'EURIBOR', direction: 'pay', unit: 'EUR', quarterlyNotional: 1e9, unlockQuarter: 0 };
+    const run = fakeRun([fx('USD', 300), debt], { rates: { EURUSD: 1.2, EURIBOR: 0 } });
+    const r = policyCover(run, { USD: 0, debt: 1 });
+    assert.equal(r.wrongFocus, false);
+    assert.equal(r.cover, 0);
+    assert.deepEqual(r.values, { USD: 300, debt: 0 });
 });

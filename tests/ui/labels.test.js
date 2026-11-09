@@ -97,11 +97,11 @@ test('locked exposures explain themselves in one short line', () => {
     assert.equal(lockedReason({ type: 'fx' }), '');
 });
 
-test('v3.1 size line: the size this quarter in the company currency; interest for floating debt', () => {
+test('v3.1 size line: the size this quarter in the company currency; the principal for floating debt', () => {
     assert.equal(exposureSizeText({ type: 'fx' }, 750e6, 'EUR'), '€750.0m this quarter');
     assert.equal(exposureSizeText({ type: 'commodity' }, 120e6, 'USD'), '$120.0m this quarter');
     assert.equal(exposureSizeText({ type: 'fx' }, 1.5e9, 'GBP'), '£1.50bn this quarter');
-    assert.equal(exposureSizeText({ type: 'ir' }, 17.5e6, 'EUR'), '€17.5m of interest this quarter');
+    assert.equal(exposureSizeText({ type: 'ir' }, 2e9, 'EUR'), '€2.00bn floating debt', 'the principal, never interest');
     assert.equal(exposureSizeText({ type: 'fx' }, 0, 'EUR'), '€0 this quarter');
     for (const bad of [null, undefined, NaN, Infinity]) assert.equal(exposureSizeText({ type: 'fx' }, bad, 'EUR'), '', String(bad));
     for (const ind of content.industries) {

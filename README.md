@@ -202,7 +202,7 @@ Simple mode (the rules live in `js/engine/sim/contract.md`; the numbers in `js/e
 - **The policy check** is size-weighted: "risk covered" (each hedgeable exposure's hedge weighted by its size this
   quarter; locked ones don't count) must sit in the band. Hedging any exposure 50+ points more than the biggest one,
   when the biggest is at least twice its size, is "wrong focus": off policy, with its own board line (on a no-policy
-  board, the line only).
+  board, the line only; a no-hedge board just wants 0%).
 - **Board mood** starts at 60 and stays within 0–100. It moves on results, not on hedging as such:
   - in policy and the quarter made money: up a little (+4); in policy and it lost money: down slightly (−2);
   - off policy but the quarter made money: no change (mixed praise and criticism);

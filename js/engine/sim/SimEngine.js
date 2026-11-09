@@ -126,10 +126,14 @@ export function quarterStartRates(run, market) {
 // v3.1: the board's policy check, shared by simulateQuarter and the quarter screen so they never disagree.
 //   values: { [exposureId]: size } for every active exposure with a usable start rate (exposureValue of this
 //           quarter's forecast notional, after the event's notionalMult); locked and zero-sized ones included.
-//   cover:  Σ h·w / Σ w over the policy set P (active, forecast ≠ 0, hedgeable, usable start rate), with h the hedge
-//           ratio after clamping to maxHedgeRatio. null when P is empty or weighs nothing.
+//   cover:  Σ h·w / Σ w over the policy set P (active, forecast ≠ 0, hedgeable, usable start rate, w > 0), with h
+//           the hedge ratio after clamping to maxHedgeRatio. null when P is empty. (A weightless exposure, such as
+//           debt at a 0% rate, adds nothing to cover, so leaving it out changes no cover; it just can't be "the small
+//           one" below.)
 //   wrongFocus: within P, the largest exposure L (first on a tie) has another S with w_L ≥ 2·w_S and h_S − h_L ≥ 0.5.
-// `run` must carry this quarter's start rates (quarterStartRates) and any power-up bought this quarter.
+//           Never on a noHedge board (run.mandate.max === 0): there any hedge is the breach, and "hedge the big one"
+//           would be the wrong advice.
+// `run` must carry this quarter's start rates (quarterStartRates), its mandate, and any power-up bought this quarter.
 export function policyCover(run, hedges = {}, notionalMult = {}) {
     const values = {};
     const set = [];
@@ -139,15 +143,16 @@ export function policyCover(run, hedges = {}, notionalMult = {}) {
         const forecast = exp.quarterlyNotional * (notionalMult[exp.id] ?? 1);
         const w = exposureValue(exp, rate, forecast) + 0;
         values[exp.id] = w;
-        if (forecast === 0 || !isHedgeable(run, exp)) continue;
+        if (forecast === 0 || !(w > 0) || !isHedgeable(run, exp)) continue;
         const requested = hedges[exp.id] ?? 0;
         set.push({ w, h: Math.min(requested, maxHedgeRatio(run, exp)) });
     }
+    if (!set.length) return { cover: null, wrongFocus: false, values };
     const total = set.reduce((s, x) => s + x.w, 0);
-    if (!(total > 0)) return { cover: null, wrongFocus: false, values };
     const cover = set.reduce((s, x) => s + x.h * x.w, 0) / total;
     const big = set.reduce((a, b) => (b.w > a.w ? b : a));
-    const wrongFocus = set.some(x => x !== big
+    const noHedgeBoard = !!run.mandate && run.mandate.max === 0;
+    const wrongFocus = !noHedgeBoard && set.some(x => x !== big
         && big.w >= WRONG_FOCUS_SIZE * x.w && x.h - big.h >= WRONG_FOCUS_GAP - EPS);
     return { cover, wrongFocus, values };
 }

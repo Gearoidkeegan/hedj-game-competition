@@ -649,3 +649,41 @@ test('each exposure card has a static sparkline when market data exists', () => 
     assert.deepEqual(qa('.exp-spark').map(s => s.textContent).filter(Boolean), [], 'a sparkline holds a canvas and no text');
     screen.unmount();
 });
+
+// ── Fix round 1 ────────────────────────────────────────────────────────────
+
+test('fix 1: on a noHedge board a small hedge is just off policy: "board wants 0%", amber, no wrong-focus note', () => {
+    const { rc, q, card, run, played } = setup(SEED.noHedge, { patch: { powerUps: { owned: ['hedgeAccess'], used: [] } } });
+    rc.run.exposures = rc.run.exposures.map(e => (e.id === 'fuel' ? { ...e, quarterlyNotional: 300e6 } : e));
+    card('fuel').querySelector('[data-step="0.5"]').click();
+    assert.equal(q('.q-status').textContent, 'Off policy: board wants 0%');
+    assert.equal(q('.risk-meter').classList.contains('is-warn'), true);
+    assert.equal(q('.rk-note').hidden, true, 'no "Big exposure left open" advice to hedge more');
+    assert.ok(!q('.q-quarter').parentNode.parentNode.textContent.includes(WRONG_FOCUS_NOTE));
+    run.click();
+    assert.equal(played.length, 0);
+    assert.equal(q('.q-confirm').hidden, false, 'still asks before an off-policy quarter');
+    card('fuel').querySelector('[data-step="0"]').click();
+    assert.equal(q('.q-status').textContent, "Inside the board's policy");
+});
+
+test('fix 2: the floating-debt card shows the principal, never an interest amount or anything that tracks the rate', () => {
+    const patch = { quarter: 6, powerUps: { owned: ['hedgeAccess'], used: [] } };
+    const a = setup(SEED.band2550, { patch });
+    const text = a.card('floating-debt').querySelector('.exp-size').textContent;
+    assert.equal(text, '€10.00bn floating debt');
+    a.screen.unmount();
+    // A very different rate level gives exactly the same card and head text (no rate, no era).
+    const b = setup(SEED.band2550, { patch: { ...patch, rates: { ...a.rc.run.rates, EURIBOR: 0.051 } } });
+    assert.equal(b.card('floating-debt').querySelector('.exp-size').textContent, text);
+    // The only money on the card is the principal; the meter shows a share, never money, in text or attributes.
+    assert.deepEqual(b.card('floating-debt').textContent.match(/[€$£¥][\d.]+(bn|m|k)?/g), ['€10.00bn']);
+    assert.doesNotMatch(b.card('floating-debt').textContent, /interest this quarter/i);
+    const risk = b.q('.q-risk');
+    for (const node of [risk, ...risk.querySelectorAll('[aria-valuetext]'), ...risk.querySelectorAll('[aria-label]')]) {
+        for (const attr of ['aria-label', 'aria-valuetext', 'title']) {
+            assert.doesNotMatch(node.getAttribute(attr) || '', /[€$£¥]|interest/i, attr);
+        }
+    }
+    assert.doesNotMatch(risk.textContent, /[€$£¥]|interest/i);
+});

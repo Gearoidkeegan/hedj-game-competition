@@ -104,12 +104,13 @@ export function moveLabel(e) {
     return titleCase(single(e?.unit || ''));
 }
 
-// v3.1: the card's size line, from policyCover's values: "€750.0m this quarter"; floating debt's size is the
-// quarter's interest, "€17.5m of interest this quarter". Empty when there is no usable size.
+// v3.1: the card's size line. FX and commodity: policyCover's value, "€750.0m this quarter". Floating debt: the
+// caller passes the principal, "€10.00bn floating debt" (never the interest, which would reveal the rate level and so
+// the era). Empty when there is no usable size.
 export function exposureSizeText(e, value, currency) {
     if (!Number.isFinite(value)) return '';
     const money = formatCash(Math.abs(value), currency);
-    return e?.type === 'ir' ? `${money} of interest this quarter` : `${money} this quarter`;
+    return e?.type === 'ir' ? `${money} floating debt` : `${money} this quarter`;
 }
 
 // Why a dial is stuck at 0 before hedgeAccess. Empty for FX, which is always hedgeable.

@@ -77,12 +77,15 @@ Policy compliance (v3.1, Simple) is size-weighted, through `policyCover` (below)
 - **Weight** `w`: `exposureValue(exp, startRate, forecastNotional)` (exposureMath.js), the size in the reporting currency
   of this quarter's forecast notional (after the event's `notionalMult`). FX and commodity notionals are already
   reporting-currency amounts, as `exposureCashImpact` treats them, so `w = |notional|`; floating debt is one quarter
-  of interest at the start rate, `w = |notional × rate × 0.25|`.
-- **Policy set** `P`: active exposures with forecast ≠ 0, `isHedgeable`, and a usable (finite) start rate (after the I4
-  seeding). Locked (not yet hedgeable) exposures keep a size for the screen but never count.
-- **Cover** `= Σ h·w / Σ w` over `P`, with `h` the applied (clamped) ratio. `null` when `P` is empty or `Σ w = 0`.
+  of interest at the start rate, `w = |notional × rate × 0.25|`. (The quarter screen never shows this interest figure,
+  which would reveal the rate level and so the era: the floating-debt card shows the principal instead.)
+- **Policy set** `P`: active exposures with forecast ≠ 0, `w > 0`, `isHedgeable`, and a usable (finite) start rate
+  (after the I4 seeding). Locked (not yet hedgeable) exposures keep a size for the screen but never count; a weightless
+  one (debt at a 0% rate) adds nothing to cover and is left out so it can't be wrong focus's "small one".
+- **Cover** `= Σ h·w / Σ w` over `P`, with `h` the applied (clamped) ratio. `null` when `P` is empty.
 - **wrongFocus**: within `P`, the largest-weight exposure `L` (the first one on a tie) has another `S` with
-  `w_L ≥ 2 × w_S` and `h_S − h_L ≥ 0.5` (with 1e-9 slack on the gap). Always false when cover is `null`.
+  `w_L ≥ 2 × w_S` and `h_S − h_L ≥ 0.5` (with 1e-9 slack on the gap). Always false when cover is `null`, and always
+  false on a noHedge board (`mandate.max === 0`), where any hedge is the breach and "hedge the big one" is wrong advice.
 - **In policy** with a mandate: `cover === null` (vacuous), or `min − 1e-9 ≤ cover ≤ max + 1e-9` and not `wrongFocus`.
   The real band is used even when the cap makes it unreachable (75–100 before `facilities` is off policy). A noHedge
   board (`{0,0}`) needs cover 0, i.e. no hedge on anything that counts, as before.
@@ -294,8 +297,9 @@ Result-quip selection rules (B3):
 Board line selection (B1; D3 writes the lines). First match wins:
 
 1. `summary.policyAdopted` set → `policyAdopted` (the board welcomes the proposal).
-1a. `summary.wrongFocus === true` → `wrongFocus` (v3.1: the small thing hedged, the big one left open), on any board.
-   The chairman yields to it. Angry when the quarter was also a losing breach, otherwise neutral.
+1a. `summary.wrongFocus === true` → `wrongFocus` (v3.1: the small thing hedged, the big one left open), on a band or
+   no-policy board (never set on a noHedge board). The chairman yields to it. Angry when the quarter was also a losing
+   breach or, on a no-policy board, a hedge loss; otherwise neutral.
 2. `policy === 'none'` → `noPolicyHedgeLoss` if `Σ lines[].hedgeImpact < 0`; `noPolicyHedgeWin` if `> 0`; otherwise
    `noPolicyNudge` (no hedge: the board presses for a policy).
 3. `breach === 'loss'` → `breachLoss`. A heavy, scathing telling-off; the angry sprite always wins over other moods.

@@ -62,13 +62,15 @@ export function policyCheck(run, decisions, events = [], market = null) {
         }
     }
     const coverage = policyCover({ ...preview, rates }, decisions.hedges || {}, mult);
-    return { ...coverage, inPolicy: coverInPolicy(run.mandate, coverage) };
+    return { ...coverage, inPolicy: coverInPolicy(run.mandate, coverage), notionalMult: mult };
 }
 
 // The status line for the policy check: why it is off, "Inside the board's policy", or nothing without a policy.
+// A noHedge board's only rule is "no hedging", so any cover is simply off (the engine reports no wrong focus there).
 function policyStatus(run, check) {
     if (!run.mandate) return '';
     if (check.inPolicy) return "Inside the board's policy";
+    if (run.mandate.max === 0) return 'Off policy: board wants 0%';
     if (check.wrongFocus) return 'Off policy: big exposure left open';
     return `Off policy: ${pct(check.cover)} of risk covered, board wants ${bandText(run.mandate)}`;
 }
@@ -434,7 +436,11 @@ export class QuarterScreen {
         const check = this._check();
         this.coverage = check;
         for (const { exp, sizeEl } of this.dials.values()) {
-            sizeEl.textContent = exposureSizeText(exp, check.values[exp.id], run.baseCurrency);
+            // Floating debt shows its principal: the interest weight would reveal the rate level, and so the era.
+            const size = exp.type === 'ir'
+                ? exp.quarterlyNotional * (check.notionalMult[exp.id] ?? 1)
+                : check.values[exp.id];
+            sizeEl.textContent = exposureSizeText(exp, size, run.baseCurrency);
             sizeEl.hidden = !sizeEl.textContent;
             sizeEl.classList.toggle('is-locked', !isHedgeable(preview, exp));
         }
