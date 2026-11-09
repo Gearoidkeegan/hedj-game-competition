@@ -2,6 +2,8 @@
 
 An interactive, web-based educational game where players manage treasury operations for companies across different industries. The **Competition Edition** extends the base game with a registration gate, global persistent leaderboard, admin analytics dashboard, and GDPR-compliant data handling — designed for live events, conferences, and online competitions.
 
+**v3 (conference edition):** phone-first, seven industries, and a run of 8 quarters that takes about 3 minutes. Two modes: **Simple** (the default: one dial per exposure, a board with a hedging policy, power-ups) and **Pro** (the full instrument-by-instrument game, unlocked by finishing a Simple run). Career mode has been removed.
+
 Built and branded for **[Hedj — Treasury Risk Management Solutions](https://www.hedj.eu)**.
 
 ---
@@ -34,7 +36,7 @@ Built and branded for **[Hedj — Treasury Risk Management Solutions](https://ww
 
 ## Overview
 
-Players take the role of a Corporate Treasury Manager, responsible for hedging FX, commodity, and interest rate exposures for a company. Each quarter they must decide how much of their exposure to hedge, which instruments to use, and which counterparty banks to trade with — all within the constraints of a board-mandated hedging policy.
+Players take the role of a Corporate Treasury Manager, responsible for hedging FX, commodity, and interest rate exposures for a company. In Simple mode, each quarter the player sets one dial per exposure (0, 25, 50, 75 or 100% hedged), answers any event, optionally buys one power-up, and runs the quarter. The board may have a hedging policy (a band such as 50–75%), may have a policy of not hedging at all, or may have no policy yet, in which case the player should propose one. In Pro mode they also choose instruments and counterparty banks.
 
 The game simulates realistic market dynamics (using historical rate data from 1994–2024), random market events (currency crises, commodity shocks), and an AI-driven board that evaluates performance and can fire the player if satisfaction falls too low.
 
@@ -47,7 +49,7 @@ At the end of a game, registered players are ranked on a global leaderboard and 
 | Layer | Technology |
 |---|---|
 | Frontend | Vanilla JavaScript (ES6 modules), HTML5, CSS3 |
-| Backend | AWS Lambda (Node.js 20) |
+| Backend | AWS Lambda (Node.js 22) |
 | Database | Amazon DynamoDB |
 | API | Amazon API Gateway (REST) |
 | Infrastructure | AWS SAM (CloudFormation) |
@@ -72,17 +74,15 @@ hedj-game-competition/
 │   ├── engine/                    # Game simulation logic
 │   │   ├── GameState.js           # Central state store
 │   │   ├── GameLoop.js            # Quarterly cycle, phase transitions
-│   │   ├── ScoreEngine.js         # Final score calculation (penalties/bonuses)
 │   │   ├── MarketEngine.js        # Rate generation, budget rates
 │   │   ├── HedgingEngine.js       # Derivative pricing, hedge book
 │   │   ├── EventEngine.js         # Random quarterly market events
 │   │   ├── BoardAI.js             # AI board feedback & satisfaction
-│   │   ├── CareerEngine.js        # Career mode progression
 │   │   ├── BankEngine.js          # Counterparty management
 │   │   └── ForecastEngine.js      # Notional variance (forecast uncertainty)
 │   │
 │   ├── screens/                   # UI screens
-│   │   ├── TitleScreen.js         # Main menu, attract mode (kiosk)
+│   │   ├── TitleScreen.js         # Main menu
 │   │   ├── RegistrationScreen.js  # Competition sign-up form
 │   │   ├── SetupScreen.js         # Industry / policy / difficulty selection
 │   │   ├── DashboardScreen.js     # Main gameplay UI
@@ -92,8 +92,8 @@ hedj-game-competition/
 │   │
 │   └── utils/
 │       ├── api.js                 # API wrappers (register, score, leaderboard)
-│       ├── storage.js             # localStorage (saves, registration, pending scores)
-│       ├── constants.js           # Game balance (grades, policies, phases)
+│       ├── storage.js             # localStorage (registration, per-player runs and progress, score queue)
+│       ├── constants.js           # Game balance (policies, phases)
 │       ├── formatters.js          # Currency & P&L formatting
 │       └── random.js              # Seeded RNG for reproducible games
 │
@@ -105,10 +105,12 @@ hedj-game-competition/
 │   └── responsive.css             # Mobile/tablet adaptations
 │
 ├── data/
-│   ├── industries.json            # Industry definitions (10+ industries)
+│   ├── industries.json            # Industry definitions (7 industries)
 │   ├── products.json              # Hedging instruments (forwards, options, swaps)
 │   ├── events.json                # Market shock event definitions
-│   ├── career-levels.json         # 5 career progression levels
+│   ├── simple-events.json         # Simple-mode events (two choices each)
+│   ├── powerups.json              # Power-up cards
+│   ├── quips.json                 # Board and chairman quips
 │   ├── board-dialogue.json        # AI board feedback templates
 │   ├── year-facts.json            # Historical trivia revealed at game end
 │   └── market/                    # Historical market rates (1994–2024)
@@ -120,6 +122,7 @@ hedj-game-competition/
 │       ├── register.mjs           # POST /register
 │       ├── score.mjs              # POST /score
 │       ├── leaderboard.mjs        # GET /leaderboard
+│       ├── event.mjs              # GET /event (live or free play)
 │       ├── analytics.mjs          # POST/GET /analytics
 │       └── admin.mjs              # GET /admin/players
 │
@@ -136,20 +139,21 @@ hedj-game-competition/
 
 | Mode | Duration | Description |
 |---|---|---|
-| **Quick Play** | ~5 min | 8 quarters, single industry, no progression. Good for events/demos. |
-| **Career Mode** | ~25 min | 5 levels from Startup to PE-Backed company, with increasing complexity and score gates between levels. |
+| **Simple** | ~3 min | 8 quarters, one industry, a dial per exposure. The conference mode and the default. Three industries are open at the start; the rest, Pro mode and the crisis scenarios unlock as you play. |
+| **Pro** | longer | The full instrument-by-instrument game. Unlocked by finishing a Simple run. |
+
+There is no career mode and no extension past 8 quarters.
 
 ### Core Gameplay Loop
 
-Each quarter runs through the following phases:
+In Pro mode each quarter runs through the following phases (Simple mode is one screen per quarter: set the dials, answer any event, run it, read the result):
 
 1. **Decision Phase** — Select which exposures to hedge, at what notional, with which instrument and counterparty bank.
 2. **Resolution Phase** — Market rates advance; P&L is calculated against budget rates; policy compliance is checked.
 3. **Event Phase** — A random market event may trigger (currency crisis, commodity spike, etc.).
 4. **Board Phase** — The AI board evaluates performance and updates satisfaction.
 5. **Summary Phase** — Quarterly results are reviewed.
-6. **Extend Phase** *(end of game)* — Option to extend by 4 more quarters (maximum 2 extensions).
-7. **Game Over** — Final score, grade, and leaderboard submission.
+6. **Game Over** — Final score, title, and leaderboard submission.
 
 ### Hedging Instruments
 
@@ -161,13 +165,13 @@ Each quarter runs through the following phases:
 
 ### Industries
 
-Ten base industries are available, each with multiple exposure types (FX, commodity, interest rate), scaled revenue and cash, and distinct board personalities:
+Seven industries are available, each with its own exposure types (FX, commodity, interest rate), scaled revenue and cash, and distinct board personalities:
 
-Airline, Bank, Manufacturing, Pharma, Food & Beverage, Energy, Retailer, Technology, Agriculture, Fintech.
+SkyBridge Airlines, Roasters Plc, NexGen Electronics, MedGlobal Labs, Momentum Construction, TerraEnergy and MainStreet Retail.
 
 ### Policies
 
-Six hedging policy templates control the rules the player must operate within:
+In Pro mode, six hedging policy templates control the rules the player must operate within (Simple mode uses the board types under Board Dynamics):
 
 | Policy | Difficulty | Key Rules |
 |---|---|---|
@@ -180,44 +184,59 @@ Six hedging policy templates control the rules the player must operate within:
 
 ### Scoring System
 
-Final score is out of 100, weighted across five components:
+Simple and Pro share one score (`js/engine/sim/score.js`), measured against an unhedged benchmark and capped at 10,000:
 
-| Component | Weight | Description |
-|---|---|---|
-| P&L vs Budget | 30% | Actual costs vs. board-set budget rates |
-| Board Satisfaction | 25% | AI satisfaction score (10–100) |
-| Cash Management | 20% | Penalises margin calls, low cash, negative balances |
-| Policy Compliance | 15% | Quarterly adherence to hedge ratio and tenor rules |
-| Risk-Adjusted Return | 10% | P&L volatility + diversification bonus (up to +10 pts) |
+- **Each quarter:** +100 inside the board's policy, +25 off policy but lucky, −300 off policy with a loss, +50 above the red line, +100 for getting a policy adopted, and up to +100 for steady cash flow.
+- **Outperformance:** 12 points per 1% of starting cash ahead of the unhedged benchmark at the end.
+- **Survival:** +500 for finishing all 8 quarters.
+- **Board mood:** the total is multiplied by 0.8–1.2 from the final board mood.
 
-**Modifiers:**
-- Trading cost penalty: −2 pts per trade above 3 avg/quarter
-- Diversification bonus: up to +10 pts for spreading trades across banks
-- Direction penalty: −5 pts per board-advised direction error
-- Perfect compliance bonus: +10 pts for zero violations
-- Fired/burnout cap: Score capped at 45 (grade F) if player is terminated
-
-**Grades:**
-
-| Grade | Score | Description |
-|---|---|---|
-| A+ | 90+ | Chief Risk Officer Material |
-| A | 80–89 | Contract Extended |
-| B | 70–79 | Solid Treasury Management |
-| C | 60–69 | Adequate Performance |
-| D | 50–59 | Under Review |
-| F | <50 | Looking for Work |
+The game-over title comes from `gameOverTitles` in `data/quips.json`.
 
 ### Board Dynamics
 
-- Board satisfaction starts at 55–60 and ranges from 10–100.
-- Satisfaction increases for policy compliance, decreases for over-hedging, over-trading, large losses, and policy violations.
-- If satisfaction drops below 10 the player is fired; cumulative stress above 100 triggers burnout.
-- Career Mode requires a minimum score of 55–60 to unlock the next level.
+Simple mode (the rules live in `js/engine/sim/contract.md`; the numbers in `js/engine/sim/balance.js`):
+
+- **Board types.** Each run draws one board: a hedging band of 25–50%, 50–75% or 75–100% (20% each), a "our policy is
+  not to hedge" board (15%), or an immature board with no policy at all (25%).
+- **Board mood** starts at 60 and stays within 0–100. It moves on results, not on hedging as such:
+  - in policy and the quarter made money: up a little (+4); in policy and it lost money: down slightly (−2);
+  - off policy but the quarter made money: no change (mixed praise and criticism);
+  - off policy and it lost money: the heaviest criticism (−12);
+  - beating the do-nothing benchmark (strictly): +3; cash below the red line (20% of starting cash): −12.
+- **The no-policy board** judges each hedge on its own profit: a hedge loss costs −20 even if the business gained, and
+  a hedge win earns +1. It also loses patience every quarter it still has no policy (−6.25). The player's first move
+  should be to propose a policy: it is adopted from the next quarter, with a one-off mood boost (+10).
+- **How a run ends,** checked in this order after each quarter:
+  1. cash below zero (below the borrowing cushion once Bigger Bank Facilities is bought): bankrupt, "CFO replaced";
+  2. one very bad off-policy quarter (a market loss of 35% of starting cash or more): fired at once;
+  3. board mood at or below 10: fired;
+  4. otherwise the run completes after 8 quarters.
+
+  There is no two-strike rule, and following the board's policy (including a policy not to hedge) never gets you
+  fired on its own.
+- **Bank lines** cap every hedge at 50% until the player buys Bigger Bank Facilities, which lifts the cap to 100% and
+  adds a borrowing cushion of 10% of starting cash. Interest-rate and commodity exposures can't be hedged until Rate &
+  Commodity Hedging is bought.
+
+Pro mode keeps its own board review screen and mood, but ends runs in the same order: bankrupt, a severe off-policy
+loss, mood at or below 10 (or the legacy board walk-out), then complete.
 
 ---
 
 ## Competition Features
+
+### Live competition or free play
+
+The site stays up all year. The backend alone decides whether a competition is live: `EventId` is set, and now is
+after `EventStartIso` (if set) and before `EventEndIso` (if set). `GET /api/event` returns
+`{ live, startIso, endIso }`, and the switch happens by itself at the dates.
+
+- **Live:** players register, scores go to the event leaderboard, and prizes come from it (below).
+- **Free play** (any other time): anyone plays without registering, as a local guest whose personal best, unlocks
+  and saved run stay on the device. Nothing is submitted and no personal data is collected. The title and game over
+  say "Practice mode" (with the next start date when one is set), the last event's leaderboard stays viewable, and
+  the stand page shows its final results. Scores from runs started before the end are still accepted for 2 hours.
 
 ### Registration
 
@@ -227,14 +246,14 @@ Before playing for the competition leaderboard, players complete a registration 
 - Required consent (data processing + competition contact)
 - Optional marketing consent (follow-up communications)
 
-On successful registration the backend returns a 4-hour `gameToken` stored in localStorage. This token is required to submit a score to the leaderboard. Players on a shared device can use "Play as someone else" to clear the stored registration and register a new player.
+On successful registration the backend returns a `gameToken` (valid for `TokenTtlHours`, 120 hours by default) stored in localStorage. This token is required to submit a score to the leaderboard. Players on a shared device can use "Play as someone else" to clear the stored registration and register a new player.
 
 ### Global Leaderboard
 
 - Scores are submitted automatically at game over if the player is registered and the token is valid.
 - If submission fails (network error) the score is queued in localStorage and retried on the next visit.
 - Submission is idempotent — re-submitting the same `gameId` returns the existing rank without creating a duplicate.
-- The leaderboard shows: player name, company, industry, score, grade, number of quarters played, and submission time. Email addresses are intentionally excluded from the public leaderboard.
+- The leaderboard shows: player name, company, industry, score, number of quarters played, and submission time. Email addresses are intentionally excluded from the public leaderboard.
 - Leaderboard responses are cached for 30 seconds; limited to 50 entries.
 
 ### Admin Dashboard
@@ -306,7 +325,22 @@ sam deploy --guided \
   --parameter-overrides AdminKey=<strong-secret-key>
 ```
 
+Backend parameters (`backend/template.yaml`):
+
+| Parameter | Purpose |
+|---|---|
+| `AdminKey` | Secret for the admin analytics endpoint |
+| `EventId` | The event; selects the leaderboard partition (default empty: free play) |
+| `EventStartIso` | Event start (ISO-8601 UTC); registration and scores open at it (default empty: open at once) |
+| `EventEndIso` | Event end (ISO-8601 UTC); registration and scores close at it, and player and score rows expire 90 days after it |
+| `TokenTtlHours` | Game token lifetime in hours (default 120) |
+
 Follow the prompts. On first deploy use `--guided`; subsequent deploys can omit it.
+
+In CI (`.github/workflows`) the parameters come from GitHub: `AdminKey` from the `COMP_ADMIN_KEY` secret, and
+`EventId`, `EventStartIso`, `EventEndIso` and `TokenTtlHours` from the repository variables `COMP_EVENT_ID` (unset
+means free play), `COMP_EVENT_START_ISO` and `COMP_EVENT_END_ISO` (UTC, e.g. `2026-11-20T18:00:00Z`; default empty;
+the start must be before the end) and `COMP_TOKEN_TTL_HOURS` (default `120`). See `docs/cutover.md`.
 
 The deploy outputs the API Gateway URL. Use this as the CloudFront origin for `/api/*` routes.
 
@@ -323,7 +357,6 @@ The deploy outputs the API Gateway URL. Use this as the CloudFront origin for `/
 API Gateway is configured to accept requests from:
 - `https://competition.hedj.eu`
 - `http://localhost:8080`
-- `http://localhost:3000`
 
 Update `template.yaml` if the production domain changes.
 
@@ -350,13 +383,12 @@ Upload all files except `backend/` to the S3 bucket. Invalidate the CloudFront d
 
 ```javascript
 {
-  apiBase: '/api',           // API Gateway base path (CloudFront rewrites /api/*)
-  competitionActive: true,   // Show registration gate and leaderboard features
-  attractModeIdleMs: 300000  // Kiosk attract mode delay (5 minutes)
+  apiBase: '/api'            // API Gateway base path (CloudFront rewrites /api/*)
 }
 ```
 
-Set `competitionActive: false` to run the game without the registration gate (e.g. for internal demos).
+There is no event id in the frontend. The backend's `EventId` parameter alone selects the leaderboard, so
+switching event is a backend redeploy only.
 
 ### Admin Key
 
@@ -374,7 +406,7 @@ A full privacy notice is available at `privacy.html`. Key points:
 - **Retention:** All competition data is auto-deleted 90 days after the competition closes (DynamoDB TTL).
 - **Infrastructure:** AWS EU region only. No third-party data sharing.
 - **Player rights:** Access, correction, deletion, and the right to lodge a complaint with the Data Protection Commission (Ireland).
-- **Contact:** [competition@hedj.eu](mailto:competition@hedj.eu)
+- **Contact:** [info@hedj.eu](mailto:info@hedj.eu)
 
 Marketing consent is stored separately and used only to identify players who opted in to follow-up communications. It is never assumed.
 

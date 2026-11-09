@@ -96,7 +96,7 @@
     background: linear-gradient(180deg, var(--rct-brown) 0%, var(--rct-brown-dark) 100%);
     padding: 6px 10px;
     font-family: var(--font-pixel);
-    font-size: 9px;
+    font-size: 12px;
     color: var(--text-bright);
     display: flex;
     justify-content: space-between;
@@ -105,7 +105,7 @@
 
 .modal-close {
     font-family: var(--font-pixel);
-    font-size: 10px;
+    font-size: 12px;
     color: var(--text-secondary);
     cursor: pointer;
     background: none;
@@ -196,7 +196,7 @@
 .spinner {
     display: inline-block;
     font-family: var(--font-pixel);
-    font-size: 10px;
+    font-size: 12px;
     color: var(--gold);
 }
 
@@ -223,7 +223,7 @@
 .badge {
     display: inline-block;
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     padding: 2px 6px;
     border: 1px solid;
     text-transform: uppercase;
@@ -268,21 +268,14 @@
     background: var(--bg-dark);
 }
 
-/* Isometric scene uses pre-rendered PNG backdrops — render smoothly,
-   not pixelated, so the Hedj brand illustrations look clean. */
-#iso-canvas {
-    image-rendering: auto;
-    image-rendering: -webkit-optimize-contrast;
-}
-
 .stress-face-label {
-    font-size: 6px;
+    font-size: 12px;
     color: var(--text-muted);
     letter-spacing: 1px;
 }
 
 .stress-face-level {
-    font-size: 8px;
+    font-size: 12px;
     color: var(--gold);
 }
 
@@ -294,7 +287,7 @@
 
 .tab {
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: 12px;
     padding: 6px 12px;
     cursor: pointer;
     color: var(--text-muted);

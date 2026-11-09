@@ -132,7 +132,7 @@ export class QuarterSummaryScreen {
                         Sum of quarterly exposure P&L + hedge MTM changes across all quarters played
                     </div>
                     <div class="summary-stat">
-                        <span class="summary-stat-label">Cash Balance</span>
+                        <span class="summary-stat-label">Settled Cash (excl. unrealised)</span>
                         <span class="summary-stat-value" style="color:${state.cashBalance >= state.startingCash * 0.2 ? 'var(--pnl-positive)' : 'var(--pnl-negative)'}">
                             ${formatCurrency(state.cashBalance, baseCcy, true)}
                         </span>
@@ -181,7 +181,7 @@ export class QuarterSummaryScreen {
 
     renderExposureDetail(d, hasBudget, baseCcy, prevRates) {
         const decimals = d.underlying.includes('JPY') ? 2 : 4;
-        const isIR = d.underlying === 'EURIBOR' || d.underlying === 'SOFR' || d.underlying === 'SONIA';
+        const isIR = d.underlying === 'EURIBOR';
         const dec = isIR ? 4 : decimals;
         const forecastNotional = d.forecastNotional || 0;
         const realizedNotional = d.realizedNotional || forecastNotional;
@@ -233,7 +233,7 @@ export class QuarterSummaryScreen {
     }
 
     renderHedgeDetail(d, baseCcy) {
-        const isIR = d.underlying === 'EURIBOR' || d.underlying === 'SOFR' || d.underlying === 'SONIA';
+        const isIR = d.underlying === 'EURIBOR';
         const dec = isIR ? 4 : 4;
 
         return `

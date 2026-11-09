@@ -7,10 +7,33 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Secret key for the admin analytics GET endpoint
+  EventId:
+    Type: String
+    Default: ''
+    Description: Identifier of the event; selects the leaderboard partition. Empty = free play (no live event, nothing written).
+    # The same checks as .github/workflows/deploy.yml, so a manual deploy gets them too (empty allowed).
+    AllowedPattern: '^([A-Za-z0-9_-]{1,40})?$'
+    ConstraintDescription: 1-40 letters, digits, '_' or '-', or empty for free play
+  EventStartIso:
+    Type: String
+    Default: ''
+    Description: ISO-8601 event start (UTC). Registration and scores open at it (empty = open as soon as EventId is set).
+    AllowedPattern: '^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z)?$'
+    ConstraintDescription: UTC like 2026-11-20T18:00:00Z or 2026-11-20T18:00Z, or empty
+  EventEndIso:
+    Type: String
+    Default: ''
+    Description: ISO-8601 event end (UTC). Registration and scores close at it, with a 2-hour grace for runs started before it; player and score rows expire 90 days after it (empty = no end, rows expire 90 days after each write).
+    AllowedPattern: '^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z)?$'
+    ConstraintDescription: UTC like 2026-11-20T18:00:00Z or 2026-11-20T18:00Z, or empty
+  TokenTtlHours:
+    Type: Number
+    Default: 120
+    Description: Lifetime of a game token in hours
 
 Globals:
   Function:
-    Runtime: nodejs20.x
+    Runtime: nodejs22.x
     MemorySize: 128
     Timeout: 10
     Environment:
@@ -18,14 +41,24 @@ Globals:
         PLAYERS_TABLE: !Ref HCompPlayers
         SCORES_TABLE: !Ref HCompScores
         ANALYTICS_TABLE: !Ref HCompAnalytics
-        ADMIN_KEY: !Ref AdminKey
+        BEST_TABLE: !Ref HCompBest
+        EVENT_ID: !Ref EventId
+        EVENT_START_ISO: !Ref EventStartIso
+        EVENT_END_ISO: !Ref EventEndIso
+        TOKEN_TTL_HOURS: !Ref TokenTtlHours
+        # The admin key is set only on AnalyticsFunction and AdminFunction, the two that check it (M6).
 
 Resources:
 
   # ─── DynamoDB Tables ───────────────────────────────────────────────────────
+  # Every table is Retain: a stack delete, a rollback to a template without it, or a replacement keeps the data.
+  # The TableNames are fixed, so a retained orphan must be deleted or renamed before a stack can create it again
+  # (docs/cutover.md, section J).
 
   HCompPlayers:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub 'HCompPlayers-${AWS::StackName}'
       BillingMode: PAY_PER_REQUEST
@@ -41,6 +74,8 @@ Resources:
 
   HCompScores:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub 'HCompScores-${AWS::StackName}'
       BillingMode: PAY_PER_REQUEST
@@ -67,8 +102,42 @@ Resources:
         AttributeName: ttl
         Enabled: true
 
+  HCompBest:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub 'HCompBest-${AWS::StackName}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: board
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: score
+          AttributeType: N
+      KeySchema:
+        - AttributeName: board
+          KeyType: HASH
+        - AttributeName: email
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: ByScore
+          KeySchema:
+            - AttributeName: board
+              KeyType: HASH
+            - AttributeName: score
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
   HCompAnalytics:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub 'HCompAnalytics-${AWS::StackName}'
       BillingMode: PAY_PER_REQUEST
@@ -85,17 +154,35 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: prod
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 50
+        ThrottlingRateLimit: 20
+      RouteSettings:
+        'GET /admin/players':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
+        'GET /admin/metrics':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
+        'GET /admin/prize':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
+        'GET /analytics':
+          ThrottlingBurstLimit: 5
+          ThrottlingRateLimit: 2
       CorsConfiguration:
         AllowOrigins:
           - 'https://competition.hedj.eu'
           - 'http://localhost:8080'
-          - 'http://localhost:3000'
         AllowHeaders:
           - Content-Type
           - x-admin-key
+          - x-player-email
+          - x-game-token
         AllowMethods:
           - GET
           - POST
+          - PUT
           - OPTIONS
 
   # ─── Lambda Functions ─────────────────────────────────────────────────────
@@ -135,6 +222,8 @@ Resources:
             TableName: !Ref HCompPlayers
         - DynamoDBCrudPolicy:
             TableName: !Ref HCompScores
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HCompBest
 
   LeaderboardFunction:
     Type: AWS::Serverless::Function
@@ -151,7 +240,7 @@ Resources:
             Method: GET
       Policies:
         - DynamoDBReadPolicy:
-            TableName: !Ref HCompScores
+            TableName: !Ref HCompBest
 
   AnalyticsFunction:
     Type: AWS::Serverless::Function
@@ -159,6 +248,9 @@ Resources:
       CodeUri: ./
       Handler: handlers/analytics.handler
       Description: Track site visits and plays; admin read endpoint
+      Environment:
+        Variables:
+          ADMIN_KEY: !Ref AdminKey
       Events:
         TrackEvent:
           Type: HttpApi
@@ -181,7 +273,10 @@ Resources:
     Properties:
       CodeUri: ./
       Handler: handlers/admin.handler
-      Description: Admin endpoint — list registered players
+      Description: Admin endpoints — list players, engagement metrics, prize export
+      Environment:
+        Variables:
+          ADMIN_KEY: !Ref AdminKey
       Events:
         GetPlayers:
           Type: HttpApi
@@ -189,8 +284,59 @@ Resources:
             ApiId: !Ref CompetitionApi
             Path: /admin/players
             Method: GET
+        GetMetrics:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /admin/metrics
+            Method: GET
+        GetPrize:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /admin/prize
+            Method: GET
       Policies:
         - DynamoDBReadPolicy:
+            TableName: !Ref HCompPlayers
+        - DynamoDBReadPolicy:
+            TableName: !Ref HCompBest
+
+  EventFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/event.handler
+      Description: Whether the competition is live (free play otherwise); public, reads no table
+      Events:
+        GetEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /event
+            Method: GET
+
+  ProgressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handlers/progress.handler
+      Description: Read and merge a player's cross-device progress
+      Events:
+        GetProgress:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /progress
+            Method: GET
+        PutProgress:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CompetitionApi
+            Path: /progress
+            Method: PUT
+      Policies:
+        - DynamoDBCrudPolicy:
             TableName: !Ref HCompPlayers
 
 Outputs:
@@ -201,5 +347,7 @@ Outputs:
     Value: !Ref HCompPlayers
   ScoresTable:
     Value: !Ref HCompScores
+  BestTable:
+    Value: !Ref HCompBest
   AnalyticsTable:
     Value: !Ref HCompAnalytics

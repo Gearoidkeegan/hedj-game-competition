@@ -26,7 +26,7 @@
 
 .title-logo .subtitle {
     font-family: var(--font-pixel);
-    font-size: 10px;
+    font-size: 12px;
     color: var(--cyan);
     margin-top: 8px;
     letter-spacing: 2px;
@@ -41,7 +41,7 @@
 
 .title-menu .btn {
     width: 100%;
-    font-size: 11px;
+    font-size: 12px;
     padding: 12px 24px;
 }
 
@@ -49,7 +49,7 @@
     position: absolute;
     bottom: 16px;
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     color: var(--text-muted);
     letter-spacing: 1px;
 }
@@ -59,33 +59,8 @@
     top: 8px;
     right: 12px;
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     color: var(--text-muted);
-}
-
-/* ---- ATTRACT MODE ---- */
-.attract-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(10, 10, 42, 0.92);
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    cursor: pointer;
-}
-
-.attract-content {
-    transition: opacity 0.4s ease;
-}
-
-.attract-cta {
-    margin-top: 16px;
 }
 
 @keyframes blink-text {
@@ -137,7 +112,7 @@
 
 .industry-card .industry-name {
     font-family: var(--font-pixel);
-    font-size: 9px;
+    font-size: 12px;
     color: var(--gold);
     margin-bottom: 4px;
 }
@@ -158,7 +133,7 @@
 
 .exposure-tag {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     padding: 2px 6px;
     background: var(--bg-input);
     border: 1px solid var(--border-inner);
@@ -195,7 +170,7 @@
 
 .setup-field label {
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: 12px;
     color: var(--text-secondary);
     display: block;
     margin-bottom: 4px;
@@ -222,7 +197,7 @@
     border: 2px solid var(--border-inner);
     cursor: pointer;
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     color: var(--text-secondary);
     min-height: 32px;
 }
@@ -244,7 +219,7 @@
 
 .char-label {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
 }
 
 /* ---- Quarter bar row structure ---- */
@@ -283,7 +258,7 @@
 
 .policy-strip-row2 {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
@@ -292,14 +267,14 @@
 
 .policy-strip-name {
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: 12px;
     color: var(--text-secondary);
     white-space: nowrap;
 }
 
 .policy-strip-range {
     font-family: var(--font-pixel);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--gold);
     font-weight: bold;
     white-space: nowrap;
@@ -307,7 +282,7 @@
 }
 
 .policy-compliance-dot {
-    font-size: 10px;
+    font-size: 12px;
     color: var(--text-muted);
     transition: color 0.3s ease;
     line-height: 1;
@@ -315,7 +290,7 @@
 
 .policy-strip-tap {
     font-family: var(--font-pixel);
-    font-size: 6px;
+    font-size: 12px;
     color: var(--text-muted);
     white-space: nowrap;
 }
@@ -329,7 +304,7 @@
     width: 100%;
     padding: 8px;
     font-family: var(--font-pixel);
-    font-size: 9px;
+    font-size: 12px;
     color: var(--text-primary);
     background: var(--bg-input);
     border: 1px solid var(--border-inner);
@@ -433,7 +408,7 @@
 
 .exposure-type-badge {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     padding: 2px 5px;
     min-width: 32px;
     text-align: center;
@@ -446,7 +421,7 @@
 
 .exposure-underlying {
     font-family: var(--font-pixel);
-    font-size: 9px;
+    font-size: 12px;
     color: var(--text-primary);
     min-width: 70px;
 }
@@ -472,7 +447,7 @@
 
 .hedge-product-btn {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     padding: 4px 8px;
     background: var(--bg-input);
     border: 1px solid var(--border-inner);
@@ -500,7 +475,7 @@
     display: flex;
     justify-content: space-between;
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: 12px;
     color: var(--text-secondary);
     margin-bottom: 4px;
 }
@@ -522,7 +497,7 @@
 
 .active-hedge .hedge-type {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     color: var(--cyan);
 }
 
@@ -550,7 +525,7 @@
     align-items: center;
     justify-content: center;
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: 12px;
     color: var(--rct-tan);
 }
 
@@ -581,7 +556,7 @@
 
 .board-member-name {
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: 12px;
     color: var(--gold);
 }
 
@@ -642,7 +617,7 @@
 }
 
 .event-title {
-    font-size: 10px;
+    font-size: 12px;
     color: var(--gold);
 }
 
@@ -708,7 +683,7 @@
 
 .choice-label {
     font-family: var(--font-pixel);
-    font-size: 9px;
+    font-size: 12px;
     color: var(--highlight);
     margin-bottom: 4px;
 }
@@ -758,7 +733,7 @@
 
 .summary-stat-value {
     font-family: var(--font-pixel);
-    font-size: 10px;
+    font-size: 12px;
 }
 
 /* ---- EXTEND SCREEN ---- */
@@ -833,104 +808,21 @@
 
 .career-pip-name {
     font-family: var(--font-pixel);
-    font-size: 6px;
+    font-size: 12px;
     color: var(--text-secondary);
 }
 
 .career-pip-score {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     color: var(--gold);
     margin-top: 2px;
 }
 
 .career-pip-arrow {
     font-family: var(--font-pixel);
-    font-size: 10px;
-    color: var(--text-muted);
-}
-
-/* ---- GAME OVER SCREEN ---- */
-.gameover-screen {
-    padding: 24px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    overflow-y: auto;
-}
-
-.gameover-grade {
-    font-family: var(--font-pixel);
-    font-size: 48px;
-    color: var(--gold);
-    text-shadow:
-        2px 2px 0 var(--gold-dark),
-        4px 4px 0 rgba(0,0,0,0.5);
-    margin: 16px 0;
-}
-
-.gameover-title {
-    font-family: var(--font-pixel);
     font-size: 12px;
-    color: var(--text-primary);
-    margin-bottom: 8px;
-}
-
-.gameover-description {
-    font-family: var(--font-readable);
-    font-size: 20px;
-    color: var(--text-secondary);
-    margin-bottom: 24px;
-}
-
-.score-breakdown {
-    width: 100%;
-    max-width: 500px;
-    margin-bottom: 24px;
-}
-
-.score-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
-.score-label {
-    font-family: var(--font-pixel);
-    font-size: 8px;
-    color: var(--text-secondary);
-    min-width: 120px;
-    text-align: left;
-}
-
-.score-bar-bg {
-    flex: 1;
-    height: 16px;
-    background: var(--bg-input);
-    border: 1px solid var(--border-inner);
-    position: relative;
-}
-
-.score-bar-fill {
-    height: 100%;
-    background: var(--cyan);
-    transition: width 0.5s ease;
-}
-
-.score-value {
-    font-family: var(--font-pixel);
-    font-size: 9px;
-    color: var(--gold);
-    min-width: 40px;
-    text-align: right;
-}
-
-.gameover-buttons {
-    display: flex;
-    gap: 12px;
-    margin-top: 16px;
+    color: var(--text-muted);
 }
 
 /* ---- HOW TO PLAY GUIDE ---- */
@@ -959,13 +851,13 @@
 }
 
 .guide-step-counter {
-    font-size: 8px;
+    font-size: 12px;
     color: var(--cyan);
     letter-spacing: 2px;
 }
 
 .guide-skip-btn {
-    font-size: 9px;
+    font-size: 12px;
     padding: 6px 14px;
     min-height: 24px;
 }
@@ -1019,7 +911,7 @@
 
 .guide-mock-title {
     font-family: var(--font-pixel);
-    font-size: 9px;
+    font-size: 12px;
     color: var(--gold);
     letter-spacing: 2px;
     padding-bottom: 8px;
@@ -1033,7 +925,7 @@
     align-items: center;
     padding: 5px 0;
     font-family: var(--font-pixel);
-    font-size: 9px;
+    font-size: 12px;
     color: var(--text-primary);
     border-bottom: 1px solid rgba(136, 170, 204, 0.12);
 }
@@ -1049,7 +941,7 @@
 
 .guide-mock-event-body {
     font-family: var(--font-pixel);
-    font-size: 9px;
+    font-size: 12px;
     color: var(--text-primary);
     padding: 6px 0 10px;
     text-align: center;
@@ -1070,7 +962,7 @@
 
 .guide-mock-bar-label {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     color: var(--text-secondary);
     letter-spacing: 1px;
     margin-bottom: 4px;
@@ -1089,7 +981,7 @@
 
 .guide-mock-bar-val {
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: 12px;
     color: var(--text-primary);
     text-align: right;
     margin-top: 2px;
@@ -1115,7 +1007,7 @@
 
 .guide-callout-text {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     background: var(--gold);
     color: #1a1208;
     padding: 4px 8px;
@@ -1146,7 +1038,7 @@
 
 .guide-footer .btn {
     min-width: 100px;
-    font-size: 10px;
+    font-size: 12px;
     padding: 8px 16px;
 }
 
@@ -1176,10 +1068,10 @@
 
 @media (max-width: 600px) {
     .guide-step-blurb { font-size: 14px; }
-    .guide-step-title { font-size: 11px; }
-    .guide-callout-text { font-size: 6px; padding: 3px 5px; }
-    .guide-footer .btn { min-width: 70px; font-size: 9px; padding: 6px 10px; }
-    .guide-mock-row { font-size: 8px; }
+    .guide-step-title { font-size: 12px; }
+    .guide-callout-text { font-size: 12px; padding: 3px 5px; }
+    .guide-footer .btn { min-width: 70px; font-size: 12px; padding: 6px 10px; }
+    .guide-mock-row { font-size: 12px; }
 }
 
 /* ---- REGISTRATION SCREEN (Competition) ---- */
@@ -1217,7 +1109,7 @@
 }
 
 .reg-title {
-    font-size: 10px;
+    font-size: 12px;
     color: var(--gold);
     letter-spacing: 2px;
     margin-bottom: 6px;
@@ -1245,7 +1137,7 @@
 
 .reg-field label {
     font-family: var(--font-pixel);
-    font-size: 7px;
+    font-size: 12px;
     color: var(--text-muted);
     letter-spacing: 1px;
 }
@@ -1287,7 +1179,7 @@
 
 .reg-error {
     font-family: var(--font-pixel);
-    font-size: 8px;
+    font-size: 12px;
     color: var(--pnl-negative);
     padding: 6px 8px;
     border: 1px solid var(--pnl-negative);
@@ -1299,10 +1191,3 @@
     background: rgba(5, 10, 20, 0.85) !important;
 }
 
-/* Submit status on GameOver screen */
-.submit-status {
-    font-family: var(--font-pixel);
-    font-size: 8px;
-    min-height: 20px;
-    padding: 4px 0;
-}

@@ -1,15 +1,24 @@
 // Registration gate for competition prize eligibility
 // Shown before SetupScreen when no valid game token is stored
 
-import { register } from '../utils/api.js';
+import { register as apiRegister } from '../utils/api.js';
+import { escapeHtml } from '../utils/escape.js';
 import { saveRegistration, getRegistration, clearRegistration } from '../utils/storage.js';
+import { validPlayerName, validCompanyName, NAME_MAX, COMPANY_MAX } from '../utils/playerName.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// R64: the server's rules (js/utils/playerName.js), said before the round trip.
+export const NAME_ERROR = `Name: up to ${NAME_MAX} letters, numbers, spaces, emoji or . ' _ - # * (no commas or brackets)`;
+export const COMPANY_ERROR = `Company: up to ${COMPANY_MAX} characters, without < or >`;
+export const CLOSED_TEXT = 'The competition has closed. Practice mode is open to all.';
 
 export class RegistrationScreen {
-    constructor(app) {
+    // deps.register lets tests inject a fake api.register.
+    constructor(app, { register = apiRegister } = {}) {
         this.app = app;
+        this.register = register;
         this.el = null;
+        this.nextScreen = null;   // set by main.js when a run was requested before registering
     }
 
     render() {
@@ -34,9 +43,11 @@ export class RegistrationScreen {
 
                     <div class="reg-fields">
                         <div class="reg-field">
-                            <label class="pixel-text" for="reg-name">FULL NAME *</label>
-                            <input id="reg-name" class="text-input" type="text" maxlength="60"
-                                placeholder="e.g. Jane Smith" value="${escapeHtml(prefillName)}" autocomplete="name" />
+                            <label class="pixel-text" for="reg-name">NAME ON LEADERBOARD *</label>
+                            <input id="reg-name" class="text-input" type="text" maxlength="${NAME_MAX}"
+                                placeholder="e.g. Jane S" value="${escapeHtml(prefillName)}" autocomplete="nickname"
+                                aria-describedby="reg-name-error" />
+                            <div id="reg-name-error" class="reg-error" role="alert" style="display:none;"></div>
                         </div>
                         <div class="reg-field">
                             <label class="pixel-text" for="reg-email">EMAIL ADDRESS *</label>
@@ -45,7 +56,7 @@ export class RegistrationScreen {
                         </div>
                         <div class="reg-field">
                             <label class="pixel-text" for="reg-company">COMPANY *</label>
-                            <input id="reg-company" class="text-input" type="text" maxlength="80"
+                            <input id="reg-company" class="text-input" type="text" maxlength="${COMPANY_MAX}"
                                 placeholder="Acme Corp" value="${escapeHtml(prefillCompany)}" autocomplete="organization" />
                         </div>
 
@@ -95,6 +106,9 @@ export class RegistrationScreen {
 
         submitBtn.addEventListener('click', () => this.handleSubmit());
 
+        // R64: say at once when the name breaks the server's rules, under the field.
+        this.el.querySelector('#reg-name').addEventListener('input', () => this.checkName());
+
         // Allow Enter key to submit
         this.el.querySelectorAll('.text-input').forEach(input => {
             input.addEventListener('keydown', (e) => {
@@ -109,6 +123,7 @@ export class RegistrationScreen {
             this.el.querySelector('#reg-company').value = '';
             this.el.querySelector('#reg-consent').checked = false;
             this.el.querySelector('#reg-marketing').checked = false;
+            this.checkName();
             this.el.querySelector('#reg-name').focus();
         });
 
@@ -139,19 +154,33 @@ export class RegistrationScreen {
         this.showError(null);
 
         try {
-            const result = await register(name, email, company, marketingConsent);
+            const result = await this.register(name, email, company, marketingConsent);
+            // The identity is set at first registration (R18, R25): keep what the server stored, which is what the
+            // boards show, rather than what was typed this time.
             saveRegistration({
-                playerName: name,
+                playerName: result?.playerName ?? name,
                 email,
-                company,
+                company: result?.company ?? company,
                 marketingConsent,
                 gameToken: result.gameToken,
                 gameTokenExpiry: result.expiresAt
             });
-            this.app.showScreen('setup');
+            // Where the player was heading (main.js sets it on the redirect); the title otherwise ("Not you?").
+            const next = this.nextScreen || 'title';
+            this.nextScreen = null;
+            this.app.showScreen(next);
         } catch (err) {
             btn.disabled = false;
             btn.textContent = 'REGISTER & PLAY';
+            // R66: the event ended while this screen was open. Check the status again and go to the title, which
+            // then shows free play.
+            if (err.status === 403 && err.message === 'competition_closed') {
+                this.app.showToast?.(CLOSED_TEXT, 'info');
+                this.nextScreen = null;
+                await Promise.resolve(this.app.eventMode?.refresh()).catch(() => {});
+                this.app.showScreen('title');
+                return;
+            }
             const msg = err.status === 400
                 ? err.message
                 : 'Could not connect — check your connection and try again.';
@@ -160,11 +189,26 @@ export class RegistrationScreen {
     }
 
     validate(name, email, company, consent) {
-        if (!name) return 'Full name is required';
+        if (!name) return 'A name for the leaderboard is required';
+        if (!validPlayerName(name)) return NAME_ERROR;
         if (!email || !EMAIL_RE.test(email)) return 'A valid email address is required';
         if (!company) return 'Company name is required';
+        if (!validCompanyName(company)) return COMPANY_ERROR;
         if (!consent) return 'You must agree to the data processing terms to register';
         return null;
+    }
+
+    // The inline name check: an empty field is not an error yet; anything the server would refuse is.
+    checkName() {
+        const input = this.el.querySelector('#reg-name');
+        const el = this.el.querySelector('#reg-name-error');
+        const value = input.value.trim();
+        const bad = value !== '' && !validPlayerName(value);
+        const text = bad ? NAME_ERROR : '';
+        if (el.textContent !== text) el.textContent = text;   // only on change, so screen readers announce it once
+        el.style.display = bad ? 'block' : 'none';
+        input.setAttribute('aria-invalid', bad ? 'true' : 'false');
+        return !bad;
     }
 
     showError(msg) {
@@ -177,12 +221,4 @@ export class RegistrationScreen {
             el.textContent = msg;
         }
     }
-}
-
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
 }

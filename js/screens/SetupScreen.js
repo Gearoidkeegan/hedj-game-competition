@@ -6,11 +6,11 @@ import { marketEngine, computeBudgetRate } from '../engine/MarketEngine.js';
 import { bankEngine } from '../engine/BankEngine.js';
 import { eventEngine } from '../engine/EventEngine.js';
 import { boardAI } from '../engine/BoardAI.js';
-import { careerEngine } from '../engine/CareerEngine.js';
 import { HEDGING_POLICY_TYPES } from '../utils/constants.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { SeededRandom, generateSeed } from '../utils/random.js';
-import { getRegistration } from '../utils/storage.js';
+import { getRegistration, isFreePlay, GUEST_PLAYER } from '../utils/storage.js';
+import { escapeHtml } from '../utils/escape.js';
 
 export class SetupScreen {
     constructor(app) {
@@ -25,23 +25,11 @@ export class SetupScreen {
 
         const industries = this.app.industriesData?.industries || [];
 
-        // Pre-fill display name from registration record
-        const reg = getRegistration();
+        // Pre-fill display name from registration record (none in free play, R66)
+        const reg = isFreePlay() ? null : getRegistration();
         const prefillName = reg?.playerName || '';
 
-        // Career mode header
-        const isCareer = this.app.gameMode === 'career' && careerEngine.careerActive;
-        const careerLevel = isCareer ? careerEngine.getCurrentLevel() : null;
-        const careerHeader = careerLevel ? `
-            <div class="panel" style="margin-bottom:8px;text-align:center;border-color:var(--gold-dark);">
-                <span style="font-size:16px;margin-right:6px;">${careerLevel.icon}</span>
-                <span class="pixel-text" style="font-size:9px;color:var(--gold);">CAREER LEVEL ${careerLevel.level}: ${careerLevel.name.toUpperCase()}</span>
-                <div class="readable-text" style="font-size:14px;color:var(--text-secondary);margin-top:4px;">${careerLevel.flavourText?.intro || careerLevel.description}</div>
-            </div>
-        ` : '';
-
         this.el.innerHTML = `
-            ${careerHeader}
             <h2 class="pixel-text">CHOOSE YOUR INDUSTRY</h2>
 
             <div class="industry-grid" id="industry-grid">
@@ -62,7 +50,7 @@ export class SetupScreen {
                 <div class="setup-fields">
                     <div class="setup-field">
                         <label>YOUR NAME</label>
-                        <input type="text" id="player-name" placeholder="Treasury Manager" maxlength="20" value="${prefillName}">
+                        <input type="text" id="player-name" placeholder="Treasury Manager" maxlength="20" value="${escapeHtml(prefillName)}">
                     </div>
                     <div class="setup-field">
                         <label>CHARACTER</label>
@@ -212,18 +200,14 @@ export class SetupScreen {
             industry = rng.pick(industries);
         }
 
-        // Read company and email from competition registration record
-        const reg = getRegistration();
+        // Read company and email from competition registration record. Free play (R66): the run is the guest's,
+        // so the game-over screen records it locally and submits nothing.
+        const free = isFreePlay();
+        const reg = free ? null : getRegistration();
         const companyName = reg?.company || '';
-        const contactEmail = reg?.email || '';
+        const contactEmail = free ? GUEST_PLAYER : reg?.email || '';
 
         const rng = new SeededRandom(seed + 1);
-
-        // Career mode: apply level parameters to the industry
-        const isCareer = this.app.gameMode === 'career' && careerEngine.careerActive;
-        if (isCareer) {
-            industry = careerEngine.applyLevelParameters(industry, rng);
-        }
 
         // Assign random hedging policy
         const hedgingPolicy = rng.pick(HEDGING_POLICY_TYPES);
@@ -235,12 +219,10 @@ export class SetupScreen {
         // Reset all engines BEFORE the dashboard mounts to avoid carrying
         // state (banks, hedges, events) from a previous playthrough.
         gameState.reset();
-        if (!isCareer) {
-            const numBanks = rng.intRange(1, 3);
-            const creditLimit = Math.round(industry.annualRevenue * 0.15);
-            bankEngine.init(numBanks, creditLimit, rng);
-            eventEngine.reset();
-        }
+        const numBanks = rng.intRange(1, 3);
+        const creditLimit = Math.round(industry.annualRevenue * 0.15);
+        bankEngine.init(numBanks, creditLimit, rng);
+        eventEngine.reset();
 
         // Initialize game state (exposures, startYear, etc.) WITHOUT triggering
         // the dashboard screen transition yet — we need to set market rates first.
@@ -254,11 +236,7 @@ export class SetupScreen {
             contactEmail
         });
 
-        if (isCareer) {
-            careerEngine.initLevel(industry, rng);
-        } else {
-            boardAI.assignCEOPersona(gameState.getRng());
-        }
+        boardAI.assignCEOPersona(gameState.getRng());
 
         // Set market rates BEFORE the dashboard renders so rates are visible immediately
         this.setMarketRates(industry, rng);
@@ -290,9 +268,7 @@ export class SetupScreen {
             'CORN': 4.5 + rng.floatRange(-0.8, 0.8),
             'GOLD': 1900 + rng.floatRange(-200, 200),
             'COFFEE': 150 + rng.floatRange(-40, 60),
-            'EURIBOR': 0.035 + rng.floatRange(-0.015, 0.015),
-            'SOFR': 0.05 + rng.floatRange(-0.02, 0.02),
-            'SONIA': 0.05 + rng.floatRange(-0.02, 0.02)
+            'EURIBOR': 0.035 + rng.floatRange(-0.015, 0.015)
         };
 
         // Try to use real historical data, falling back to placeholders per-underlying

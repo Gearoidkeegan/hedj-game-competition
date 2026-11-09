@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.js';
-import { getRegistration } from './storage.js';
+import { getRegistration, getQueuedScores, removeQueuedScore } from './storage.js';
+import { isFinalRejection } from './scoreRejection.js';
 
 const TIMEOUT_MS = 10000;
 
@@ -43,18 +44,99 @@ export async function register(playerName, email, company, marketingConsent = fa
     return data; // { gameToken, expiresAt }
 }
 
-export async function submitScore(payload) {
+// Registration with a token that has not expired, or null.
+function validRegistration() {
     const reg = getRegistration();
-    if (!reg?.gameToken) throw new ApiError('Not registered', 401);
-    const data = await apiFetch('/score', {
-        method: 'POST',
-        body: JSON.stringify({ ...payload, gameToken: reg.gameToken, email: reg.email })
-    });
-    return data; // { rank }
+    if (!reg?.gameToken || !reg.email) return null;
+    if (reg.gameTokenExpiry && reg.gameTokenExpiry <= Date.now()) return null;
+    return reg;
 }
 
-export async function fetchLeaderboard(limit = 20) {
-    return apiFetch(`/leaderboard?limit=${limit}`);
+function authHeaders(reg) {
+    return { 'x-player-email': reg.email, 'x-game-token': reg.gameToken };
+}
+
+// Returns { rank, best, isBest }, or { duplicate: true } when the gameId was already submitted.
+export async function submitScore(payload) {
+    const reg = validRegistration();
+    if (!reg) throw new ApiError('Not registered', 401);
+    return apiFetch('/score', {
+        method: 'POST',
+        body: JSON.stringify({
+            ...payload,
+            playerName: payload.playerName || reg.playerName,
+            email: payload.email || reg.email,
+            gameToken: reg.gameToken
+        })
+    });
+}
+
+// no-store: the server sends max-age=30, and a player who has just submitted must see their own entry.
+export async function fetchLeaderboard({ mode = 'simple', period = 'event', limit = 20 } = {}) {
+    const data = await apiFetch(`/leaderboard?mode=${encodeURIComponent(mode)}&period=${encodeURIComponent(period)}&limit=${limit}`,
+        { cache: 'no-store' });
+    return data?.entries || [];
+}
+
+export async function getRemoteProgress() {
+    const reg = validRegistration();
+    if (!reg) return null;
+    const data = await apiFetch('/progress', { headers: authHeaders(reg) });
+    return data?.progress || null;
+}
+
+export async function putRemoteProgress(progress) {
+    const reg = validRegistration();
+    if (!reg) throw new ApiError('Not registered', 401);
+    const data = await apiFetch('/progress', {
+        method: 'PUT',
+        headers: authHeaders(reg),
+        body: JSON.stringify({ progress })
+    });
+    return data?.progress || null;
+}
+
+let flushing = null;
+
+// Sends queued scores. Drops an item the server refuses for good (isFinalRejection: a 4xx other than 401, 408 and
+// 429) and moves on; on anything else (offline, 401, 408, 429, 5xx) keeps it and stops, to retry later.
+// Returns how many were sent. Only sends a player's scores while that same player is registered on this device.
+export function flushScoreQueue() {
+    if (!flushing) {
+        flushing = doFlush().finally(() => { flushing = null; });
+    }
+    return flushing;
+}
+
+async function doFlush() {
+    let sent = 0;
+    for (const item of getQueuedScores()) {
+        const reg = validRegistration();
+        if (!reg) break;
+        if (item.email && String(item.email).toLowerCase() !== reg.email.toLowerCase()) continue;
+        try {
+            await submitScore(item);
+            removeQueuedScore(item.gameId);
+            sent++;
+        } catch (err) {
+            if (isFinalRejection(err)) {
+                removeQueuedScore(item.gameId);
+                continue;
+            }
+            break;
+        }
+    }
+    return sent;
+}
+
+// R66: { live, startIso, endIso } from the backend, which alone decides whether the competition is live.
+// A short timeout so a slow network never holds up the title; the caller falls back to the cached value.
+const EVENT_TIMEOUT_MS = 4000;
+
+export async function fetchEvent() {
+    const res = await fetch(`${CONFIG.apiBase}/event`, { cache: 'no-store', signal: AbortSignal.timeout(EVENT_TIMEOUT_MS) });
+    if (!res.ok) throw new ApiError(`HTTP ${res.status}`, res.status);
+    return res.json();
 }
 
 export async function fetchPlayCount() {

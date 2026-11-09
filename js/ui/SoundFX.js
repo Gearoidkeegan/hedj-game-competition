@@ -174,16 +174,6 @@ class SoundFXController {
     }
 
     /**
-     * Level complete — fanfare.
-     */
-    levelComplete() {
-        const notes = [523, 659, 784, 1047, 784, 1047];
-        notes.forEach((freq, i) => {
-            setTimeout(() => this.tone(freq, 0.15, 'square', 0.4), i * 120);
-        });
-    }
-
-    /**
      * Game over — dramatic chord.
      */
     gameOver() {

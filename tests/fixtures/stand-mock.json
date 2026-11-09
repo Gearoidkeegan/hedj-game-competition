@@ -1,0 +1,14 @@
+{
+  "simple-event": [
+    {"rank": 1, "playerName": "Ann <b>Boss</b>", "company": "Acme & Sons", "score": 15200},
+    {"rank": 2, "playerName": "Siobhán Ó Briain 🚀", "company": "Beta", "score": 14100},
+    {"rank": 3, "playerName": "Cy", "company": "", "score": 9000}
+  ],
+  "pro-event": [
+    {"rank": 1, "playerName": "Dee", "company": "Gamma", "score": 22000}
+  ],
+  "simple-today": [
+    {"rank": 1, "playerName": "Ann <b>Boss</b>", "company": "Acme & Sons", "score": 15200}
+  ],
+  "pro-today": []
+}

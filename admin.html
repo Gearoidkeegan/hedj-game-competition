@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin — Treasury Manager Competition</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/fonts.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -216,7 +215,7 @@
     <div class="panel-title">ADMIN ACCESS</div>
     <div class="key-input-row">
         <input type="password" id="admin-key-input" placeholder="Enter admin key..." autocomplete="off">
-        <button onclick="login()">UNLOCK</button>
+        <button id="btn-login">UNLOCK</button>
     </div>
     <div id="auth-msg" class="msg error" style="margin-top:10px;display:none;"></div>
 </div>
@@ -225,6 +224,7 @@
 
     <div class="panel">
         <div class="panel-title">OVERVIEW</div>
+        <div id="event-status" class="msg" style="margin:0 0 10px;">—</div>
         <div class="stats-grid">
             <div class="stat-box">
                 <div class="stat-label">VISITS</div>
@@ -242,10 +242,26 @@
     </div>
 
     <div class="panel">
+        <div class="panel-title">ENGAGEMENT</div>
+        <div class="stats-grid">
+            <div class="stat-box"><div class="stat-label">PLAYERS WHO PLAYED</div><div class="stat-value cyan" id="m-unique">—</div></div>
+            <div class="stat-box"><div class="stat-label">RUNS / PLAYER</div><div class="stat-value cyan" id="m-runs">—</div></div>
+            <div class="stat-box"><div class="stat-label">RETURN RATE</div><div class="stat-value green" id="m-return">—</div></div>
+            <div class="stat-box"><div class="stat-label">MULTI-DAY RATE</div><div class="stat-value green" id="m-multiday">—</div></div>
+        </div>
+        <div class="toolbar" style="margin-top:14px;">
+            <button class="btn-cyan" data-prize-mode="simple" data-prize-period="event">PRIZE CSV: SIMPLE EVENT</button>
+            <button class="btn-cyan" data-prize-mode="pro" data-prize-period="event">PRIZE CSV: PRO EVENT</button>
+            <button data-prize-mode="simple" data-prize-period="today">SIMPLE TODAY</button>
+            <button data-prize-mode="pro" data-prize-period="today">PRO TODAY</button>
+        </div>
+    </div>
+
+    <div class="panel">
         <div class="panel-title">REGISTERED PLAYERS</div>
         <div class="toolbar">
-            <button class="btn-cyan" onclick="downloadCSV()">DOWNLOAD CSV</button>
-            <button onclick="refresh()">REFRESH</button>
+            <button class="btn-cyan" id="btn-download-csv">DOWNLOAD CSV</button>
+            <button id="btn-refresh">REFRESH</button>
             <span class="count-badge" id="player-count"></span>
         </div>
         <div id="players-msg" class="msg loading">LOADING...</div>
@@ -268,160 +284,6 @@
 
 </div>
 
-<script>
-    const API = '/api';
-    let adminKey = '';
-    let playersData = [];
-
-    function getStoredKey() {
-        try { return sessionStorage.getItem('hedj_admin_key') || ''; } catch { return ''; }
-    }
-
-    function storeKey(k) {
-        try { sessionStorage.setItem('hedj_admin_key', k); } catch {}
-    }
-
-    async function login() {
-        const input = document.getElementById('admin-key-input');
-        const key = input.value.trim();
-        if (!key) return;
-        adminKey = key;
-        storeKey(key);
-        await loadAll();
-    }
-
-    document.getElementById('admin-key-input').addEventListener('keydown', e => {
-        if (e.key === 'Enter') login();
-    });
-
-    async function apiFetch(path, headers = {}) {
-        const res = await fetch(API + path, {
-            headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey, ...headers }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-    }
-
-    async function loadAll() {
-        const authMsg = document.getElementById('auth-msg');
-        authMsg.style.display = 'none';
-        try {
-            const [analyticsData, playersResult] = await Promise.all([
-                apiFetch('/analytics'),
-                apiFetch('/admin/players')
-            ]);
-
-            // Unlock UI
-            document.getElementById('auth-section').style.display = 'none';
-            document.getElementById('data-section').style.display = 'block';
-
-            // Stats
-            const counts = analyticsData.counts || {};
-            document.getElementById('stat-visits').textContent =
-                (counts.visit || 0).toLocaleString();
-            document.getElementById('stat-plays').textContent =
-                (counts.play || 0).toLocaleString();
-
-            // Players
-            playersData = playersResult.players || [];
-            document.getElementById('stat-regs').textContent =
-                playersData.length.toLocaleString();
-            renderPlayers(playersData);
-
-        } catch (err) {
-            if (err.message.includes('401') || err.message.includes('403')) {
-                authMsg.textContent = 'INVALID ADMIN KEY';
-            } else {
-                authMsg.textContent = 'ERROR: ' + err.message;
-            }
-            authMsg.style.display = 'block';
-            adminKey = '';
-            storeKey('');
-        }
-    }
-
-    function renderPlayers(players) {
-        const tbody = document.getElementById('players-tbody');
-        const msg = document.getElementById('players-msg');
-        const wrap = document.getElementById('players-table-wrap');
-        const badge = document.getElementById('player-count');
-
-        badge.textContent = players.length + ' PLAYERS';
-
-        if (players.length === 0) {
-            msg.textContent = 'NO REGISTRATIONS YET';
-            msg.className = 'msg empty';
-            msg.style.display = 'block';
-            wrap.style.display = 'none';
-            return;
-        }
-
-        msg.style.display = 'none';
-        wrap.style.display = 'block';
-
-        tbody.innerHTML = players.map((p, i) => `
-            <tr>
-                <td class="muted">${i + 1}</td>
-                <td>${esc(p.playerName)}</td>
-                <td>${esc(p.email)}</td>
-                <td>${esc(p.company)}</td>
-                <td class="muted">${formatDate(p.registeredAt)}</td>
-                <td style="color:${p.marketingConsent ? 'var(--pnl-positive)' : 'var(--text-muted)'}">
-                    ${p.marketingConsent ? 'YES' : 'no'}
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    function esc(s) {
-        return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
-    function formatDate(iso) {
-        if (!iso) return '—';
-        try {
-            return new Date(iso).toLocaleString('en-IE', {
-                dateStyle: 'short', timeStyle: 'short'
-            });
-        } catch { return iso; }
-    }
-
-    function downloadCSV() {
-        if (!playersData.length) return;
-        const csvEscape = v => `"${(v || '').replace(/"/g, '""')}"`;
-        const rows = [
-            'Name,Email,Company,Registered At,Marketing Consent',
-            ...playersData.map(p =>
-                [p.playerName, p.email, p.company, p.registeredAt, p.marketingConsent ? 'Yes' : 'No'].map(csvEscape).join(','))
-        ].join('\r\n');
-        const blob = new Blob([rows], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `players-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
-    function refresh() {
-        if (!adminKey) return;
-        document.getElementById('stat-visits').textContent = '—';
-        document.getElementById('stat-plays').textContent = '—';
-        document.getElementById('stat-regs').textContent = '—';
-        document.getElementById('players-msg').textContent = 'LOADING...';
-        document.getElementById('players-msg').className = 'msg loading';
-        document.getElementById('players-msg').style.display = 'block';
-        document.getElementById('players-table-wrap').style.display = 'none';
-        loadAll();
-    }
-
-    // Auto-unlock if key is stored in session
-    const storedKey = getStoredKey();
-    if (storedKey) {
-        adminKey = storedKey;
-        document.getElementById('admin-key-input').value = storedKey;
-        loadAll();
-    }
-</script>
+<script type="module" src="js/admin.js"></script>
 </body>
 </html>

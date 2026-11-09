@@ -101,6 +101,19 @@ class BankEngineController {
     }
 
     /**
+     * Release every allocated trade whose hedge is no longer live (e.g. unwound by an event).
+     * @param {string[]} liveHedgeIds - ids of the hedges still in the portfolio
+     */
+    releaseClosedTrades(liveHedgeIds) {
+        const live = new Set(liveHedgeIds);
+        for (const [bankId, trades] of Object.entries(this.tradesByBank)) {
+            for (const { hedgeId } of [...trades]) {
+                if (!live.has(hedgeId)) this.releaseTrade(bankId, hedgeId);
+            }
+        }
+    }
+
+    /**
      * Check whether the player can currently make a bank request.
      * Returns { allowed, reason, detail } so UI can pre-disable buttons.
      * @param {string} requestType - 'new_bank' or 'increase_limit'

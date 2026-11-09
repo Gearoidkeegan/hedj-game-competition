@@ -1,0 +1,27 @@
+{
+    "forecasting": {
+        "name": "Cash Forecasting",
+        "blurb": "Three modules lift forecast accuracy to 100%. Fewer nasty volume shocks.",
+        "levels": [
+            "Module 1: forecast accuracy 40% to 60%. Surprises shrink a little.",
+            "Module 2: forecast accuracy 60% to 80%. The shocks get smaller.",
+            "Module 3: forecast accuracy 80% to 100%. No volume surprises left."
+        ],
+        "hedjLine": "In real life, Hedj turns messy cash forecasts into numbers you can hedge against."
+    },
+    "visibility": {
+        "name": "Cash Visibility",
+        "blurb": "One use: finds 3% of starting cash hiding in forgotten bank accounts.",
+        "hedjLine": "In real life, Hedj puts every bank balance in one place, so idle cash stops hiding."
+    },
+    "facilities": {
+        "name": "Bigger Bank Facilities",
+        "blurb": "Hedge up to 100%, not 50%, plus a borrowing cushion of 10% of starting cash.",
+        "hedjLine": "In real life, Hedj helps you secure bigger bank facilities as your business outgrows them."
+    },
+    "hedgeAccess": {
+        "name": "Rate & Commodity Hedging",
+        "blurb": "Many banks won't offer it. Now you can hedge interest-rate and commodity exposures.",
+        "hedjLine": "In real life, Hedj gives you interest-rate and commodity hedging many banks won't offer."
+    }
+}

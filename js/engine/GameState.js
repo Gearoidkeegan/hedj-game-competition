@@ -3,6 +3,8 @@
 
 import { GAME_CONFIG, PHASE } from '../utils/constants.js';
 import { SeededRandom, generateSeed } from '../utils/random.js';
+import { marketEngine } from './MarketEngine.js';
+import { pickStartYear } from './sim/startYears.js';
 
 class GameStateManager {
     constructor() {
@@ -33,8 +35,7 @@ class GameStateManager {
             currentYearOffset: 0,     // 0-based (Year 1 = 0)
             currentQuarter: 1,        // 1-4
             totalQuartersPlayed: 0,
-            maxQuarters: GAME_CONFIG.DEFAULT_QUARTERS,
-            extensionsUsed: 0,
+            maxQuarters: GAME_CONFIG.MAX_QUARTERS,   // fixed at 8 (v3: no extensions)
             phase: PHASE.SETUP,
 
             // Financial
@@ -68,16 +69,15 @@ class GameStateManager {
             // Trading
             tradesThisQuarter: 0,
             tradingCostsThisQuarter: 0,
+            premiumsThisQuarter: 0,   // option/cap premiums paid this quarter
             totalTradingCosts: 0,
             tradeDirectionErrors: 0,
             maxStressReached: 0,
 
-            // Career mode
-            careerMode: false,
-            careerLevel: 0,
-            careerLevelName: '',
-            satisfactionLossMultiplier: 1.0,
-            satisfactionGainMultiplier: 1.0,
+            // v3 scoring (proAdapter): one QuarterSummary per resolved quarter
+            quarterSummaries: [],
+            runStatus: 'playing',     // 'playing'|'complete'|'bankrupt'|'fired'
+            proResult: null,          // set at game over: { mode: 'pro', status, score, history }
 
             // Flags
             firedByBoard: false,
@@ -111,9 +111,15 @@ class GameStateManager {
         const gameSeed = seed || generateSeed();
         this.rng = new SeededRandom(gameSeed);
 
-        // Pick random start year ensuring enough forward data
-        const maxStart = GAME_CONFIG.MAX_DATA_YEAR - GAME_CONFIG.GAME_WINDOW_YEARS;
-        const startYear = this.rng.intRange(GAME_CONFIG.MIN_DATA_YEAR, maxStart);
+        // Start year: only where every exposure has real monthly data for the whole run (A1 chooser).
+        // Without loaded market data (tests, offline) fall back to any year with a full game window.
+        let startYear;
+        if (marketEngine.isLoaded()) {
+            startYear = pickStartYear(marketEngine, industry.exposures, this.rng, { quarters: GAME_CONFIG.MAX_QUARTERS }).year;
+        } else {
+            const maxStart = GAME_CONFIG.MAX_DATA_YEAR - GAME_CONFIG.GAME_WINDOW_YEARS;
+            startYear = this.rng.intRange(GAME_CONFIG.MIN_DATA_YEAR, maxStart);
+        }
 
         // Deep-copy all exposures for progression tracking
         const allExposures = JSON.parse(JSON.stringify(industry.exposures));
@@ -290,6 +296,11 @@ class GameStateManager {
         // Clear realized notionals from previous quarter
         this.state.realizedNotionals = {};
 
+        // Per-quarter trading counters start afresh (totalTradingCosts keeps running)
+        this.state.tradesThisQuarter = 0;
+        this.state.tradingCostsThisQuarter = 0;
+        this.state.premiumsThisQuarter = 0;
+
         this.emit('quarterAdvanced', this.state);
         this.emit('stateChange', this.state);
     }
@@ -312,48 +323,10 @@ class GameStateManager {
 
     // Check if game should end
     isGameOver() {
+        if (this.state.runStatus !== 'playing') return true;
         if (this.state.firedByBoard) return true;
         if (this.state.totalQuartersPlayed >= this.state.maxQuarters) return true;
         return false;
-    }
-
-    // Check if extension is available
-    canExtend() {
-        return (
-            this.state.extensionsUsed < GAME_CONFIG.MAX_EXTENSIONS &&
-            this.state.totalQuartersPlayed >= this.state.maxQuarters &&
-            !this.state.firedByBoard
-        );
-    }
-
-    // Apply extension
-    extendGame() {
-        if (!this.canExtend()) return false;
-        this.state.extensionsUsed++;
-        this.state.maxQuarters += GAME_CONFIG.EXTENSION_QUARTERS;
-
-        // v2: Scale existing exposure notionals by 1.2x-1.5x on first extension
-        if (this.state.extensionsUsed === 1 && this.rng) {
-            const scaleFactor = 1.2 + this.rng.float() * 0.3; // 1.2 to 1.5
-            for (const exp of this.state.exposures) {
-                if (exp.type !== 'ir') {
-                    exp.quarterlyNotional = Math.round(exp.quarterlyNotional * scaleFactor);
-                }
-            }
-            // Also scale in allExposures for consistency
-            for (const exp of this.state.allExposures) {
-                if (exp.type !== 'ir') {
-                    exp.quarterlyNotional = Math.round(exp.quarterlyNotional * scaleFactor);
-                }
-            }
-        }
-
-        // v2: Unlock any exposures with unlockQuarter >= 9 (extension-only exposures)
-        this.checkExposureUnlocks();
-
-        this.emit('gameExtended', this.state);
-        this.emit('stateChange', this.state);
-        return true;
     }
 
     // Get current calendar quarter string (hidden year + quarter)
@@ -388,6 +361,8 @@ class GameStateManager {
     fromJSON(data) {
         if (!data || (data._version !== 1 && data._version !== 2)) return false;
         this.state = { ...this.createInitialState(), ...data };
+        // Saves from builds with extensions may carry a longer run; v3 runs are 8 quarters.
+        this.state.maxQuarters = GAME_CONFIG.MAX_QUARTERS;
 
         // Migrate v1 saves: populate v2 fields if missing
         if (data._version === 1) {

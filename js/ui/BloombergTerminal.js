@@ -413,7 +413,9 @@ export class BloombergTerminal {
         cy += 18;
 
         // Change
-        const changeStr = `${isUp ? '+' : ''}${this.change.toFixed(4)}`;
+        const changeStr = this.exposureType === 'ir'
+            ? `${isUp ? '+' : ''}${(this.change * 100).toFixed(3)}pp`
+            : `${isUp ? '+' : ''}${this.change.toFixed(4)}`;
         const pctStr = `${isUp ? '+' : ''}${this.changePct.toFixed(2)}%`;
         ctx.font = '9px monospace';
         ctx.fillStyle = isUp ? '#22c55e' : '#ef4444';
@@ -520,7 +522,8 @@ export class BloombergTerminal {
 
     formatPrice(price) {
         if (!price) return '—';
-        if (this.exposureType === 'ir') return price.toFixed(4);
+        // Interest rates are decimals (0.0347 = 3.470%)
+        if (this.exposureType === 'ir') return `${(price * 100).toFixed(3)}%`;
         if (this.underlying.includes('JPY')) return price.toFixed(2);
         if (this.exposureType === 'commodity') return price.toFixed(2);
         return price.toFixed(4);

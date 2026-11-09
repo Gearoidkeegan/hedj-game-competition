@@ -1,0 +1,9 @@
+{
+  "name": "hedj-game-v3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\" \"backend/test/**/*.test.mjs\"",
+    "simulate": "node tools/simulate.js"
+  }
+}

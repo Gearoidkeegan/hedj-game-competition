@@ -1,0 +1,19 @@
+{
+  "events": [
+    {
+      "id": "fixture-supplier", "pool": "business", "weight": 2,
+      "title": "Supplier squeeze", "text": "A key supplier wants payment up front.",
+      "choices": [
+        { "id": "pay", "label": "Pay up", "quip": "Cash is king.", "effects": { "cashPct": -0.02, "mood": 5 } },
+        { "id": "refuse", "label": "Refuse", "quip": "Bold.", "effects": { "mood": -5, "varianceMult": 2, "notionalMult": { "fuel": 1.5, "no-such-exposure": 3 } } }
+      ]
+    },
+    {
+      "id": "fixture-conference", "pool": "conference", "weight": 1,
+      "title": "Conference windfall", "text": "A sponsor pays for your stand.",
+      "choices": [
+        { "id": "accept", "label": "Accept", "quip": "Thanks.", "effects": { "cashPct": 0.01 } }
+      ]
+    }
+  ]
+}

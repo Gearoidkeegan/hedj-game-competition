@@ -228,7 +228,7 @@
             "type": "instant",
             "category": "industry_specific",
             "title": "Fuel Prices Surge 25%",
-            "description": "Geopolitical tensions have caused a 25% spike in fuel prices. Brent has just jumped — your unhedged fuel exposure is now marked at a much higher level. Decide whether to lock in here or ride it out.",
+            "description": "Geopolitical tensions have sent jet fuel up 25%. Your unhedged fuel exposure is now marked at a much higher level, and any new hedges lock in at the new price.",
             "choices": [
                 {
                     "id": "acknowledge",
@@ -250,8 +250,8 @@
             "choices": [
                 {
                     "id": "accept",
-                    "label": "Adapt to new reality",
-                    "description": "Adjust your strategy for the new debt load and tougher board.",
+                    "label": "Meet the new owners",
+                    "description": "The deal is done. Your rate exposure doubles and the PE partners take their seats.",
                     "effect": { "pe_takeover": true, "ir_exposure_multiply": 2, "satisfaction_reset": 50, "satisfaction_delta": 0 }
                 }
             ],

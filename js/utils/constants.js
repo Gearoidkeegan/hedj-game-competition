@@ -1,9 +1,7 @@
 // Game balance constants and configuration
 
 export const GAME_CONFIG = {
-    DEFAULT_QUARTERS: 8,        // 2 years = ~5 minute game
-    EXTENSION_QUARTERS: 4,      // Each extension adds 1 year
-    MAX_EXTENSIONS: 2,          // Up to 16 quarters total
+    MAX_QUARTERS: 8,            // 2 years; v3 has no extensions
     QUARTERS_PER_YEAR: 4,
 
     // Board satisfaction
@@ -27,15 +25,6 @@ export const GAME_CONFIG = {
     MAX_EVENTS_PER_QUARTER: 1,
     MIN_EVENTS_PER_YEAR: 2,
 
-    // Scoring weights
-    SCORE_WEIGHTS: {
-        pnl: 0.30,
-        boardSatisfaction: 0.25,
-        cashManagement: 0.20,
-        policyCompliance: 0.15,
-        riskAdjusted: 0.10
-    },
-
     // Option pricing (simplified)
     OPTION_PREMIUM_ATM: 0.03,   // 3% of notional for ATM option
     OPTION_PREMIUM_SCALE: 1.5,  // Vol multiplier for premium
@@ -50,15 +39,6 @@ export const GAME_CONFIG = {
     MIN_SATISFACTION_FOR_LIMIT_INCREASE: 50,  // Min board satisfaction to raise credit lines
     BANK_REQUEST_COOLDOWN_QUARTERS: 2         // Quarters between any bank/limit request
 };
-
-export const GRADES = [
-    { min: 90, grade: 'A+', title: 'Chief Risk Officer Material', description: 'A headhunter is on the line for you.' },
-    { min: 80, grade: 'A',  title: 'Contract Extended', description: 'The board wants to extend your contract.' },
-    { min: 70, grade: 'B',  title: 'Solid Treasury Management', description: 'Steady hands on the wheel.' },
-    { min: 60, grade: 'C',  title: 'Adequate Performance', description: 'Room for improvement, but you kept the lights on.' },
-    { min: 50, grade: 'D',  title: 'Under Review', description: 'The board is reviewing your performance.' },
-    { min: 0,  grade: 'F',  title: 'Looking for Work', description: 'Your LinkedIn profile has been updated.' }
-];
 
 export const HEDGING_POLICY_TYPES = [
     {
@@ -181,7 +161,5 @@ export const PHASE = {
     EVENT: 'event',
     BOARD: 'board',
     SUMMARY: 'summary',
-    EXTEND: 'extend',
-    LEVEL_COMPLETE: 'level_complete',
     GAMEOVER: 'gameover'
 };
