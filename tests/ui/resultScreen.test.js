@@ -274,3 +274,30 @@ test('no quarter to show: a BACK TO TITLE button', () => {
     q('.q-back').click();
     assert.deepEqual(app.shown, ['title']);
 });
+
+// ── Market charts ─────────────────────────────────────────────────────────
+
+test('each exposure line gets a chart row with a Hedged caption when hedged, and no year anywhere', () => {
+    const { rc, result } = playOne();
+    const lines = result.summary.lines.map((l, i) => ({ ...l, hedgeRatio: i === 0 ? 0.75 : 0 }));
+    const { el, qa, timers } = mountResult(appWith(rc, { ...result, summary: { ...result.summary, lines } }));
+    assert.ok(qa('.r-chart-row').length > 0, 'charts present for real market data');
+    assert.ok(qa('.r-chart-row').every(r => r.hidden), 'hidden until their line reveals');
+    timers.advance(4000);
+    assert.ok(qa('.r-chart-row').every(r => !r.hidden));
+    assert.ok(qa('.r-chart canvas').length > 0);
+    const captions = qa('.r-chart-caption').map(c => c.textContent);
+    assert.deepEqual(captions, ['Hedged 75%']);
+    assert.ok(!/\b(19|20)\d\d\b/.test(qa('.r-chart-row').map(r => r.textContent).join(' ')), 'no year in the chart rows');
+    assert.ok(el);
+});
+
+test('a missing market dataset leaves the line without a chart and does not throw', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    app.runController = { market: { getDataset: () => null } };
+    const { qa, timers } = mountResult(app);
+    timers.advance(4000);
+    assert.equal(qa('.r-chart-row').length, 0);
+    assert.ok(qa('.r-line').every(l => !l.hidden));
+});
