@@ -2,7 +2,7 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { installFakeDom, key } from '../helpers/fakeDom.js';
 import { loadJson, loadMarketData, loadIndustries } from '../helpers/loadData.js';
-import { marketEngine } from '../../js/engine/MarketEngine.js';
+import { marketEngine, MarketEngineController } from '../../js/engine/MarketEngine.js';
 import { POLICY_OPTIONS } from '../../js/engine/sim/SimEngine.js';
 import * as storage from '../../js/utils/storage.js';
 import { RunController } from '../../js/screens/simple/RunController.js';
@@ -648,6 +648,55 @@ test('each exposure card has a static sparkline when market data exists', () => 
     assert.ok(cards.every(c => c.querySelector('.exp-spark canvas')), 'one sparkline per card');
     assert.deepEqual(qa('.exp-spark').map(s => s.textContent).filter(Boolean), [], 'a sparkline holds a canvas and no text');
     screen.unmount();
+});
+
+// v3.2: weekly sparklines, and nothing from after the quarter start can reach them.
+function weeklyMarket(poisonAfterYear = null) {
+    const m = new MarketEngineController();
+    m.loadFromObjects(loadMarketData());
+    const fx = loadJson('data/market/fx-weekly.json');
+    const commodities = loadJson('data/market/commodities-weekly.json');
+    if (poisonAfterYear !== null) {
+        for (const group of [fx, commodities]) {
+            for (const [k, s] of Object.entries(group)) {
+                if (k === '_meta') continue;
+                // After the moment the engine's Q1 start rate was observed (mid-January, or the end of January).
+                const cut = s.anchor === 'end' ? Date.UTC(poisonAfterYear, 1, 0) : Date.UTC(poisonAfterYear, 0, 15);
+                const t0 = Date.parse(`${s.start}T00:00:00Z`);
+                s.v = s.v.map((x, i) => (t0 + i * 7 * 864e5 > cut ? 1e6 : x));
+            }
+        }
+    }
+    m.loadWeeklyFromObjects({ fx, commodities });
+    return m;
+}
+
+test('v3.2: with weekly data the sparklines are weekly, end on the start rate, and see nothing after it', () => {
+    const sparksFor = (market) => {
+        const rc = new RunController({ storage, market, content, now: () => 1_700_000_000_000 });
+        rc.start('airline', { seed: SEED.band2550 });
+        const app = { runController: rc, content, marketReady: Promise.resolve(), shown: [], toasts: [],
+            showScreen(id) { this.shown.push(id); }, showToast() {} };
+        const screen = new QuarterScreen(app, { now: () => 0 });
+        dom.document.body.appendChild(screen.render());
+        screen.mount();
+        const out = screen.sparks.map(s => ({ ...s.series, exposureId: s.exposureId }));
+        screen.unmount();
+        return { out, rc };
+    };
+    const { out, rc } = sparksFor(weeklyMarket());
+    const year = rc.run.startYear;   // seed 3: a year the weekly data covers
+    const poisoned = sparksFor(weeklyMarket(year)).out;
+    assert.ok(out.length >= 2, `${out.length} sparks`);
+    for (const [i, s] of out.entries()) {
+        const ex = rc.run.exposures.find(e => e.id === s.exposureId);
+        const rate = rc.market.getRate(ex.underlying, year, 1);
+        const start = ex.type === 'fx' && ex.underlying.endsWith(ex.unit) ? 1 / rate : rate;
+        assert.equal(s.history.at(-1), start, `${ex.underlying} ends on the start rate`);
+        assert.deepEqual(s.quarter, []);
+        assert.equal(s.source, ex.type === 'ir' ? 'monthly' : 'weekly', ex.underlying);
+        assert.deepEqual(poisoned[i].history, s.history, `${ex.underlying}: no point after the quarter start`);
+    }
 });
 
 // ── Fix round 1 ────────────────────────────────────────────────────────────

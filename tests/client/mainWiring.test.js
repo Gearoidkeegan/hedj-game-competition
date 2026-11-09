@@ -103,3 +103,27 @@ test('a tab back in view redraws the title or the registration form on a change,
     await app.onVisible();
     assert.deepEqual(app.shown.slice(4), [], 'at most one check a minute');
 });
+
+// v3.2: the chart-only weekly data starts loading once the title is up, never before it and never blocking it.
+test('weekly chart data loads after the title renders, without blocking', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { marketEngine } = await import('../../js/engine/MarketEngine.js');
+    const src = readFileSync(new URL('../../js/main.js', import.meta.url), 'utf8');
+    const init = src.slice(src.indexOf('async init()'), src.indexOf('onVisible() {'));
+    const title = init.indexOf("this.showScreen('title');");
+    const weekly = init.indexOf('this.loadChartData();');
+    assert.ok(title > 0 && weekly > title, 'loadChartData is called after the title is shown');
+    assert.doesNotMatch(init, /await this\.loadChartData/);
+
+    const { app } = makeApp();
+    const real = marketEngine.loadWeekly;
+    const calls = [];
+    marketEngine.loadWeekly = (base) => { calls.push(base); return Promise.reject(new Error('x')); };
+    try {
+        assert.doesNotThrow(() => app.loadChartData());
+        await new Promise(r => setTimeout(r, 0));
+    } finally {
+        marketEngine.loadWeekly = real;
+    }
+    assert.deepEqual(calls, ['data/market']);
+});

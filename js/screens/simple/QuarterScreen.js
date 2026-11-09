@@ -311,19 +311,20 @@ export class QuarterScreen {
     }
 
     // A small static trend line of the year up to this quarter's start. Nothing after the start, no labels.
+    // v3.2: weekly closes once they have loaded (chart only), otherwise monthly.
     _sparkRow(run, exp) {
         const market = this.rc?.market;
         if (!market?.getDataset) return null;
         let series = null;
         try {
             series = chartSeries(market.getDataset(exp.underlying), run.startYear, run.quarter,
-                { upTo: 'start', invert: chartInverted(exp) });
+                { upTo: 'start', invert: chartInverted(exp), weekly: market.getWeekly?.(exp.underlying) ?? null });
         } catch (err) {
             console.warn('QuarterScreen: sparkline unavailable', err);
         }
         if (!series) return null;
         const host = h('div', { class: 'exp-spark', 'aria-hidden': 'true' });
-        this.sparks.push({ host, series });
+        this.sparks.push({ host, series, exposureId: exp.id });
         return host;
     }
 
