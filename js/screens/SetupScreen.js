@@ -9,7 +9,7 @@ import { boardAI } from '../engine/BoardAI.js';
 import { HEDGING_POLICY_TYPES } from '../utils/constants.js';
 import { formatCurrency } from '../utils/formatters.js';
 import { SeededRandom, generateSeed } from '../utils/random.js';
-import { getRegistration } from '../utils/storage.js';
+import { getRegistration, isFreePlay, GUEST_PLAYER } from '../utils/storage.js';
 import { escapeHtml } from '../utils/escape.js';
 
 export class SetupScreen {
@@ -25,8 +25,8 @@ export class SetupScreen {
 
         const industries = this.app.industriesData?.industries || [];
 
-        // Pre-fill display name from registration record
-        const reg = getRegistration();
+        // Pre-fill display name from registration record (none in free play, R66)
+        const reg = isFreePlay() ? null : getRegistration();
         const prefillName = reg?.playerName || '';
 
         this.el.innerHTML = `
@@ -200,10 +200,12 @@ export class SetupScreen {
             industry = rng.pick(industries);
         }
 
-        // Read company and email from competition registration record
-        const reg = getRegistration();
+        // Read company and email from competition registration record. Free play (R66): the run is the guest's,
+        // so the game-over screen records it locally and submits nothing.
+        const free = isFreePlay();
+        const reg = free ? null : getRegistration();
         const companyName = reg?.company || '';
-        const contactEmail = reg?.email || '';
+        const contactEmail = free ? GUEST_PLAYER : reg?.email || '';
 
         const rng = new SeededRandom(seed + 1);
 

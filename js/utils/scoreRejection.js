@@ -8,6 +8,8 @@
 const RETRYABLE_4XX = [401, 408, 429];
 const PREFIX = 'Score not accepted: ';
 const FALLBACK_REASON = 'the server refused it';
+// Server error codes with their own wording. competition_closed: after the event and its 2-hour grace (R66).
+const REASONS = { competition_closed: 'the competition has closed' };
 export const REJECTION_TEXT_MAX = 90;
 
 export function isFinalRejection(err) {
@@ -18,6 +20,7 @@ export function isFinalRejection(err) {
 // "Score not accepted: <reason>", from the server's error message, in 90 characters or fewer.
 export function rejectionText(message) {
     let reason = typeof message === 'string' ? message.trim() : '';
+    if (Object.hasOwn(REASONS, reason)) reason = REASONS[reason];
     if (!reason || /^HTTP \d+$/.test(reason)) reason = FALLBACK_REASON;
     reason = reason.charAt(0).toLowerCase() + reason.slice(1);
     const room = REJECTION_TEXT_MAX - PREFIX.length;

@@ -208,6 +208,8 @@
 .t-tag { color: var(--v3-muted); }
 .t-player { text-align: center; color: var(--v3-muted); }
 .t-player-name { color: var(--v3-text); overflow-wrap: anywhere; }
+.t-practice { display: grid; justify-items: center; gap: 4px; text-align: center; color: var(--v3-muted); }
+.t-practice-tag { font-size: 20px; letter-spacing: 2px; color: var(--v3-gold); border: 2px solid var(--v3-gold); padding: 0 8px; }
 .t-menu { display: grid; gap: 10px; }
 .t-menu .btn { display: grid; gap: 2px; min-height: 64px; text-transform: none; }
 .t-btn-main { font-family: var(--font-readable); font-size: 26px; text-transform: uppercase; }

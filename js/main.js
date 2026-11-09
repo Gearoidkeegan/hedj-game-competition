@@ -22,9 +22,9 @@ import { QuarterScreen } from './screens/simple/QuarterScreen.js';
 import { ResultScreen } from './screens/simple/ResultScreen.js';
 import * as api from './utils/api.js';
 import * as storage from './utils/storage.js';
+import { EventMode, needsRegistration } from './utils/eventStatus.js';
 
 const { trackEvent, flushScoreQueue } = api;
-const { getRegistration } = storage;
 
 class App {
     constructor() {
@@ -40,11 +40,21 @@ class App {
         this.runController = null;
         this.lastQuarter = null;   // the latest runController.playQuarter() result, for the result screen (B3)
         this.gameOverMode = null;  // 'simple' (set by the result screen) or 'pro' (the Pro game loop)
+        // R66: live competition or free play, from GET /api/event (cached value, then free play, when it fails).
+        this.eventMode = new EventMode({ fetchEvent: api.fetchEvent, storage, now: () => Date.now() });
+    }
+
+    // { live, startIso, endIso }: the latest known event status.
+    get event() {
+        return this.eventMode.event;
     }
 
     async init() {
-        // Load game data
+        // Load game data, and the event status alongside it (a short timeout, so the title never waits long)
+        const eventReady = this.eventMode.refresh();
         await this.loadData();
+        await eventReady;
+        this.eventMode.apply();
         this.runController = new RunController({
             storage, api, market: marketEngine, content: this.content, now: () => Date.now()
         });
@@ -78,6 +88,17 @@ class App {
         // Send any scores queued while offline
         flushScoreQueue().catch(() => {});
         window.addEventListener('online', () => flushScoreQueue().catch(() => {}));
+
+        // R66: a tab back in view checks the event again (at most once a minute). The new mode shows at once only
+        // on the title or the registration form; anywhere else it applies at the next title or run start, so a
+        // run under way carries on as it began.
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) return;
+            this.eventMode.recheck().then(() => {
+                const stale = this.event.live === storage.isFreePlay();
+                if (stale && (this.currentScreen === 'title' || this.currentScreen === 'registration')) this.showScreen('title');
+            }).catch(() => {});
+        });
 
         // Always start at title screen
         this.showScreen('title');
@@ -169,14 +190,15 @@ class App {
     }
 
     showScreen(screenId) {
-        // Redirect to registration when a run (Pro setup or Simple industry pick) is requested without a valid token
-        if (screenId === 'setup' || screenId === 'industry') {
-            const reg = getRegistration();
-            if (!reg || reg.gameTokenExpiry < Date.now()) {
-                // After registering, carry on to where the player was going.
-                if (this.screens.registration) this.screens.registration.nextScreen = screenId;
-                screenId = 'registration';
-            }
+        // R66: the title and the start of a run are where the live/free-play mode is applied (no run under way).
+        if (screenId === 'title' || screenId === 'setup' || screenId === 'industry') this.eventMode.apply();
+
+        // Redirect to registration when a run (Pro setup or Simple industry pick) is requested without a valid token.
+        // Never in free play.
+        if (needsRegistration(screenId, storage, Date.now())) {
+            // After registering, carry on to where the player was going.
+            if (this.screens.registration) this.screens.registration.nextScreen = screenId;
+            screenId = 'registration';
         }
 
         // Unmount current screen

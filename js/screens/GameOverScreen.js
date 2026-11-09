@@ -7,6 +7,8 @@
 //   Pro (R6): gameState.get().proResult = { mode:'pro', status, score, history }. The headline is keyed on
 //   proResult.status, the title comes from scorePro(state, quips.gameOverTitles), and this screen records the
 //   run (progress, score queue) and submits it with mode 'pro', once per game.
+// Free play (R66): a guest run (RunController's practice outcome, or a Pro run whose contactEmail is the guest)
+// records progress only. No submission, no queue; one practice line stands in for the rank.
 // No innerHTML: the DOM is built node by node with textContent (R7).
 
 import { gameState } from '../engine/GameState.js';
@@ -24,6 +26,8 @@ import { createTapGuard } from '../ui/tapGuard.js';
 import * as realApi from '../utils/api.js';
 import { isFinalRejection, rejectionText } from '../utils/scoreRejection.js';
 import * as realStorage from '../utils/storage.js';
+import { GUEST_PLAYER } from '../utils/storage.js';
+import { practiceLine } from '../utils/eventStatus.js';
 
 export const COUNT_MS = 1500;           // score count-up
 const ENDING_SALT = 30;                 // cosmetic RNG salt for the ending quip (RunController uses 0..9, B2 20..28)
@@ -242,7 +246,7 @@ export class GameOverScreen {
             total: o.score, title: o.title, industryId: run.industryId, industryName: industry?.name || '',
             crisisId: run.crisisId || null, startYear: run.startYear,
             isPersonalBest: !!o.isPersonalBest, newlyUnlocked: o.newlyUnlocked || [], ranked: o.ranked !== false,
-            outcome: { ...o, pending: !!pending }, pending
+            practice: !!o.practice, outcome: { ...o, pending: !!pending }, pending
         };
     }
 
@@ -256,7 +260,8 @@ export class GameOverScreen {
             mode: 'pro', status: pr.status, severe: !!(pr.history || []).at(-1)?.severe, seed: state.seed,
             total, title: scored.title, industryId: state.industryId, industryName: state.industry?.name || '',
             crisisId: null, startYear: state.startYear,
-            isPersonalBest: record.isPersonalBest, newlyUnlocked: record.newlyUnlocked, ranked: true,
+            isPersonalBest: record.isPersonalBest, newlyUnlocked: record.newlyUnlocked,
+            ranked: !record.outcome.practice, practice: !!record.outcome.practice,
             outcome: { ...record.outcome, pending: !!record.pending && !record.settled },
             pending: record.settled ? null : record.pending
         };
@@ -271,7 +276,8 @@ export class GameOverScreen {
         const storage = this.storage;
         const api = this.api;
         const reg = storage.getRegistration();
-        const email = sameEmail(state.contactEmail, reg?.email) ? reg.email : null;
+        const guest = state.contactEmail === GUEST_PLAYER;   // set up in free play (R66)
+        const email = guest ? GUEST_PLAYER : sameEmail(state.contactEmail, reg?.email) ? reg.email : null;
         const record = { isPersonalBest: false, newlyUnlocked: [], outcome: null, pending: null, settled: false };
         this.proRecords.set(key, record);
         if (!email) {
@@ -286,6 +292,11 @@ export class GameOverScreen {
         if (storage.saveProgress(email, progress) === false) storageFailed = true;
         record.isPersonalBest = isPersonalBest;
         record.newlyUnlocked = newlyUnlocked;
+        if (guest) {
+            record.outcome = { ranked: false, practice: true, rank: null, queued: false, storageFailed };
+            record.settled = true;
+            return record;
+        }
 
         const payload = {
             gameId: key, email, mode: 'pro', score: total,
@@ -379,6 +390,11 @@ export class GameOverScreen {
     _paintRank() {
         if (!this.rankEl || !this.view) return;
         const v = this.view;
+        if (v.practice && !v.crisisId) {
+            // One line of 90 characters or fewer: a storage warning takes the place of the date.
+            this.rankEl.textContent = v.outcome?.storageFailed ? `Practice mode. ${STORAGE_FAILED}` : practiceLine(this.app.event, Date.now());
+            return;
+        }
         this.rankEl.textContent = v.crisisId || !v.ranked ? crisisText(v) : rankText(v.outcome);
     }
 
@@ -417,8 +433,14 @@ export class GameOverScreen {
             this.app.showScreen('setup');
             return;
         }
+        // R66: the event opened or closed since this run started. The title shows the new mode first.
+        if (this.app.eventMode?.apply()) {
+            this.navigated = true;
+            this.app.showScreen('title');
+            return;
+        }
         const reg = this.storage.getRegistration();
-        if (!reg || reg.gameTokenExpiry < Date.now()) {   // the same test as main.js showScreen's gate
+        if (!this.storage.isFreePlay?.() && (!reg || reg.gameTokenExpiry < Date.now())) {   // main.js's gate
             this.navigated = true;
             this.app.showScreen('industry');
             return;

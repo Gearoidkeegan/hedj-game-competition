@@ -1,7 +1,7 @@
 // Registration gate for competition prize eligibility
 // Shown before SetupScreen when no valid game token is stored
 
-import { register } from '../utils/api.js';
+import { register as apiRegister } from '../utils/api.js';
 import { escapeHtml } from '../utils/escape.js';
 import { saveRegistration, getRegistration, clearRegistration } from '../utils/storage.js';
 import { validPlayerName, validCompanyName, NAME_MAX, COMPANY_MAX } from '../utils/playerName.js';
@@ -10,10 +10,13 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // R64: the server's rules (js/utils/playerName.js), said before the round trip.
 export const NAME_ERROR = `Name: up to ${NAME_MAX} letters, numbers, spaces, emoji or . ' _ - # * (no commas or brackets)`;
 export const COMPANY_ERROR = `Company: up to ${COMPANY_MAX} characters, without < or >`;
+export const CLOSED_TEXT = 'The competition has closed. Practice mode is open to all.';
 
 export class RegistrationScreen {
-    constructor(app) {
+    // deps.register lets tests inject a fake api.register.
+    constructor(app, { register = apiRegister } = {}) {
         this.app = app;
+        this.register = register;
         this.el = null;
         this.nextScreen = null;   // set by main.js when a run was requested before registering
     }
@@ -151,7 +154,7 @@ export class RegistrationScreen {
         this.showError(null);
 
         try {
-            const result = await register(name, email, company, marketingConsent);
+            const result = await this.register(name, email, company, marketingConsent);
             // The identity is set at first registration (R18, R25): keep what the server stored, which is what the
             // boards show, rather than what was typed this time.
             saveRegistration({
@@ -169,6 +172,15 @@ export class RegistrationScreen {
         } catch (err) {
             btn.disabled = false;
             btn.textContent = 'REGISTER & PLAY';
+            // R66: the event ended while this screen was open. Check the status again and go to the title, which
+            // then shows free play.
+            if (err.status === 403 && err.message === 'competition_closed') {
+                this.app.showToast?.(CLOSED_TEXT, 'info');
+                this.nextScreen = null;
+                await Promise.resolve(this.app.eventMode?.refresh()).catch(() => {});
+                this.app.showScreen('title');
+                return;
+            }
             const msg = err.status === 400
                 ? err.message
                 : 'Could not connect — check your connection and try again.';

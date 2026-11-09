@@ -10,6 +10,7 @@ import { applyRunToProgress, emptyProgress, mergeProgress, serialiseSave } from 
 import { CRISES } from '../../engine/sim/crises.js';
 import { SeededRandom } from '../../utils/random.js';
 import { isFinalRejection, rejectionText } from '../../utils/scoreRejection.js';
+import { GUEST_PLAYER } from '../../utils/storage.js';
 import { CHAIRMAN_SPRITES, spriteIdForMember } from '../../ui/pixel/sprites.js';
 
 // The chairman speaks instead of a board member in these quarters, and whenever the gap to the benchmark
@@ -107,6 +108,7 @@ function bandMidpoint(policy) {
 
 
 const sameEmail = (a, b) => !!a && !!b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+const isGuest = email => email === GUEST_PLAYER;
 
 export class RunController {
     // storage: js/utils/storage.js (namespace import); api: js/utils/api.js (or a fake with the same names);
@@ -114,7 +116,8 @@ export class RunController {
     // now: () => ms timestamp.
     //
     // Player identity (R39): the current player is ALWAYS the one in the registration store
-    // (storage.getRegistration().email), read at call time. Every public method first checks it; if it no longer
+    // (storage.getRegistration().email), read at call time; in free play (storage.isFreePlay(), R66) it is the local
+    // guest (GUEST_PLAYER), whose runs are never submitted, queued or synced. Every public method first checks it; if it no longer
     // matches the player this controller holds, the controller resets itself (run, email, outcome dropped).
     // B2's "Not you?" handler should still call reset() explicitly after clearing the registration.
     constructor({ storage, api = null, market, content, now = () => Date.now() }) {
@@ -138,8 +141,9 @@ export class RunController {
         this._finishing = null;
     }
 
-    // The registered player's email, or null.
+    // The registered player's email, the guest in free play, or null.
     currentPlayer() {
+        if (this.storage.isFreePlay?.()) return GUEST_PLAYER;
         return this.storage.getRegistration()?.email || null;
     }
 
@@ -274,7 +278,8 @@ export class RunController {
         }
         this.storage.clearRun(email);
 
-        const ranked = !run.crisisId;
+        const practice = isGuest(email);   // free play (R66): no submission, no queue
+        const ranked = !run.crisisId && !practice;
         let payload = null;
         let queued = false;
         if (ranked) {
@@ -294,6 +299,7 @@ export class RunController {
             score: s.total, title: s.title, breakdown: s.breakdown, newlyUnlocked, isPersonalBest,
             rank: null, queued, ranked, storageFailed
         };
+        if (practice) this.outcome.practice = true;
         this._finishing = this._submit({ ...this.outcome }, payload, progress, { email, gameId: run.gameId });
         return this._finishing;
     }
@@ -313,7 +319,7 @@ export class RunController {
     async syncProgress() {
         const local = this.progress();
         const email = this.currentPlayer();
-        if (!email || typeof this.api?.getRemoteProgress !== 'function') return local;
+        if (!email || isGuest(email) || typeof this.api?.getRemoteProgress !== 'function') return local;
         let remote;
         try {
             remote = await this.api.getRemoteProgress();
@@ -422,7 +428,7 @@ export class RunController {
             }
         }
         // Checked and called in the same synchronous step, so the token used is the run owner's.
-        if (typeof this.api?.putRemoteProgress === 'function' && sameEmail(this.currentPlayer(), owner.email)) {
+        if (typeof this.api?.putRemoteProgress === 'function' && !isGuest(owner.email) && sameEmail(this.currentPlayer(), owner.email)) {
             try {
                 Promise.resolve(this.api.putRemoteProgress(progress)).catch(() => {});
             } catch {

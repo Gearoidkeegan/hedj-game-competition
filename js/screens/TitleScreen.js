@@ -2,9 +2,12 @@
 // PRO and CRISES entries, and "Not you?" for a shared device.
 // Per player (R39): everything personal comes from app.runController, which only ever reads the registered
 // player's namespaced save and progress. Player strings are set with textContent (R7); no innerHTML.
+// Free play (R66): the local guest's progress and RESUME, a PRACTICE MODE line instead of the player line, no
+// rank or top 3, and the last event's leaderboard only when it has entries.
 
 import * as apiModule from '../utils/api.js';
-import { getRegistration, clearRegistration, hasSeenGuide } from '../utils/storage.js';
+import { getRegistration, clearRegistration, hasSeenGuide, isFreePlay } from '../utils/storage.js';
+import { practiceLine } from '../utils/eventStatus.js';
 import { CRISES } from '../engine/sim/crises.js';
 import { CHAIRMAN_SPRITES } from '../ui/pixel/sprites.js';
 import { soundFX } from '../ui/SoundFX.js';
@@ -30,15 +33,19 @@ export class TitleScreen {
         this.el = null;
         this.mountId = 0;
         this.starting = false;
+        this.checking = false;   // PLAY is waiting on the event re-check (R66)
     }
 
     render() {
         const rc = this.app.runController;
-        this.reg = validRegistration();
-        // Unlocks and stats only for a valid registration: an expired one shows the first-time view (PRO/CRISES locked).
-        this.progress = this.reg && rc ? rc.progress() : null;
-        // resume() only ever returns the registered player's run, and resets the controller otherwise.
-        this.resumeRun = this.reg && rc ? rc.resume() : null;
+        this.free = isFreePlay();
+        this.reg = this.free ? null : validRegistration();
+        // Unlocks and stats only for a valid registration (or the guest in free play): an expired one shows the
+        // first-time view (PRO/CRISES locked).
+        const player = this.free || !!this.reg;
+        this.progress = player && rc ? rc.progress() : null;
+        // resume() only ever returns the current player's run, and resets the controller otherwise.
+        this.resumeRun = player && rc ? rc.resume() : null;
         this.crisisOpen = false;
         this.statsEl = null;
 
@@ -48,10 +55,10 @@ export class TitleScreen {
                     h('img', { src: 'assets/images/hedj-logo.png', alt: 'Hedj', width: '72', height: '72' }),
                     h('h1', { text: 'Treasury Manager' }),
                     h('p', { class: 't-tag', text: 'Eight quarters. One board. Can you keep your job?' })),
-                this._playerLine(),
+                this.free ? this._practiceLine() : this._playerLine(),
                 this._menu(),
-                this.reg ? this._stats() : null,
-                this._teaser(),
+                this.reg || this.free ? this._stats() : null,
+                this.free ? this._lastEvent() : this._teaser(),
                 this._more()),
             h('footer', { class: 't-footer' },
                 h('button', { class: 'btn t-sound', type: 'button', 'aria-label': soundFX.enabled ? 'Sound on' : 'Sound off',
@@ -64,6 +71,14 @@ export class TitleScreen {
     mount() {
         const id = ++this.mountId;
         const live = () => id === this.mountId;
+        if (this.free) {
+            // Only whether the last event's board has entries: it decides if its LEADERBOARD button shows.
+            Promise.resolve()
+                .then(() => this.api.fetchLeaderboard({ mode: 'simple', period: 'event', limit: 1 }))
+                .then(entries => { if (live()) this.lastBoardBtn.hidden = !(Array.isArray(entries) && entries.length); })
+                .catch(() => {});
+            return;
+        }
         if (this.reg && this.app.runController) {
             this.app.runController.syncProgress()
                 .then(p => { if (live() && p) this._paintStats(p); })
@@ -91,6 +106,12 @@ export class TitleScreen {
             h('button', { class: 'btn-link t-notyou', type: 'button', text: 'Not you?', on: { click: () => this._notYou() } }));
     }
 
+    _practiceLine() {
+        return h('p', { class: 't-practice' },
+            h('span', { class: 't-practice-tag', text: 'PRACTICE MODE' }),
+            h('span', { class: 't-practice-line', text: practiceLine(this.app.event, Date.now()) }));
+    }
+
     _menu() {
         const run = this.resumeRun;
         const industry = run && (this.app.content?.industries || []).find(i => i.id === run.industryId);
@@ -112,7 +133,7 @@ export class TitleScreen {
         this.statsEl = h('section', { class: 't-stats', 'aria-label': 'Your progress' },
             h('dl', { class: 't-stat-grid' },
                 stat('best', 'Personal best'),
-                stat('rank', "Today's rank"),
+                this.free ? null : stat('rank', "Today's rank"),
                 stat('chairmen', 'Chairmen met')),
             this.nextEl,
             this.badgesEl);
@@ -128,6 +149,13 @@ export class TitleScreen {
             this.topList,
             this.topEmpty,
             h('button', { class: 'btn t-lb', type: 'button', text: 'LEADERBOARD', on: { click: () => this.showLeaderboard() } }));
+    }
+
+    // Free play: the last event's final board, hidden until mount() finds it has entries.
+    _lastEvent() {
+        this.lastBoardBtn = h('button', { class: 'btn t-lb', type: 'button', text: "Last event's leaderboard", hidden: true,
+            on: { click: () => this.showLeaderboard() } });
+        return this.lastBoardBtn;
     }
 
     _more() {
@@ -173,7 +201,7 @@ export class TitleScreen {
             h('span', { class: 't-top-score', text: num(Number(e.score) || 0) }))));
         this.topEmpty.textContent = offline ? 'Leaderboard unavailable offline' : 'No scores yet today. Be the first.';
         this.topEmpty.hidden = !offline && entries.length > 0;
-        if (this.statsEl) {
+        if (this.statsEl && !this.free) {
             // The board carries no emails (GDPR), so "you" is the entry with your name and company.
             const me = this.reg && entries.find(e => e.playerName === this.reg.playerName && (e.company || '') === (this.reg.company || ''));
             this.statsEl.querySelector('[data-stat="rank"] .t-stat-value').textContent = offline ? 'Offline' : me ? `#${me.rank}` : '—';
@@ -194,12 +222,35 @@ export class TitleScreen {
     }
 
     _play() {
-        this._viaGuide('industry');
+        this._afterEventCheck(() => this._viaGuide('industry'));
     }
 
     _pro() {
         this.app.gameMode = 'quickplay';
-        this._viaGuide('setup');
+        // PRO was offered from the other mode's unlocks: if the mode changes, show the title again instead.
+        this._afterEventCheck(() => this._viaGuide('setup'), { titleIfChanged: true });
+    }
+
+    // R66: when the last event check failed, quietly check again first; a live event then switches to live mode
+    // (and the run start sends the player to register).
+    _afterEventCheck(next, { titleIfChanged = false } = {}) {
+        const em = this.app.eventMode;
+        if (!em || em.fresh) {
+            next();
+            return;
+        }
+        if (this.checking) return;
+        this.checking = true;
+        const id = this.mountId;
+        Promise.resolve()
+            .then(() => em.beforePlay())
+            .catch(() => false)
+            .then((changed) => {
+                this.checking = false;
+                if (id !== this.mountId) return;
+                if (changed && titleIfChanged) this.app.showScreen('title');
+                else next();
+            });
     }
 
     // R39: forget this player completely before the next one registers.
@@ -211,7 +262,7 @@ export class TitleScreen {
 
     async startCrisis(crisisId) {
         const crisis = CRISES.find(c => c.id === crisisId);
-        if (!crisis || this.starting || !this.reg) return;   // a crisis needs a valid registration
+        if (!crisis || this.starting || !(this.reg || this.free)) return;   // a crisis needs a player (or the guest)
         const id = this.mountId;
         this.starting = true;
         try {
@@ -245,8 +296,9 @@ export class TitleScreen {
         this._closeLeaderboard();
         const body = h('div', { class: 'lb-body' }, h('p', { text: 'Loading scores…' }));
         const close = h('button', { class: 'btn lb-close', type: 'button', text: 'CLOSE' });
-        const overlay = h('div', { class: 'v3-modal', role: 'dialog', 'aria-label': 'Leaderboard' },
-            h('div', { class: 'v3-modal-box' }, h('h2', { text: 'Leaderboard' }), body, close));
+        const heading = this.free ? "Last event's leaderboard" : 'Leaderboard';
+        const overlay = h('div', { class: 'v3-modal', role: 'dialog', 'aria-label': heading },
+            h('div', { class: 'v3-modal-box' }, h('h2', { text: heading }), body, close));
         const doc = globalThis.document;
         const onKey = e => { if (e.key === 'Escape') this._closeLeaderboard(); };
         this._modal = { overlay, onKey, opener: doc.activeElement };
@@ -265,7 +317,7 @@ export class TitleScreen {
                         h('span', { text: e.playerName || 'Anonymous' }),
                         e.company ? h('span', { class: 'lb-company', text: e.company }) : null),
                     h('span', { class: 'lb-score', text: num(Number(e.score) || 0) }))))
-                : h('p', { text: 'No scores yet. Be the first.' }));
+                : h('p', { text: this.free ? 'No scores from the last event.' : 'No scores yet. Be the first.' }));
         } catch {
             body.replaceChildren(h('p', { text: 'Leaderboard unavailable offline.' }));
         }
