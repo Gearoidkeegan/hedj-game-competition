@@ -142,6 +142,14 @@
                 "Done. From next quarter we're a grown-up board. Don't let it show.",
                 "Adopted unanimously, because I was the only one who read it.",
                 "A policy! The analysts will love this. I'll tell them I wrote it."
+            ],
+            "wrongFocus": [
+                "You hedged the loose change and left the vault door open. Bold. Wrong, but bold.",
+                "Small thing locked down, big thing swinging in the wind. That's backwards, champ.",
+                "You guarded the petty cash and gambled the house. I like risk. Not that kind.",
+                "Fully hedged on the tiny one? The big one was the whole game, and you left it open.",
+                "Wrong target. Nobody gets a bonus for protecting the small stuff.",
+                "You hedged the side bet and let the main bet ride. Pick your fights better."
             ]
         },
         "cautious": {
@@ -226,6 +234,14 @@
                 "At last, a document. I shall read it, annotate it and laminate it.",
                 "Policy ratified. The auditors will send flowers. Possibly a questionnaire too.",
                 "Adopted. From next quarter, we may call things 'compliant' again."
+            ],
+            "wrongFocus": [
+                "The small exposure was covered. The large one was not. That is the wrong way round.",
+                "You protected the minor risk and left the major one open. The minutes will note it.",
+                "Our largest exposure was left unhedged. Covering the small one does not offset that.",
+                "A seatbelt on the bicycle, none on the lorry. Please review your priorities.",
+                "The policy is about our total risk. The biggest exposure was left wide open.",
+                "Hedged where it mattered least, exposed where it mattered most. Unacceptable."
             ]
         },
         "operational": {
@@ -310,6 +326,14 @@
                 "Adopted. It's like a safety sign, but for money.",
                 "A policy! I can plan production around that. Or at least plan a tea break.",
                 "Policy in place from next quarter. I feel safer already. Slightly."
+            ],
+            "wrongFocus": [
+                "You padlocked the shed and left the hangar open. Hedge the big one first.",
+                "Covered the small stuff, left the big bill open. That's what keeps me up at night.",
+                "The big exposure is where the money is. You hedged the bit that hardly moves us.",
+                "Insured the toolbox, not the factory. Flip that round next quarter, please.",
+                "Small risk sorted, big risk running loose. On the floor we call that busywork.",
+                "Hedge what can hurt us. The small one couldn't. The big one still can."
             ]
         }
     },

@@ -165,6 +165,24 @@ test('R54: a small premium does not cancel a bigSave', () => {
     assert.equal(resultQuipKey(s, 1000), 'bigSave');
 });
 
+test('v3.1: a Pro quarter keeps its own policy result; no size-weighted cover or wrong focus', () => {
+    // The shape Simple would call wrong focus: a big exposure left open, a small one fully hedged.
+    const big = { ...expo('big', 'EURUSD', -50), forecastNotional: 1000, realizedNotional: 1000 };
+    const small = { ...expo('small', 'EURGBP', -1), forecastNotional: 10, realizedNotional: 10 };
+    const details = [big, small, hdg('EURGBP', 1)];
+    const inside = toQuarterSummary(baseState(), result({ details, hedgePnL: 1 }));
+    assert.equal(inside.policy, 'in', 'GameLoop said in mandate, so Pro is in policy');
+    assert.equal(inside.inMandate, true);
+    assert.equal(inside.breach, 'none');
+    for (const k of ['riskCover', 'wrongFocus', 'exposureValues']) assert.equal(Object.hasOwn(inside, k), false, k);
+    assert.notEqual(boardLineKey(inside, 55), 'wrongFocus');
+    const off = toQuarterSummary(baseState(), { ...result({ details, hedgePnL: 1 }), inMandate: false });
+    assert.equal(off.policy, 'off');
+    assert.equal(off.breach, 'loss');
+    assert.equal(boardLineKey(off, 55), 'breachLoss');
+    assert.doesNotMatch(readFileSync(new URL('../../js/engine/sim/proAdapter.js', import.meta.url), 'utf8'), /policyCover|wrongFocus/);
+});
+
 // ---- Cash meter wiring ----
 let dom;
 beforeEach(() => { dom = installFakeDom(); });
