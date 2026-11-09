@@ -579,3 +579,34 @@ test('avatar canvases draw at an integer scale, 1:1 with device pixels, no row o
         else globalThis.devicePixelRatio = saved;
     }
 });
+
+// Final review M8: at DPR 1.75 (and other odd ratios) the nearest whole scale made a 64px picture 73px, which overhung
+// its picker cell. The picker clamps the shown size to its slot; 4 slots, gaps, padding and borders fit at 360px.
+test('final M8: picker pictures never overhang their 64px slot at any DPR, and the grid fits 360px', () => {
+    const saved = globalThis.devicePixelRatio;
+    try {
+        for (const dpr of [1, 1.25, 1.5, 1.75, 2, 2.25, 2.625, 3]) {
+            globalThis.devicePixelRatio = dpr;
+            const t = mountPicker(makeApp());
+            const pics = t.qa('canvas.av-pic');
+            assert.equal(pics.length, AVATAR_IDS.length);
+            for (const c of pics) {
+                const shown = parseFloat(c.style.width);
+                assert.ok(shown <= 64 + 1e-9, `@${dpr}: shown ${shown}px`);
+                assert.ok(shown >= 40, `@${dpr}: not tiny (${shown}px)`);
+                const s = Number(c.getAttribute('width')) / 32;
+                assert.ok(Number.isInteger(s) && Math.abs(shown * dpr - 32 * s) < 1e-6, `@${dpr}: still 1:1 device pixels`);
+                assert.equal(c.parentNode.style.width, '64px');
+            }
+            t.screen.unmount?.();
+        }
+    } finally {
+        if (saved === undefined) delete globalThis.devicePixelRatio;
+        else globalThis.devicePixelRatio = saved;
+    }
+    // 360px wide, 12px gutters: 4 x (64 + 2 x 4 padding + 2 x 2 border) + 3 x 8 gap = 328 <= 336.
+    const css = readFileSync(new URL('../../css/v3.css', import.meta.url), 'utf8');
+    assert.match(css, /\.av-grid \{[^}]*gap: 8px/);
+    assert.match(css, /\.av-option \{[^}]*padding: 4px;[^}]*border: 2px solid/s);
+    assert.ok(4 * (64 + 8 + 4) + 3 * 8 <= 360 - 2 * 12);
+});

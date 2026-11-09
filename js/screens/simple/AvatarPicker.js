@@ -37,22 +37,24 @@ export function needsAvatar(storage = realStorage) {
 }
 
 // The whole-number drawing scale for a character shown about `cssPx` wide at `dpr`: the nearest integer to
-// cssPx x dpr / 32, at least 1.
-export function avatarScale(cssPx, dpr) {
+// cssPx x dpr / 32, at least 1. With `fit` (final review M8) it rounds down instead, so the shown size never exceeds
+// cssPx (the picker's cells have no room to overhang).
+export function avatarScale(cssPx, dpr, { fit = false } = {}) {
     const d = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
     const css = Number.isFinite(cssPx) && cssPx > 0 ? cssPx : AVATAR_SIZE;
-    return Math.max(1, Math.round((css * d) / AVATAR_SIZE));
+    const exact = (css * d) / AVATAR_SIZE;
+    return Math.max(1, fit ? Math.floor(exact + 1e-9) : Math.round(exact));
 }
 
 // The character in a fixed slot of the nominal `cssPx` size (so layouts never jump), with the canvas centred in it.
 // The canvas is 32 x scale device pixels and shown at exactly (32 x scale / dpr) CSS pixels, so every source pixel
 // is the same whole number of device pixels (1:1, crisp). The shown size can differ from cssPx by up to about a
-// third. The scale is measured when the screen is built (each render). Returns the slot; the canvas inside carries
+// third (with `fit`, it is never larger than cssPx). The scale is measured when the screen is built (each render). Returns the slot; the canvas inside carries
 // `className` and the data-avatar / data-mood attributes. Drawing is cosmetic: without a 2D context (tests) the
 // canvas is simply left blank.
-export function avatarCanvas(id, mood, cssPx, className = 'av-face', label = null) {
+export function avatarCanvas(id, mood, cssPx, className = 'av-face', label = null, { fit = false } = {}) {
     const dpr = Math.min(3, Math.max(1, Number(globalThis.devicePixelRatio) || 1));
-    const px = AVATAR_SIZE * avatarScale(cssPx, dpr);
+    const px = AVATAR_SIZE * avatarScale(cssPx, dpr, { fit });
     const canvas = h('canvas', {
         class: className, width: String(px), height: String(px), 'data-avatar': id, 'data-mood': mood,
         role: label ? 'img' : null, 'aria-label': label, 'aria-hidden': label ? null : 'true'
@@ -109,7 +111,7 @@ export class AvatarPicker {
         this.radios = AVATAR_IDS.map((id, i) => h('button', {
             class: 'av-option', type: 'button', role: 'radio', 'aria-label': `Character ${i + 1}`,
             'data-avatar': id, on: { click: this.tapGuard.wrap(() => this.choose(i)) }
-        }, avatarCanvas(id, 'happy', PICK_PX, 'av-pic')));
+        }, avatarCanvas(id, 'happy', PICK_PX, 'av-pic', null, { fit: true })));
         this.group = h('div', { class: 'av-grid', role: 'radiogroup', 'aria-label': 'Characters',
             on: { keydown: e => this._key(e) } }, this.radios);
         this.el = h('div', { class: 'screen active v3 avatar-screen' },
