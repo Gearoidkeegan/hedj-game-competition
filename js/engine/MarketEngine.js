@@ -51,18 +51,88 @@ export function fillShortGaps(series, maxGap = 2) {
     return out;
 }
 
+/**
+ * v3.2 chart-only weekly series: { start: 'YYYY-MM-DD', anchor?: 'avg'|'end', v: [number|null, ...] }, one value
+ * per week (start + 7 days per step). Decodes to { t0 (UTC ms), anchor, v } with every gap or bad value as null,
+ * or null when the entry is unusable. "anchor" says what the monthly value for a month is: its average or its
+ * last close (see tools/fetch-weekly-data.cjs).
+ */
+export function decodeWeekly(entry) {
+    if (!entry || typeof entry !== 'object' || !Array.isArray(entry.v) || !entry.v.length) return null;
+    if (typeof entry.start !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(entry.start)) return null;
+    const t0 = Date.parse(`${entry.start}T00:00:00Z`);
+    if (!Number.isFinite(t0)) return null;
+    const v = entry.v.map(x => (typeof x === 'number' && Number.isFinite(x) && x > 0 ? x : null));
+    return { t0, anchor: entry.anchor === 'end' ? 'end' : 'avg', v };
+}
+
+const JET_FACTOR = 1.8 * 7.4;   // Jet CIF NWE proxy from Brent ($/bbl -> $/tonne with crack spread)
+
 function fillAll(group) {
     const out = {};
     for (const [name, series] of Object.entries(group)) out[name] = fillShortGaps(series);
     return out;
 }
 
-class MarketEngineController {
+export class MarketEngineController {
     constructor() {
         this.fxData = null;
         this.ratesData = null;
         this.commoditiesData = null;
         this.loaded = false;
+        // v3.2: weekly series for the charts only. Nothing in the engine reads these (getRate, getDataset and the
+        // simulation stay on the monthly data).
+        this.weekly = null;
+        this._weeklyLoading = null;
+    }
+
+    /**
+     * Load the chart-only weekly files. Optional and lazy: call it after the first screen is up. Shares a load
+     * in flight, does nothing once loaded, never rejects. On any failure the charts stay on the monthly data.
+     */
+    loadWeekly(basePath = 'data/market', fetchImpl = globalThis.fetch?.bind(globalThis)) {
+        if (this.weekly) return Promise.resolve();
+        if (this._weeklyLoading) return this._weeklyLoading;
+        const get = async (file) => {
+            const res = await fetchImpl(`${basePath}/${file}`);
+            if (!res?.ok) throw new Error(`${file}: ${res?.status}`);
+            return res.json();
+        };
+        this._weeklyLoading = (async () => {
+            try {
+                if (typeof fetchImpl !== 'function') throw new Error('no fetch');
+                const [fx, commodities] = await Promise.all([get('fx-weekly.json'), get('commodities-weekly.json')]);
+                this.loadWeeklyFromObjects({ fx, commodities });
+            } catch (e) {
+                console.warn('MarketEngine: weekly chart data not available, charts use monthly', e?.message || e);
+            } finally {
+                this._weeklyLoading = null;
+            }
+        })();
+        return this._weeklyLoading;
+    }
+
+    /** Set the weekly series from parsed JSON (Node tests, and loadWeekly). Derives the JETNWE proxy. */
+    loadWeeklyFromObjects({ fx, commodities } = {}) {
+        const out = {};
+        for (const group of [fx, commodities]) {
+            if (!group || typeof group !== 'object') continue;
+            for (const [name, entry] of Object.entries(group)) {
+                if (name === '_meta') continue;
+                const d = decodeWeekly(entry);
+                if (d) out[name] = d;
+            }
+        }
+        if (out.BRENT && !out.JETNWE) {
+            out.JETNWE = { ...out.BRENT, v: out.BRENT.v.map(x => (x === null ? null : x * JET_FACTOR)) };
+        }
+        this.weekly = out;
+    }
+
+    /** The decoded weekly series for a chart, or null (not loaded, or no weekly data for it: use monthly). */
+    getWeekly(underlying) {
+        if (!this.weekly || typeof underlying !== 'string') return null;
+        return Object.prototype.hasOwnProperty.call(this.weekly, underlying) ? this.weekly[underlying] : null;
     }
 
     /**
@@ -100,7 +170,7 @@ class MarketEngineController {
 
         // Derived proxy: Jet CIF NWE ≈ Brent × 1.8 × 7.4 ($/bbl → $/tonne with crack spread)
         if (this.commoditiesData.BRENT && !this.commoditiesData.JETNWE) {
-            const k = 1.8 * 7.4;
+            const k = JET_FACTOR;
             const jet = {};
             for (const [date, px] of Object.entries(this.commoditiesData.BRENT)) {
                 jet[date] = px * k;
