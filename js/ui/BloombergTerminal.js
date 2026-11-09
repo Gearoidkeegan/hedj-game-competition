@@ -521,7 +521,7 @@ export class BloombergTerminal {
     }
 
     formatPrice(price) {
-        if (!price) return '—';
+        if (!price) return '–';
         // Interest rates are decimals (0.0347 = 3.470%)
         if (this.exposureType === 'ir') return `${(price * 100).toFixed(3)}%`;
         if (this.underlying.includes('JPY')) return price.toFixed(2);

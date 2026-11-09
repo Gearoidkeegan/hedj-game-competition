@@ -165,9 +165,9 @@ export function initAdmin(env = {}) {
 
     function refresh() {
         if (!adminKey) return;
-        $('stat-visits').textContent = '—';
-        $('stat-plays').textContent = '—';
-        $('stat-regs').textContent = '—';
+        $('stat-visits').textContent = '–';
+        $('stat-plays').textContent = '–';
+        $('stat-regs').textContent = '–';
         $('players-msg').textContent = 'LOADING...';
         $('players-msg').className = 'msg loading';
         $('players-msg').style.display = 'block';
@@ -218,7 +218,7 @@ function esc(s) {
 }
 
 function formatDate(iso) {
-    if (!iso) return '—';
+    if (!iso) return '–';
     try {
         return new Date(iso).toLocaleString('en-IE', {
             dateStyle: 'short', timeStyle: 'short'

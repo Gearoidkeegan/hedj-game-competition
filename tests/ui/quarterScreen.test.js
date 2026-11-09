@@ -425,7 +425,7 @@ test('v3.1: nothing hedgeable this quarter: the meter shows a dash, never NaN, a
     const { rc, q, el } = setup(SEED.band2550);
     rc.run.exposures = rc.run.exposures.map(e => (e.id === 'usd-revenue' ? { ...e, quarterlyNotional: 0 } : e));
     q('[data-powerup="forecasting"]').click();   // any change repaints
-    assert.equal(q('.rk-value').textContent, '—');
+    assert.equal(q('.rk-value').textContent, '–');
     assert.equal(q('.risk-meter').classList.contains('is-warn'), false);
     assert.equal(q('.rk-note').textContent, 'Nothing you can hedge yet');
     assert.ok(!el.textContent.includes('NaN'));

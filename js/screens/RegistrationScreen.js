@@ -183,7 +183,7 @@ export class RegistrationScreen {
             }
             const msg = err.status === 400
                 ? err.message
-                : 'Could not connect — check your connection and try again.';
+                : 'Could not connect. Check your connection and try again.';
             this.showError(msg);
         }
     }

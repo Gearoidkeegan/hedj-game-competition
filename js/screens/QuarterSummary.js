@@ -46,7 +46,7 @@ export class QuarterSummaryScreen {
         this.el.innerHTML = `
             <div class="quarter-bar">
                 <span class="company-name">${state.industry?.name || 'Company'}</span>
-                <span class="quarter-label">QUARTER SUMMARY — ${formatQuarter(result.yearOffset, result.quarterNum)}</span>
+                <span class="quarter-label">QUARTER SUMMARY: ${formatQuarter(result.yearOffset, result.quarterNum)}</span>
                 <span></span>
             </div>
 
@@ -70,7 +70,7 @@ export class QuarterSummaryScreen {
 
                 <!-- This quarter: realized exposure vs settled hedge cash flows -->
                 <div class="panel" style="max-width:640px;margin:8px auto;">
-                    <div class="panel-title">THIS QUARTER — REALIZED P&L</div>
+                    <div class="panel-title">THIS QUARTER: REALIZED P&L</div>
 
                     <div class="summary-stat">
                         <span class="summary-stat-label">Exposure P&L (realized vs budget)</span>
@@ -94,7 +94,7 @@ export class QuarterSummaryScreen {
 
                 <!-- Full programme: horizon exposure vs total hedge book MTM -->
                 <div class="panel" style="max-width:640px;margin:8px auto;">
-                    <div class="panel-title">HEDGING PROGRAMME — ${horizon}Q HORIZON</div>
+                    <div class="panel-title">HEDGING PROGRAMME: ${horizon}Q HORIZON</div>
 
                     <div class="summary-stat">
                         <span class="summary-stat-label">Forecast exposure change (vs budget)</span>
@@ -290,7 +290,7 @@ export class QuarterSummaryScreen {
         return `
             <div style="margin-top:8px;text-align:center;">
                 <div class="pixel-text" style="font-size:7px;color:var(--text-muted);margin-bottom:2px;">HEDGE EFFECTIVENESS</div>
-                <div class="pixel-text" style="font-size:9px;color:${color};">${offsetPct}% — ${commentary}</div>
+                <div class="pixel-text" style="font-size:9px;color:${color};">${offsetPct}% (${commentary.toLowerCase()})</div>
             </div>
         `;
     }

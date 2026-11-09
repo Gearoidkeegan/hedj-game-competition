@@ -7,8 +7,8 @@
         },
         "1995": {
             "headline": "Barings Bank Collapses",
-            "fact": "Nick Leeson brought down Barings Bank — Britain's oldest merchant bank — with $1.3 billion in unauthorised derivatives losses. He hid the losses in a secret 'error account'. The bank was sold for £1.",
-            "market_note": "USD/JPY fell from 100 to 80 — the strongest yen in history"
+            "fact": "Nick Leeson brought down Barings Bank, Britain's oldest merchant bank, with $1.3 billion in unauthorised derivatives losses. He hid the losses in a secret 'error account'. The bank was sold for £1.",
+            "market_note": "USD/JPY fell from 100 to 80, the strongest yen in history"
         },
         "1996": {
             "headline": "The Copper King Falls",
@@ -33,7 +33,7 @@
         "2000": {
             "headline": "The Dot-Com Bubble Bursts",
             "fact": "The NASDAQ peaked at 5,048 in March before losing 78% over the next two years. Enron was still considered a blue-chip company. Oil hit $37 per barrel.",
-            "market_note": "EUR/USD fell to 0.82 — its all-time low"
+            "market_note": "EUR/USD fell to 0.82, its all-time low"
         },
         "2001": {
             "headline": "Enron Collapses, 9/11 Reshapes the World",
@@ -68,11 +68,11 @@
         "2007": {
             "headline": "The First Cracks Appear",
             "fact": "Bear Stearns' subprime hedge funds collapsed in June. Northern Rock suffered the first UK bank run in 150 years. The credit crisis had begun, though few realised how bad it would get.",
-            "market_note": "GBP/USD hit $2.11 — its highest level in 26 years"
+            "market_note": "GBP/USD hit $2.11, its highest level in 26 years"
         },
         "2008": {
             "headline": "The Global Financial Crisis",
-            "fact": "Lehman Brothers collapsed, triggering the worst financial crisis since the 1930s. Counterparty risk became real — treasurers who had concentrated derivatives positions with failing banks faced chaos. AIG was bailed out for $182 billion.",
+            "fact": "Lehman Brothers collapsed, triggering the worst financial crisis since the 1930s. Counterparty risk became real. Treasurers who had concentrated derivatives positions with failing banks faced chaos. AIG was bailed out for $182 billion.",
             "market_note": "Oil crashed from $147 to $32; GBP fell from $2.00 to $1.35"
         },
         "2009": {
@@ -106,7 +106,7 @@
             "market_note": "USD/RUB went from 33 to 68; Brent crude halved"
         },
         "2015": {
-            "headline": "SNB Shock — The 'Francogeddon'",
+            "headline": "SNB Shock: The 'Francogeddon'",
             "fact": "The Swiss National Bank abandoned its EUR/CHF 1.20 floor without warning. EUR/CHF crashed 30% in minutes. Brokers went bankrupt. Treasurers with CHF exposure learned the hard way about central bank risk.",
             "market_note": "EUR/CHF dropped from 1.20 to 0.85 in seconds"
         },
@@ -118,7 +118,7 @@
         "2017": {
             "headline": "The Year of Low Volatility",
             "fact": "Markets were eerily calm. VIX hit all-time lows. Treasurers could hedge cheaply but many questioned whether the calm was real. Bitcoin surged from $1,000 to $20,000.",
-            "market_note": "VIX averaged just 11 — its lowest annual average ever"
+            "market_note": "VIX averaged just 11, its lowest annual average ever"
         },
         "2018": {
             "headline": "Volmageddon and Trade Wars",
@@ -147,12 +147,12 @@
         },
         "2023": {
             "headline": "Banking Crisis and AI Mania",
-            "fact": "Silicon Valley Bank collapsed in 48 hours — the second-largest US bank failure ever. Credit Suisse was forced into UBS's arms. Meanwhile, AI hype drove tech stocks higher. LIBOR finally died.",
+            "fact": "Silicon Valley Bank collapsed in 48 hours, the second-largest US bank failure ever. Credit Suisse was forced into UBS's arms. Meanwhile, AI hype drove tech stocks higher. LIBOR finally died.",
             "market_note": "2-year Treasury yield swung 100bps in 3 days during SVB crisis"
         },
         "2024": {
             "headline": "Rate Cuts Begin, Geopolitics Intensify",
-            "fact": "Major central banks began cutting rates after two years of hikes. Middle East tensions spiked oil volatility. Treasurers navigated the transition from hiking to easing cycles — timing hedges around pivot points.",
+            "fact": "Major central banks began cutting rates after two years of hikes. Middle East tensions spiked oil volatility. Treasurers had to switch from hiking to easing cycles, timing hedges around the pivot points.",
             "market_note": "ECB, BoE, and Fed all began cutting rates; gold hit new all-time highs above $2,700"
         }
     }
