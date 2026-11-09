@@ -17,6 +17,7 @@
     --v3-cyan: #44ccdd;
     --v3-green: #33cc66;
     --v3-red: #ff5a5a;
+    --v3-amber: #ffaa33;          /* v3.1: RISK COVERED outside the policy (warn, not danger) */
     --v3-gutter: 12px;
     --v3-col: 480px;
 
@@ -690,3 +691,55 @@
 .av-option:hover { background: var(--v3-panel-2); }
 .av-option[aria-checked="true"] { border-color: var(--v3-gold); background: var(--v3-gold-soft); }
 .v3 .av-option:focus-visible { outline: 2px solid var(--v3-cyan); outline-offset: 2px; }
+
+/* ---------- Exposure size and RISK COVERED (v3.1) ---------- */
+/* The size line sits under the card title, clear of the sparkline; a locked card shows it greyed. */
+.exp-size { font-size: 18px; color: var(--v3-text); }
+.exp-size.is-locked { color: var(--v3-muted); opacity: 0.75; }
+/* One compact row under the cash row: label, bar (band shaded), value; the note wraps below. */
+.q-risk { width: 100%; min-width: 0; }
+.risk-meter {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "label bar value" "note note note";
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 2px;
+}
+.rk-row { display: contents; }
+.rk-label { grid-area: label; color: var(--v3-muted); font-size: 16px; letter-spacing: 1px; }
+.rk-value { grid-area: value; font-size: 22px; color: var(--v3-cyan); min-width: 3ch; text-align: right; }
+.rk-bar {
+    grid-area: bar;
+    position: relative;
+    height: 12px;
+    background: #0d0d1e;
+    border: 2px solid var(--v3-line);
+    image-rendering: pixelated;
+}
+.rk-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: repeating-linear-gradient(90deg, var(--v3-cyan) 0 6px, #36a8b8 6px 8px);
+}
+/* The board's band, drawn over the fill so it stays visible. */
+.rk-band {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    z-index: 1;
+    background: var(--v3-gold-soft);
+    border-left: 2px solid var(--v3-gold);
+    border-right: 2px solid var(--v3-gold);
+    box-sizing: border-box;
+}
+.rk-band.is-point { min-width: 2px; border-right: 0; }
+.rk-band[hidden] { display: none; }
+.rk-note { grid-area: note; font-size: 16px; color: var(--v3-muted); }
+.rk-note[hidden] { display: none; }
+.risk-meter.is-warn .rk-value, .rk-note.is-warn { color: var(--v3-amber); }
+.risk-meter.is-warn .rk-fill { background: repeating-linear-gradient(90deg, var(--v3-amber) 0 6px, #d98a22 6px 8px); }
+.r-focus { margin-top: 4px; font-size: 18px; color: var(--v3-amber); }

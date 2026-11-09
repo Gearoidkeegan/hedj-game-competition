@@ -6,7 +6,7 @@ import { marketEngine } from '../../js/engine/MarketEngine.js';
 import * as storage from '../../js/utils/storage.js';
 import { RunController, boardLineKey, expressionFor } from '../../js/screens/simple/RunController.js';
 import {
-    ResultScreen, resultLine, moveText, impactText, unitMovePct
+    ResultScreen, resultLine, moveText, impactText, unitMovePct, WRONG_FOCUS_RESULT
 } from '../../js/screens/simple/ResultScreen.js';
 import { TAP_GUARD_MS } from '../../js/ui/tapGuard.js';
 
@@ -366,4 +366,33 @@ test('a missing market dataset leaves the line without a chart and does not thro
     assert.equal(qa('.r-chart-row').length, 0);
     assert.ok(qa('.r-line').every(l => !l.hidden));
     assert.equal(q('.r-board').hidden, false, 'the board still shows with no charts');
+});
+
+// ── v3.1 wrong focus ──────────────────────────────────────────────────────
+
+test('v3.1: a wrong-focus quarter shows a short note with the board reaction, revealed with it', () => {
+    const { rc, result } = playOne();
+    const lastQuarter = { ...result, summary: { ...result.summary, wrongFocus: true } };
+    const { q } = mountResult(appWith(rc, lastQuarter));
+    const note = q('.r-focus');
+    assert.ok(note, 'the note is there');
+    assert.equal(note.textContent, WRONG_FOCUS_RESULT);
+    assert.ok(WRONG_FOCUS_RESULT.length <= 90);
+    assert.ok(q('.r-board').contains ? q('.r-board').contains(note) : note.parentNode.parentNode === q('.r-board'));
+    assert.equal(q('.r-board').hidden, true, 'hidden until the board is revealed');
+    q('.r-body').click();
+    assert.equal(q('.r-board').hidden, false);
+});
+
+test('v3.1: no note without wrong focus, nor for a summary saved before v3.1', () => {
+    const { rc, result } = playOne();
+    const plain = { ...result, summary: { ...result.summary, wrongFocus: false } };
+    assert.equal(mountResult(appWith(rc, plain)).q('.r-focus'), null);
+    const old = structuredClone(result.summary);
+    delete old.wrongFocus;
+    delete old.riskCover;
+    delete old.exposureValues;
+    const { q, el } = mountResult(appWith(rc, { ...result, summary: old }));
+    assert.equal(q('.r-focus'), null);
+    assert.ok(!el.textContent.includes('undefined') && !el.textContent.includes('NaN'));
 });

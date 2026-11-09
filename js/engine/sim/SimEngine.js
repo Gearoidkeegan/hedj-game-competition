@@ -153,7 +153,7 @@ export function policyCover(run, hedges = {}, notionalMult = {}) {
 }
 
 // In policy (v3.1): the cover inside the band and not the wrong focus; vacuously in when nothing counts.
-function coverInPolicy(mandate, { cover, wrongFocus }) {
+export function coverInPolicy(mandate, { cover, wrongFocus }) {
     if (!mandate || cover === null) return true;
     return cover >= mandate.min - EPS && cover <= mandate.max + EPS && !wrongFocus;
 }

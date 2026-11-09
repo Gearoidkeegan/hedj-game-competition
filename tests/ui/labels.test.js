@@ -6,7 +6,7 @@ import { CRISES } from '../../js/engine/sim/crises.js';
 import { CHAIRMAN_SPRITES } from '../../js/ui/pixel/sprites.js';
 import {
     UNLOCK_HINTS, unlockLabel, unlockRuleText, nextUnlockHint, badgeLabel,
-    exposureTitle, exposureCopy, exposureRisk, lockedReason
+    exposureTitle, exposureCopy, exposureRisk, lockedReason, exposureSizeText
 } from '../../js/ui/labels.js';
 
 const content = { industries: loadIndustries(), powerups: loadJson('data/powerups.json') };
@@ -95,4 +95,19 @@ test('locked exposures explain themselves in one short line', () => {
     assert.equal(lockedReason({ type: 'commodity' }), "Your bank doesn't offer commodity hedging");
     assert.equal(lockedReason({ type: 'ir' }), "Your bank doesn't offer interest-rate hedging");
     assert.equal(lockedReason({ type: 'fx' }), '');
+});
+
+test('v3.1 size line: the size this quarter in the company currency; interest for floating debt', () => {
+    assert.equal(exposureSizeText({ type: 'fx' }, 750e6, 'EUR'), '€750.0m this quarter');
+    assert.equal(exposureSizeText({ type: 'commodity' }, 120e6, 'USD'), '$120.0m this quarter');
+    assert.equal(exposureSizeText({ type: 'fx' }, 1.5e9, 'GBP'), '£1.50bn this quarter');
+    assert.equal(exposureSizeText({ type: 'ir' }, 17.5e6, 'EUR'), '€17.5m of interest this quarter');
+    assert.equal(exposureSizeText({ type: 'fx' }, 0, 'EUR'), '€0 this quarter');
+    for (const bad of [null, undefined, NaN, Infinity]) assert.equal(exposureSizeText({ type: 'fx' }, bad, 'EUR'), '', String(bad));
+    for (const ind of content.industries) {
+        for (const e of ind.exposures) {
+            const t = exposureSizeText(e, e.quarterlyNotional * 5, ind.baseCurrency);
+            assert.ok(t.length <= 90 && !/\b(19|20)\d\d\b/.test(t), t);
+        }
+    }
 });
