@@ -25,7 +25,7 @@ import { chartSeries, chartInverted, mountPriceChart } from '../../ui/PriceChart
 import { avatarMood } from '../../engine/sim/avatarMood.js';
 import { avatarCanvas, moodLabel, storedAvatar } from './AvatarPicker.js';
 
-export const OFF_POLICY_PROMPT = "Outside the board's policy — run anyway?";
+export const OFF_POLICY_PROMPT = "Outside the board's policy. Run anyway?";
 const EVENT_FIRST = 'Choose how to respond to the event first';
 const NUDGE_SALT = 20;   // RunController uses cosmetic salts 0..9
 const SPRITE_SCALE = 2;  // 32px sprites drawn at 64px

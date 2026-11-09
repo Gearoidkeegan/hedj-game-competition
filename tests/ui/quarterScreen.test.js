@@ -303,7 +303,7 @@ test('R51: off-policy decisions need a confirm tap before RUN; ADJUST cancels', 
     const confirm = q('.q-confirm');
     assert.equal(confirm.hidden, false);
     assert.equal(confirm.querySelector('p').textContent, OFF_POLICY_PROMPT);
-    assert.equal(OFF_POLICY_PROMPT, "Outside the board's policy — run anyway?");
+    assert.equal(OFF_POLICY_PROMPT, "Outside the board's policy. Run anyway?");
     clock.t += TAP_GUARD_MS;   // opening the prompt re-arms the tap guard
     q('.q-adjust').click();
     assert.equal(confirm.hidden, true);

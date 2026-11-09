@@ -51,21 +51,21 @@ const OUTFITS = {
 
 // The chairmen: one signature prop and a colour scheme each.
 export const CHAIRMAN_SPRITES = Object.freeze({
-    jameson: Object.freeze({ label: 'The Editor', prop: 'cigar', skin: '#f0c49a', hair: '#3a3a3a', style: 'flattop',
+    jameson: Object.freeze({ label: 'J.J. Jameson', prop: 'cigar', skin: '#f0c49a', hair: '#3a3a3a', style: 'flattop',
         outfit: { kind: 'braces', main: '#f4f4ec', shirt: '#f4f4ec', accent: '#6b4a33', braces: PAL.red }, moustache: '#3a3a3a' }),
-    musk: Object.freeze({ label: 'The Rocketeer', prop: 'rocket', skin: '#f6d5b8', hair: '#3a2a22', style: 'swept',
+    musk: Object.freeze({ label: 'ElonUsk', prop: 'rocket', skin: '#f6d5b8', hair: '#3a2a22', style: 'swept',
         outfit: { kind: 'tee', main: '#2c2c34' } }),
-    oleary: Object.freeze({ label: 'The Budget Flyer', prop: 'piggy', skin: '#f0c49a', hair: '#8a8a8a', style: 'crop',
+    oleary: Object.freeze({ label: "Michael O'Scary", prop: 'piggy', skin: '#f0c49a', hair: '#8a8a8a', style: 'crop',
         outfit: { kind: 'suit', main: '#1f4fa0', shirt: PAL.white, accent: PAL.yellow } }),
-    dimon: Object.freeze({ label: 'The Banker', prop: 'magnifier', skin: '#f0c49a', hair: '#d2d6dc', style: 'slick',
+    dimon: Object.freeze({ label: 'Jamie Diamond', prop: 'magnifier', skin: '#f0c49a', hair: '#d2d6dc', style: 'slick',
         outfit: { kind: 'suit', main: '#283550', shirt: PAL.white, accent: PAL.blue, pinstripe: '#4c5c7c' } }),
-    buffett: Object.freeze({ label: 'The Sage', prop: 'icecream', skin: '#f6d5b8', hair: '#eeeeee', style: 'bald',
+    buffett: Object.freeze({ label: 'Warren Biscuit', prop: 'icecream', skin: '#f6d5b8', hair: '#eeeeee', style: 'bald',
         outfit: { kind: 'suit', main: '#6f7c8c', shirt: PAL.white, accent: PAL.redDark }, glasses: 'thick' }),
-    jobs: Object.freeze({ label: 'The Visionary', prop: 'apple', skin: '#f0c49a', hair: '#7a7a7a', style: 'shaved',
+    jobs: Object.freeze({ label: 'Steve Jobsworth', prop: 'apple', skin: '#f0c49a', hair: '#7a7a7a', style: 'shaved',
         outfit: { kind: 'turtleneck', main: '#26262c' }, glasses: 'round', stubble: '#7a7a7a' }),
-    dorsey: Object.freeze({ label: 'The Monk', prop: 'bitcoin', skin: '#f6d5b8', hair: '#4a3a2c', style: 'beanie',
+    dorsey: Object.freeze({ label: 'Jack Doorstep', prop: 'bitcoin', skin: '#f6d5b8', hair: '#4a3a2c', style: 'beanie',
         outfit: { kind: 'tee', main: '#2c2c34' }, beard: '#6a5a4a', beanie: '#5d6e84' }),
-    ackman: Object.freeze({ label: 'The Essayist', prop: 'scroll', skin: '#f0c49a', hair: '#b8bcc4', style: 'parting',
+    ackman: Object.freeze({ label: 'Bill Hackman', prop: 'scroll', skin: '#f0c49a', hair: '#b8bcc4', style: 'parting',
         outfit: { kind: 'suit', main: '#2b3a5c', shirt: '#cfe0f5', accent: '#5a7ab0' } }),
 });
 
