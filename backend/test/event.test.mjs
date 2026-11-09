@@ -157,7 +157,8 @@ test('an empty EventId: everything closed, an empty leaderboard, no row written 
     assert.equal(lb.statusCode, 200);
     assert.deepEqual(JSON.parse(lb.body), { entries: [] });
     assert.equal(ddb.tables.S.size, 0);
-    assert.equal([...ddb.tables.B.keys()].filter(k => !k.startsWith('#') && !k.startsWith('test#')).length, 0);
+    // Only the two rows seeded above: nothing was written under an empty event ('#simple#all') or 'test'.
+    assert.deepEqual([...ddb.tables.B.keys()].sort(), ['#simple#all\u0000x@y.z', 'test#simple#all\u0000x@y.z']);
 });
 
 test('after the end, the leaderboard still shows the last event board', async () => {
