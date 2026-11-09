@@ -16,6 +16,9 @@
 //             midpoint (ties go down), within the cap
 //   full      buys facilities in Q1, hedgeAccess in Q2 when relevant; 100% everywhere
 //   random    one random dial value per quarter, applied to every exposure; buys nothing; never proposes
+//   smallFirst diagnostic wrong-focus player (v3.1): buys and proposes like policy, but hedges the smallest-weight
+//             hedgeable exposure at 100% and leaves the largest at 0; the rest sit at policy's dial. Shows that
+//             wrong-focus play scores clearly worse than following the mandate
 // `severe` is the share of runs fired at once by a severe losing breach (R35); it is part of `fired`.
 // Event choices: a seeded random pick among the event's choices (its own RNG stream per run), so
 // both choices of every card get played.
@@ -25,14 +28,16 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { marketEngine } from '../js/engine/MarketEngine.js';
 import { SeededRandom } from '../js/utils/random.js';
-import { createRun, simulateQuarter, isRunOver } from '../js/engine/sim/SimEngine.js';
-import { canBuyPowerUp, hedgeCap, POWER_UP_IDS } from '../js/engine/sim/powerUps.js';
+import {
+    activeExposures, createRun, simulateQuarter, isRunOver, policyCover, quarterStartRates
+} from '../js/engine/sim/SimEngine.js';
+import { applyPowerUp, canBuyPowerUp, hedgeCap, isHedgeable, POWER_UP_IDS } from '../js/engine/sim/powerUps.js';
 import { finalScore } from '../js/engine/sim/score.js';
 import { loadMarketData, loadIndustries } from '../tests/helpers/loadData.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIAL = [0, 0.25, 0.5, 0.75, 1];
-export const STRATEGIES = ['unhedged', 'flat50', 'policy', 'full', 'random'];
+export const STRATEGIES = ['unhedged', 'flat50', 'policy', 'full', 'random', 'smallFirst'];
 export const BOARD_TYPES = ['band', 'noHedge', 'none'];
 const PROPOSAL = { min: 0.5, max: 0.75 };
 
@@ -66,24 +71,48 @@ const hasIrOrCommodity = run => run.exposures.some(e => e.type === 'ir' || e.typ
 const owns = (run, id) => run.powerUps.owned.includes(id);
 const canBuy = (run, id) => canBuyPowerUp(run, id, POWER_UP_IDS);
 
-// This quarter's decisions for a strategy: { h, buyPowerUp, proposePolicy }.
-function plan(strategy, run, rng) {
+// smallFirst's dials (v3.1 diagnostic): `mid` everywhere, except the smallest-weight exposure in the wrong-focus set
+// (hedgeable, non-zero, not floating debt, weighed with the engine's own policyCover at this quarter's start rates)
+// at 100% and the
+// largest at 0. With fewer than two such exposures, every dial is at `mid`. `run` already has this quarter's power-up.
+export function smallFirstHedges(run, mid, market) {
+    const { values } = policyCover({ ...run, rates: quarterStartRates(run, market) }, {});
+    const set = activeExposures(run)
+        .filter(e => e.type !== 'ir' && e.quarterlyNotional !== 0 && isHedgeable(run, e) && values[e.id] > 0)
+        .sort((a, b) => values[a.id] - values[b.id]);
+    const hedges = Object.fromEntries(run.exposures.map(e => [e.id, mid]));
+    if (set.length >= 2) {
+        hedges[set[0].id] = 1;
+        hedges[set[set.length - 1].id] = 0;
+    }
+    return hedges;
+}
+
+function policyPlan(run) {
+    const proposePolicy = run.mandate === null ? PROPOSAL : null;
+    const band = run.mandate ?? PROPOSAL;
+    const wants = [];
+    if (band.min > hedgeCap(run) && !owns(run, 'facilities')) wants.push('facilities');
+    if (band.max > 0 && hasIrOrCommodity(run) && !owns(run, 'hedgeAccess')) wants.push('hedgeAccess');
+    if (!owns(run, 'forecasting')) wants.push('forecasting');
+    const buyPowerUp = wants.find(id => canBuy(run, id)) ?? null;
+    const cap = buyPowerUp === 'facilities' ? 1 : hedgeCap(run);
+    return { h: Math.min(snap((band.min + band.max) / 2), cap), buyPowerUp, proposePolicy };
+}
+
+// This quarter's decisions for a strategy: { h, buyPowerUp, proposePolicy, hedges? } (hedges overrides the uniform h).
+function plan(strategy, run, rng, market) {
     switch (strategy) {
         case 'unhedged': return { h: 0, buyPowerUp: null, proposePolicy: null };
         case 'flat50': {
             const buyPowerUp = run.quarter === 0 && canBuy(run, 'forecasting') ? 'forecasting' : null;
             return { h: 0.5, buyPowerUp, proposePolicy: null };
         }
-        case 'policy': {
-            const proposePolicy = run.mandate === null ? PROPOSAL : null;
-            const band = run.mandate ?? PROPOSAL;
-            const wants = [];
-            if (band.min > hedgeCap(run) && !owns(run, 'facilities')) wants.push('facilities');
-            if (band.max > 0 && hasIrOrCommodity(run) && !owns(run, 'hedgeAccess')) wants.push('hedgeAccess');
-            if (!owns(run, 'forecasting')) wants.push('forecasting');
-            const buyPowerUp = wants.find(id => canBuy(run, id)) ?? null;
-            const cap = buyPowerUp === 'facilities' ? 1 : hedgeCap(run);
-            return { h: Math.min(snap((band.min + band.max) / 2), cap), buyPowerUp, proposePolicy };
+        case 'policy': return policyPlan(run);
+        case 'smallFirst': {
+            const p = policyPlan(run);
+            const preview = p.buyPowerUp ? applyPowerUp(run, p.buyPowerUp) : run;
+            return { ...p, hedges: smallFirstHedges(preview, p.h, market) };
         }
         case 'full': {
             let buyPowerUp = null;
@@ -104,8 +133,8 @@ export function playRun(strategy, industry, seed) {
     // Strategy and event picks use their own stream so they never disturb the engine's.
     const rng = new SeededRandom((seed ^ 0x5bd1e995) >>> 0);
     while (!isRunOver(run)) {
-        const { h, buyPowerUp, proposePolicy } = plan(strategy, run, rng);
-        const hedges = Object.fromEntries(run.exposures.map(e => [e.id, h]));
+        const { h, buyPowerUp, proposePolicy, hedges: planned } = plan(strategy, run, rng, market);
+        const hedges = planned ?? Object.fromEntries(run.exposures.map(e => [e.id, h]));
         let eventChoice = null;
         if (run.pendingEvent) {
             const event = content.events.find(e => e.id === run.pendingEvent);
@@ -241,7 +270,11 @@ export function criteria(res) {
         c('none board: firedRate(unhedged) >= 0.5 x its band-board firedRate', uNoneFired >= uBandHalf,
             `${uNoneFired.toFixed(3)} vs ${uBandHalf.toFixed(3)}`, above(uNoneFired, uBandHalf)),
         c('none board: mean(unhedged) < mean(policy)', noneU < noneP, `${noneU.toFixed(0)} vs ${noneP.toFixed(0)}`, below(noneU, noneP)),
-        c('max quarters === 8', maxQ === 8, String(maxQ), maxQ === 8 ? Infinity : -1)
+        c('max quarters === 8', maxQ === 8, String(maxQ), maxQ === 8 ? Infinity : -1),
+        // v3.1 fix round 1: hedging the small thing and leaving the big one open scores clearly worse.
+        c('mean(smallFirst) < mean(policy)', mean(res.smallFirst.scores) < mean(P.scores),
+            `${mean(res.smallFirst.scores).toFixed(0)} vs ${mean(P.scores).toFixed(0)}`,
+            below(mean(res.smallFirst.scores), mean(P.scores)))
     ];
 }
 
@@ -251,7 +284,7 @@ function pad(v, w) {
 
 export function formatTable(res) {
     const head = ['strategy', 'mean', 'p10', 'p25', 'median', 'p75', 'p90', 'max', 'bankrupt', 'fired', 'severe', 'meanQ'];
-    const widths = [9, 6, 6, 6, 6, 6, 6, 6, 8, 6, 6, 5];
+    const widths = [10, 6, 6, 6, 6, 6, 6, 6, 8, 6, 6, 5];
     const lines = [head.map((h, i) => pad(h, widths[i])).join(' ')];
     for (const s of STRATEGIES) {
         const r = res[s];
@@ -264,13 +297,13 @@ export function formatTable(res) {
 
 // Fired rate, bankrupt rate and mean score per strategy and starting board type.
 export function formatBoards(res) {
-    const lines = [['strategy', ...BOARD_TYPES.flatMap(b => [`${b}:n`, 'fired', 'bust', 'mean'])].map((h, i) => pad(h, i ? 9 : 9)).join(' ')];
+    const lines = [['strategy', ...BOARD_TYPES.flatMap(b => [`${b}:n`, 'fired', 'bust', 'mean'])].map((h, i) => pad(h, i ? 9 : 10)).join(' ')];
     for (const s of STRATEGIES) {
         const cells = BOARD_TYPES.flatMap(b => {
             const x = res[s].byBoard[b];
             return [x.n, (x.fired / x.n).toFixed(3), (x.bankrupt / x.n).toFixed(3), mean(x.scores).toFixed(0)];
         });
-        lines.push([s, ...cells].map(v => pad(v, 9)).join(' '));
+        lines.push([s, ...cells].map((v, i) => pad(v, i ? 9 : 10)).join(' '));
     }
     return lines.join('\n');
 }
@@ -279,11 +312,11 @@ export function formatBoards(res) {
 export function formatTitles(res) {
     const { titles } = loadWorld();
     const names = titles.map(t => t.title);
-    const lines = [['min', 'title', ...STRATEGIES, 'all'].map((h, i) => (i < 2 ? h.padEnd(i ? 24 : 5) : pad(h, 8))).join(' ')];
+    const lines = [['min', 'title', ...STRATEGIES, 'all'].map((h, i) => (i < 2 ? h.padEnd(i ? 24 : 5) : pad(h, 10))).join(' ')];
     const all = STRATEGIES.flatMap(s => res[s].titles);
     titles.forEach((t, k) => {
         const share = list => (list.filter(x => x === names[k]).length / list.length * 100).toFixed(1) + '%';
-        lines.push([String(t.min).padEnd(5), t.title.padEnd(24), ...STRATEGIES.map(s => pad(share(res[s].titles), 8)), pad(share(all), 8)].join(' '));
+        lines.push([String(t.min).padEnd(5), t.title.padEnd(24), ...STRATEGIES.map(s => pad(share(res[s].titles), 10)), pad(share(all), 10)].join(' '));
     });
     return lines.join('\n');
 }

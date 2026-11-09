@@ -28,10 +28,13 @@ import { isFinalRejection, rejectionText } from '../utils/scoreRejection.js';
 import * as realStorage from '../utils/storage.js';
 import { GUEST_PLAYER } from '../utils/storage.js';
 import { practiceLine } from '../utils/eventStatus.js';
+import { avatarMood } from '../engine/sim/avatarMood.js';
+import { avatarCanvas, moodLabel, storedAvatar } from './simple/AvatarPicker.js';
 
 export const COUNT_MS = 1500;           // score count-up
 const ENDING_SALT = 30;                 // cosmetic RNG salt for the ending quip (RunController uses 0..9, B2 20..28)
 const SHARE_URL = 'https://competition.hedj.eu';
+const AVATAR_PX = 64;                   // the player's character beside the headline (Simple, v3.1)
 
 const fmt = n => Math.round(n).toLocaleString('en-GB');
 const sameEmail = (a, b) => !!a && !!b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
@@ -152,7 +155,8 @@ export class GameOverScreen {
             this.yearHeadlineEl, this.yearFactEl, this.yearNoteEl);
 
         const body = h('div', { class: 'v3-body go-body' },
-            h('section', { class: `go-ending is-${v.status}` },
+            h('section', { class: `go-ending is-${v.status}${v.avatar ? ' has-avatar' : ''}` },
+                v.avatar ? avatarCanvas(v.avatar, v.avatarMood, AVATAR_PX, 'av-face go-avatar', moodLabel(v.avatarMood)) : null,
                 h('h1', { class: 'go-headline', text: ending.headline }),
                 h('p', { class: 'go-sub', text: ending.sub }),
                 quip ? h('p', { class: 'go-quip', text: quip }) : null),
@@ -246,7 +250,9 @@ export class GameOverScreen {
             total: o.score, title: o.title, industryId: run.industryId, industryName: industry?.name || '',
             crisisId: run.crisisId || null, startYear: run.startYear,
             isPersonalBest: !!o.isPersonalBest, newlyUnlocked: o.newlyUnlocked || [], ranked: o.ranked !== false,
-            practice: !!o.practice, outcome: { ...o, pending: !!pending }, pending
+            practice: !!o.practice, outcome: { ...o, pending: !!pending }, pending,
+            // v3.1: the player's character with the face from the final status (none if never chosen)
+            avatar: storedAvatar(this.storage), avatarMood: avatarMood(run)
         };
     }
 

@@ -6,7 +6,7 @@ import { marketEngine } from '../../js/engine/MarketEngine.js';
 import * as storage from '../../js/utils/storage.js';
 import { RunController, boardLineKey, expressionFor } from '../../js/screens/simple/RunController.js';
 import {
-    ResultScreen, resultLine, moveText, impactText, unitMovePct
+    ResultScreen, resultLine, moveText, impactText, unitMovePct, WRONG_FOCUS_RESULT
 } from '../../js/screens/simple/ResultScreen.js';
 import { TAP_GUARD_MS } from '../../js/ui/tapGuard.js';
 
@@ -208,6 +208,7 @@ test('the result reveals itself over time; a tap skips the reveal, NEXT goes to 
     assert.ok(qa('.r-line').every(l => !l.hidden), 'a tap reveals every line');
     assert.equal(q('.r-board').hidden, false);
     assert.deepEqual(app.shown, [], 'the first tap only skips the reveal');
+    timers.advance(TAP_GUARD_MS);   // the reveal re-arms the tap guard (final review I2)
     q('.r-next').click();
     assert.deepEqual(app.shown, ['quarter']);
     q('.r-next').click();
@@ -273,4 +274,200 @@ test('no quarter to show: a BACK TO TITLE button', () => {
     const { q } = mountResult(app);
     q('.q-back').click();
     assert.deepEqual(app.shown, ['title']);
+});
+
+// ── Market charts ─────────────────────────────────────────────────────────
+
+// A manual requestAnimationFrame clock, to watch the charts play.
+function fakeRaf() {
+    let t = 0, id = 0, q = [];
+    return {
+        requestAnimationFrame: fn => { q.push([++id, fn]); return id; },
+        cancelAnimationFrame: i => { q = q.filter(([k]) => k !== i); },
+        tick(ms) { t += ms; const run = q; q = []; for (const [, fn] of run) fn(t); },
+        get pending() { return q.length; }
+    };
+}
+
+function mountAnimated(app) {
+    const timers = fakeTimers();
+    const raf = fakeRaf();
+    const screen = new ResultScreen(app, { setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout,
+        now: () => timers.time, requestAnimationFrame: raf.requestAnimationFrame, cancelAnimationFrame: raf.cancelAnimationFrame });
+    const el = screen.render();
+    dom.document.body.appendChild(el);
+    screen.mount();
+    timers.advance(TAP_GUARD_MS);
+    return { screen, el, timers, raf, q: s => el.querySelector(s), qa: s => el.querySelectorAll(s) };
+}
+
+test('each exposure line gets a chart row with a Hedged caption when hedged, and nothing else but canvases', () => {
+    const { rc, result } = playOne();
+    const lines = result.summary.lines.map((l, i) => ({ ...l, hedgeRatio: i === 0 ? 0.75 : 0 }));
+    const { qa, timers } = mountResult(appWith(rc, { ...result, summary: { ...result.summary, lines } }));
+    const rows = qa('.r-chart-row');
+    assert.ok(rows.length > 0, 'charts present for real market data');
+    assert.ok(rows.every(r => r.hidden), 'hidden until their line reveals');
+    timers.advance(4000);
+    assert.ok(rows.every(r => !r.hidden));
+    assert.equal(qa('.r-chart canvas').length, rows.length, 'one canvas per row');
+    assert.deepEqual(qa('.r-chart-caption').map(c => c.textContent), ['Hedged 75%']);
+    // The only text in a chart row is the caption: no date, year or price can sit beside the canvas.
+    assert.deepEqual(rows.map(r => r.textContent).filter(Boolean), ['Hedged 75%']);
+});
+
+test('the charts play their full run: the board waits for the last chart, a tap completes everything', () => {
+    const { rc, result } = playOne();
+    const { q, qa, timers, raf, screen } = mountAnimated(appWith(rc, result));
+    const n = qa('.r-chart-row').length;
+    assert.ok(n >= 2);
+    const base = raf.pending;   // the scene and the cash meter
+    timers.advance(2400);   // every line is up and the old 0.5 s board delay has passed
+    assert.ok(qa('.r-line').every(l => !l.hidden));
+    assert.equal(q('.r-board').hidden, true, 'the board does not cut the charts short');
+    assert.equal(screen.charts.length, n);
+    assert.equal(raf.pending, base + 1, 'one extra frame loop for all the charts, not one each');
+    raf.tick(16); raf.tick(900);
+    assert.equal(q('.r-board').hidden, true, 'still playing');
+    for (let i = 0; i < 10; i++) raf.tick(400);
+    assert.equal(q('.r-board').hidden, false, 'board shows after the last chart finishes');
+    assert.ok(raf.pending <= base, 'chart loop stopped');
+});
+
+test('a tap during the charts finishes them and shows the board, without advancing', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    const { q, timers, raf, screen } = mountAnimated(app);
+    timers.advance(1200);
+    const running = raf.pending;
+    raf.tick(16); raf.tick(300);
+    q('.r-body').click();
+    assert.equal(q('.r-board').hidden, false);
+    assert.ok(screen.rows.every(r => !r.chart || r.chart.done), 'every chart finished');
+    assert.equal(raf.pending, running - 1, 'the chart loop stopped');
+    timers.advance(TAP_GUARD_MS);   // the reveal re-arms the tap guard (final review I2)
+    q('.r-body').click();
+    assert.deepEqual(app.shown, ['quarter'], 'the next tap moves on');
+});
+
+test('leaving the screen cancels the chart loop', () => {
+    const { rc, result } = playOne();
+    const { timers, raf, screen } = mountAnimated(appWith(rc, result));
+    timers.advance(1200);
+    assert.ok(raf.pending > 0);
+    screen.unmount();
+    assert.equal(raf.pending, 0);
+});
+
+test('a missing market dataset leaves the line without a chart and does not throw', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    app.runController = { market: { getDataset: () => null } };
+    const { qa, timers, q } = mountResult(app);
+    timers.advance(4000);
+    assert.equal(qa('.r-chart-row').length, 0);
+    assert.ok(qa('.r-line').every(l => !l.hidden));
+    assert.equal(q('.r-board').hidden, false, 'the board still shows with no charts');
+});
+
+// ── v3.1 wrong focus ──────────────────────────────────────────────────────
+
+test('v3.1: a wrong-focus quarter shows a short note with the board reaction, revealed with it', () => {
+    const { rc, result } = playOne();
+    const lastQuarter = { ...result, summary: { ...result.summary, wrongFocus: true } };
+    const { q } = mountResult(appWith(rc, lastQuarter));
+    const note = q('.r-focus');
+    assert.ok(note, 'the note is there');
+    assert.equal(note.textContent, WRONG_FOCUS_RESULT);
+    assert.ok(WRONG_FOCUS_RESULT.length <= 90);
+    assert.ok(q('.r-board').contains ? q('.r-board').contains(note) : note.parentNode.parentNode === q('.r-board'));
+    assert.equal(q('.r-board').hidden, true, 'hidden until the board is revealed');
+    q('.r-body').click();
+    assert.equal(q('.r-board').hidden, false);
+});
+
+test('v3.1: no note without wrong focus, nor for a summary saved before v3.1', () => {
+    const { rc, result } = playOne();
+    const plain = { ...result, summary: { ...result.summary, wrongFocus: false } };
+    assert.equal(mountResult(appWith(rc, plain)).q('.r-focus'), null);
+    const old = structuredClone(result.summary);
+    delete old.wrongFocus;
+    delete old.riskCover;
+    delete old.exposureValues;
+    const { q, el } = mountResult(appWith(rc, { ...result, summary: old }));
+    assert.equal(q('.r-focus'), null);
+    assert.ok(!el.textContent.includes('undefined') && !el.textContent.includes('NaN'));
+});
+
+// ── Final review I2 / I3 ───────────────────────────────────────────────────
+
+test('final I2: a fast double tap reveals but cannot also leave the quarter (the guard re-arms on reveal)', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    const { q, timers } = mountResult(app);
+    q('.r-body').click();
+    assert.equal(q('.r-board').hidden, false, 'tap 1 reveals');
+    q('.r-body').click();
+    q('.r-next').click();
+    assert.deepEqual(app.shown, [], 'tap 2 (body or NEXT) inside the guard window is dropped');
+    timers.advance(TAP_GUARD_MS);
+    q('.r-body').click();
+    assert.deepEqual(app.shown, ['quarter']);
+});
+
+test('final I2: a tap landing just as the board appears on its own does not advance', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    const { q, timers } = mountResult(app);
+    for (let i = 0; i < 400 && q('.r-board').hidden; i++) timers.advance(25);
+    assert.equal(q('.r-board').hidden, false, 'the board appeared naturally');
+    timers.advance(50);
+    q('.r-body').click();
+    assert.deepEqual(app.shown, [], 'a skip tap that lands as the board appears is dropped');
+    timers.advance(TAP_GUARD_MS);
+    q('.r-body').click();
+    assert.deepEqual(app.shown, ['quarter']);
+});
+
+test('final I3: showing the board scrolls it into view (nearest), naturally or on a tap; no throw without the API', () => {
+    const { rc, result } = playOne();
+    const calls = [];
+    const tapped = mountResult(appWith(rc, result));
+    tapped.q('.r-board').scrollIntoView = opts => calls.push(opts);
+    tapped.q('.r-body').click();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].block, 'nearest');
+    const natural = mountResult(appWith(rc, result));
+    const calls2 = [];
+    natural.q('.r-board').scrollIntoView = opts => calls2.push(opts);
+    for (let i = 0; i < 400 && natural.q('.r-board').hidden; i++) natural.timers.advance(25);
+    assert.equal(natural.q('.r-board').hidden, false);
+    assert.equal(calls2.length, 1);
+    // fakeDom elements have no scrollIntoView: the reveal must not throw.
+    const plain = mountResult(appWith(rc, result));
+    assert.doesNotThrow(() => plain.q('.r-body').click());
+    assert.equal(plain.q('.r-board').hidden, false);
+});
+
+test('final I3: with more than 3 exposure lines the charts are compact', () => {
+    const { rc, result } = playOne();
+    const few = mountResult(appWith(rc, result));
+    assert.equal(few.q('.r-lines').classList.contains('is-compact'), false);
+    const line = id => ({ exposureId: id, movePct: 1, exposureImpact: -1e6, hedgeImpact: 0, realisedNotional: 1, forecastNotional: 1, hedgeRatio: 0 });
+    const lines = result.run.exposures.map(e => line(e.id));
+    assert.ok(lines.length > 3);
+    const many = mountResult(appWith(rc, { ...result, summary: { ...result.summary, lines } }));
+    assert.equal(many.q('.r-lines').classList.contains('is-compact'), true);
+    many.q('.r-body').click();   // reveal: every chart mounts
+    const heights = many.qa('.r-chart canvas').map(c => c.style.height);
+    assert.ok(heights.length > 3);
+    assert.ok(heights.every(hh => hh === '56px'), heights.join(','));
+    few.q('.r-body').click();
+    assert.ok(few.qa('.r-chart canvas').every(c => c.style.height === '72px'));
+});
+
+test('final M1: the wrong-focus note does not claim the big exposure was unhedged', () => {
+    assert.doesNotMatch(WRONG_FOCUS_RESULT, /left the big one open|unhedged/i);
+    assert.match(WRONG_FOCUS_RESULT, /big/i);
+    assert.ok(WRONG_FOCUS_RESULT.length <= 90);
 });

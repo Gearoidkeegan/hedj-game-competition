@@ -7,7 +7,8 @@ import { POLICY_OPTIONS } from '../../js/engine/sim/SimEngine.js';
 import * as storage from '../../js/utils/storage.js';
 import { RunController } from '../../js/screens/simple/RunController.js';
 import { TAP_GUARD_MS } from '../../js/ui/tapGuard.js';
-import { QuarterScreen, OFF_POLICY_PROMPT, offPolicyExposures } from '../../js/screens/simple/QuarterScreen.js';
+import { QuarterScreen, OFF_POLICY_PROMPT, policyCheck } from '../../js/screens/simple/QuarterScreen.js';
+import { WRONG_FOCUS_NOTE } from '../../js/ui/RiskMeter.js';
 
 marketEngine.loadFromObjects(loadMarketData());
 
@@ -83,7 +84,7 @@ test('renders the cash meter, a 120px scene strip, one card per active exposure 
     assert.equal(card('usd-revenue').querySelector('.exp-forecast').textContent, 'Forecast accuracy 40%');
     assert.equal(run.textContent, 'RUN THE QUARTER');
     assert.equal(q('.q-quarter').textContent, 'Quarter 1 of 8');
-    assert.equal(q('.q-policy').textContent, 'Board policy: hedge 25–50% of each exposure');
+    assert.equal(q('.q-policy').textContent, 'Board policy: cover 25–50% of your risk');
     // The start year is a secret until game over.
     assert.ok(!q('.q-head').textContent.includes(String(rc.run.startYear)));
 });
@@ -329,16 +330,114 @@ test('R51: with facilities bought and dials in the band, RUN plays at once', () 
     });
 });
 
-test('offPolicyExposures mirrors the engine: clamps to the cap, skips unhedgeable and zero-notional lines', () => {
+test('policyCheck mirrors the engine: clamps to the cap, weights by size, skips unhedgeable and zero-notional lines', () => {
     const rc = new RunController({ storage, market: marketEngine, content });
     const run = rc.start('airline', { seed: SEED.band5075 });
-    const ids = d => offPolicyExposures(run, d, content.events).map(e => e.id);
-    assert.deepEqual(ids({ hedges: { fuel: 0, 'usd-revenue': 0.5 } }), [], 'fuel is not hedgeable yet');
-    assert.deepEqual(ids({ hedges: { fuel: 0, 'usd-revenue': 0.25 } }), ['usd-revenue']);
-    assert.deepEqual(ids({ hedges: { 'usd-revenue': 1 } }), [], '100% clamps to the 50% cap, inside 50–75%');
-    assert.deepEqual(ids({ hedges: { 'usd-revenue': 1 }, buyPowerUp: 'facilities' }), ['usd-revenue']);
-    assert.deepEqual(ids({ hedges: { fuel: 0, 'usd-revenue': 0.5 }, buyPowerUp: 'hedgeAccess' }), ['fuel']);
-    assert.deepEqual(offPolicyExposures({ ...run, mandate: null }, { hedges: {} }, []), []);
+    const check = d => policyCheck(run, d, content.events, marketEngine);
+    assert.equal(check({ hedges: { fuel: 0, 'usd-revenue': 0.5 } }).inPolicy, true, 'fuel is not hedgeable yet');
+    assert.equal(check({ hedges: { fuel: 0, 'usd-revenue': 0.5 } }).cover, 0.5);
+    assert.equal(check({ hedges: { fuel: 0, 'usd-revenue': 0.25 } }).inPolicy, false);
+    assert.equal(check({ hedges: { 'usd-revenue': 1 } }).cover, 0.5, '100% clamps to the 50% cap, inside 50–75%');
+    assert.equal(check({ hedges: { 'usd-revenue': 1 }, buyPowerUp: 'facilities' }).inPolicy, false);
+    // With hedgeAccess the 600m fuel book counts: 50% of the 750m dollars is 28% of the risk, below 50–75%.
+    const access = check({ hedges: { fuel: 0, 'usd-revenue': 0.5 }, buyPowerUp: 'hedgeAccess' });
+    assert.equal(access.inPolicy, false);
+    assert.ok(Math.abs(access.cover - 375 / 1350) < 1e-12);
+    assert.deepEqual(access.values, { fuel: 600e6, 'usd-revenue': 750e6 });
+    const none = policyCheck({ ...run, mandate: null }, { hedges: {} }, [], marketEngine);
+    assert.equal(none.inPolicy, true);
+    assert.equal(none.cover, 0);
+});
+
+test('v3.1: each card shows its size this quarter; a locked card shows it greyed, with its locked reason', () => {
+    const { card, q } = setup(SEED.band2550);
+    const usd = card('usd-revenue').querySelector('.exp-size');
+    assert.equal(usd.textContent, '€750.0m this quarter');
+    assert.equal(usd.classList.contains('is-locked'), false);
+    const fuel = card('fuel').querySelector('.exp-size');
+    assert.equal(fuel.textContent, '€600.0m this quarter');
+    assert.equal(fuel.classList.contains('is-locked'), true);
+    assert.equal(card('fuel').querySelector('.hd-note').textContent, "Your bank doesn't offer commodity hedging");
+    assert.equal(fuel.parentNode.classList.contains('exp-spark'), false, 'the size line is not part of the sparkline');
+    q('[data-powerup="hedgeAccess"]').click();
+    assert.equal(fuel.classList.contains('is-locked'), false, 'hedgeable once Rate & Commodity Hedging is picked');
+});
+
+test('v3.1: an event that changes the volume changes the size line', () => {
+    const { card, q } = setup(SEED.band2550, { patch: { pendingEvent: 'big_export_order' } });
+    assert.equal(card('usd-revenue').querySelector('.exp-size').textContent, '€750.0m this quarter');
+    q('[data-choice="book_it_all"]').click();
+    assert.equal(card('usd-revenue').querySelector('.exp-size').textContent, '€1.05bn this quarter');
+});
+
+test('v3.1: RISK COVERED sits right under the cash row, full width, and equals the engine cover for the same input', () => {
+    const { q, app, screen, card, run, clock } = setup(SEED.band2550, { patch: { powerUps: { owned: ['facilities', 'hedgeAccess'], used: [] } } });
+    const head = q('.q-head');
+    const risk = q('.q-risk');
+    const kids = head.children;
+    const cashIdx = kids.findIndex(k => k.classList.contains('q-cash-row') || k.classList.contains('q-cash'));
+    assert.ok(cashIdx >= 0);
+    assert.equal(kids.indexOf(risk), cashIdx + 1);
+    assert.equal(q('.rk-label').textContent, 'RISK COVERED');
+    card('fuel').querySelector('[data-step="0.25"]').click();
+    card('usd-revenue').querySelector('[data-step="1"]').click();
+    assert.equal(q('.rk-value').textContent, '67%');
+    assert.equal(q('.risk-meter').classList.contains('is-warn'), true, 'outside 25–50%');
+    assert.equal(q('.q-status').textContent, 'Off policy: 67% of risk covered, board wants 25–50%');
+    const shown = screen.coverage.cover;
+    run.click();
+    clock.t += TAP_GUARD_MS;
+    q('.q-run-anyway').click();
+    assert.equal(app.lastQuarter.summary.riskCover, shown, 'meter and engine agree exactly');
+    assert.equal(app.lastQuarter.summary.policy, 'off');
+});
+
+test('v3.1: inside the band the meter is not amber and the status says so', () => {
+    const { q, step } = setup(SEED.band2550);
+    step('usd-revenue', 0.5).click();
+    assert.equal(q('.rk-value').textContent, '50%');
+    assert.equal(q('.risk-meter').classList.contains('is-warn'), false);
+    assert.equal(q('.rk-band').style.left, '25.0%');
+    assert.equal(q('.rk-band').style.width, '25.0%');
+    assert.equal(q('.q-status').textContent, "Inside the board's policy");
+});
+
+test('v3.1: wrong focus turns the meter amber with "Big exposure under-hedged", and RUN asks to confirm', () => {
+    // A 300m fuel book against 750m of dollars: hedging the fuel fully and the dollars at 25% covers 46% (inside
+    // 25–50%), but the big exposure is left open.
+    const { rc, q, card, run, played } = setup(SEED.band2550, { patch: { powerUps: { owned: ['facilities', 'hedgeAccess'], used: [] } } });
+    rc.run.exposures = rc.run.exposures.map(e => (e.id === 'fuel' ? { ...e, quarterlyNotional: 300e6 } : e));
+    card('fuel').querySelector('[data-step="1"]').click();
+    card('usd-revenue').querySelector('[data-step="0.25"]').click();
+    assert.equal(q('.rk-value').textContent, '46%');
+    assert.equal(q('.risk-meter').classList.contains('is-warn'), true);
+    assert.equal(q('.rk-note').hidden, false);
+    assert.equal(q('.rk-note').textContent, WRONG_FOCUS_NOTE);
+    assert.equal(q('.q-status').textContent, 'Off policy: big exposure under-hedged');
+    run.click();
+    assert.equal(played.length, 0);
+    assert.equal(q('.q-confirm').hidden, false);
+    card('usd-revenue').querySelector('[data-step="0.75"]').click();
+    assert.equal(q('.rk-note').hidden, true, 'a gap under 50 points is fine');
+});
+
+test('v3.1: nothing hedgeable this quarter: the meter shows a dash, never NaN, and the quarter is in policy', () => {
+    const { rc, q, el } = setup(SEED.band2550);
+    rc.run.exposures = rc.run.exposures.map(e => (e.id === 'usd-revenue' ? { ...e, quarterlyNotional: 0 } : e));
+    q('[data-powerup="forecasting"]').click();   // any change repaints
+    assert.equal(q('.rk-value').textContent, '—');
+    assert.equal(q('.risk-meter').classList.contains('is-warn'), false);
+    assert.equal(q('.rk-note').textContent, 'Nothing you can hedge yet');
+    assert.ok(!el.textContent.includes('NaN'));
+    assert.equal(q('.q-status').textContent, "Inside the board's policy");
+});
+
+test('v3.1: on a no-policy board the meter has no band and is never amber for being "off"', () => {
+    const { q, step } = setup(SEED.none);
+    step('usd-revenue', 0.25).click();
+    assert.equal(q('.rk-band').hidden, true);
+    assert.equal(q('.rk-value').textContent, '25%');
+    assert.equal(q('.risk-meter').classList.contains('is-warn'), false);
 });
 
 test('keyboard: arrow keys on a dial change the decision', () => {
@@ -540,4 +639,62 @@ test('R53: RUN ignores taps in the first 600 ms after mount (a double tap from N
     if (app.shown.length === 0) q('.q-run-anyway').click();
     assert.equal(played.length, 1);
     assert.deepEqual(app.shown, ['result']);
+});
+
+test('each exposure card has a static sparkline when market data exists', () => {
+    const { qa, screen } = setup(SEED.band2550);
+    const cards = qa('.exp-card');
+    assert.ok(cards.length > 0);
+    assert.ok(cards.every(c => c.querySelector('.exp-spark canvas')), 'one sparkline per card');
+    assert.deepEqual(qa('.exp-spark').map(s => s.textContent).filter(Boolean), [], 'a sparkline holds a canvas and no text');
+    screen.unmount();
+});
+
+// ── Fix round 1 ────────────────────────────────────────────────────────────
+
+test('fix 1: on a noHedge board a small hedge is just off policy: "board wants 0%", amber, no wrong-focus note', () => {
+    const { rc, q, card, run, played } = setup(SEED.noHedge, { patch: { powerUps: { owned: ['hedgeAccess'], used: [] } } });
+    rc.run.exposures = rc.run.exposures.map(e => (e.id === 'fuel' ? { ...e, quarterlyNotional: 300e6 } : e));
+    card('fuel').querySelector('[data-step="0.5"]').click();
+    assert.equal(q('.q-status').textContent, 'Off policy: board wants 0%');
+    assert.equal(q('.risk-meter').classList.contains('is-warn'), true);
+    assert.equal(q('.rk-note').hidden, true, 'no "Big exposure under-hedged" advice to hedge more');
+    assert.ok(!q('.q-quarter').parentNode.parentNode.textContent.includes(WRONG_FOCUS_NOTE));
+    run.click();
+    assert.equal(played.length, 0);
+    assert.equal(q('.q-confirm').hidden, false, 'still asks before an off-policy quarter');
+    card('fuel').querySelector('[data-step="0"]').click();
+    assert.equal(q('.q-status').textContent, "Inside the board's policy");
+});
+
+test('fix 2: the floating-debt card shows the principal, never an interest amount or anything that tracks the rate', () => {
+    const patch = { quarter: 6, powerUps: { owned: ['hedgeAccess'], used: [] } };
+    const a = setup(SEED.band2550, { patch });
+    const text = a.card('floating-debt').querySelector('.exp-size').textContent;
+    assert.equal(text, '€10.00bn floating debt');
+    a.screen.unmount();
+    // A very different rate level gives exactly the same card and head text (no rate, no era).
+    const b = setup(SEED.band2550, { patch: { ...patch, rates: { ...a.rc.run.rates, EURIBOR: 0.051 } } });
+    assert.equal(b.card('floating-debt').querySelector('.exp-size').textContent, text);
+    // The only money on the card is the principal; the meter shows a share, never money, in text or attributes.
+    assert.deepEqual(b.card('floating-debt').textContent.match(/[€$£¥][\d.]+(bn|m|k)?/g), ['€10.00bn']);
+    assert.doesNotMatch(b.card('floating-debt').textContent, /interest this quarter/i);
+    const risk = b.q('.q-risk');
+    for (const node of [risk, ...risk.querySelectorAll('[aria-valuetext]'), ...risk.querySelectorAll('[aria-label]')]) {
+        for (const attr of ['aria-label', 'aria-valuetext', 'title']) {
+            assert.doesNotMatch(node.getAttribute(attr) || '', /[€$£¥]|interest/i, attr);
+        }
+    }
+    assert.doesNotMatch(risk.textContent, /[€$£¥]|interest/i);
+});
+
+test('final M2: the off-policy status never shows a cover that reads as inside the band', () => {
+    // 50–75% band, fuel 600m at 75% and usd 615m at 25%: cover (450 + 153.75) / 1215 = 49.69%, which rounds to 50%.
+    const { rc, q, card } = setup(SEED.band5075, { patch: { powerUps: { owned: ['facilities', 'hedgeAccess'], used: [] } } });
+    rc.run.exposures = rc.run.exposures.map(e => (e.id === 'usd-revenue' ? { ...e, quarterlyNotional: 615e6 } : e));
+    card('fuel').querySelector('[data-step="0.75"]').click();
+    card('usd-revenue').querySelector('[data-step="0.25"]').click();
+    assert.equal(Math.round(policyCheck(rc.run, { hedges: { fuel: 0.75, 'usd-revenue': 0.25 } }, [], marketEngine).cover * 100), 50);
+    assert.equal(q('.q-status').textContent, 'Off policy: 49% of risk covered, board wants 50–75%');
+    assert.equal(q('.rk-value').textContent, '49%', 'the meter and the status agree');
 });

@@ -7,9 +7,15 @@ import {
     applyPowerUp, borrowingBuffer, canBuyPowerUp, forecastVariance, isHedgeable, maxHedgeRatio, POWER_UP_IDS
 } from './powerUps.js';
 import { applyEventChoice, rollEvent } from './events.js';
-import { exposureCashImpact, hedgeCashImpact } from './exposureMath.js';
+import { exposureCashImpact, exposureValue, hedgeCashImpact } from './exposureMath.js';
 
 const MAX_QUARTERS = 8;
+// Float slack for the band check and the wrong-focus hedge gap (0.7 − 0.2 is 0.49999999999999994).
+const EPS = 1e-9;
+// Wrong focus (v3.1): the biggest exposure is at least WRONG_FOCUS_SIZE times a smaller one that is hedged at least
+// WRONG_FOCUS_GAP more.
+const WRONG_FOCUS_SIZE = 2;
+const WRONG_FOCUS_GAP = 0.5;
 
 // A9 (R43): the policies a player may propose to a no-policy board: the three bands and "not to hedge".
 // Frozen: validation relies on it, so UI code must not be able to change what the engine accepts.
@@ -26,7 +32,7 @@ export function isRunOver(run) {
 }
 
 // Calendar position of run quarter index i (0-based from the start year's Q1).
-function calendar(startYear, i) {
+export function calendar(startYear, i) {
     return { year: startYear + Math.floor(i / 4), quarter: (i % 4) + 1 };
 }
 
@@ -103,6 +109,66 @@ function usableRate(r) {
     return typeof r === 'number' && Number.isFinite(r);
 }
 
+// The rates this quarter starts from: run.rates, plus (I4) a rate for any active exposure whose underlying had no
+// data at the start year's Q1, seeded from this quarter. A copy; draws no random numbers. simulateQuarter uses it, and
+// the quarter screen uses it so its live "risk covered" matches the engine.
+export function quarterStartRates(run, market) {
+    const rates = { ...run.rates };
+    const now = calendar(run.startYear, run.quarter);
+    for (const exp of activeExposures(run)) {
+        if (usableRate(rates[exp.underlying])) continue;
+        const r = market.getRate(exp.underlying, now.year, now.quarter);
+        if (usableRate(r)) rates[exp.underlying] = r;
+    }
+    return rates;
+}
+
+// v3.1: the board's policy check, shared by simulateQuarter and the quarter screen so they never disagree.
+//   values: { [exposureId]: size } for every active exposure with a usable start rate (exposureValue of this
+//           quarter's forecast notional, after the event's notionalMult); locked and zero-sized ones included.
+//   cover:  Σ h·w / Σ w over the policy set P (active, forecast ≠ 0, hedgeable, usable start rate, w > 0), with h
+//           the hedge ratio after clamping to maxHedgeRatio. null when P is empty. (A weightless exposure, such as
+//           debt at a 0% rate, adds nothing to cover, so leaving it out changes no cover; it just can't be "the small
+//           one" below.)
+//   wrongFocus: within P minus floating debt (ir), the largest exposure L (first on a tie) has another S with
+//           w_L ≥ 2·w_S and h_S − h_L ≥ 0.5. Never on a noHedge board (run.mandate.max === 0): there any hedge is the breach, and "hedge the big one"
+//           would be the wrong advice.
+// `run` must carry this quarter's start rates (quarterStartRates), its mandate, and any power-up bought this quarter.
+export function policyCover(run, hedges = {}, notionalMult = {}) {
+    const values = {};
+    const set = [];
+    for (const exp of activeExposures(run)) {
+        const rate = run.rates?.[exp.underlying];
+        if (!usableRate(rate)) continue;
+        const forecast = exp.quarterlyNotional * (notionalMult[exp.id] ?? 1);
+        const w = exposureValue(exp, rate, forecast) + 0;
+        values[exp.id] = w;
+        if (forecast === 0 || !(w > 0) || !isHedgeable(run, exp)) continue;
+        const requested = hedges[exp.id] ?? 0;
+        set.push({ w, h: Math.min(requested, maxHedgeRatio(run, exp)), ir: exp.type === 'ir' });
+    }
+    if (!set.length) return { cover: null, wrongFocus: false, values };
+    const total = set.reduce((s, x) => s + x.w, 0);
+    const cover = set.reduce((s, x) => s + x.h * x.w, 0) / total;
+    // Floating debt counts in cover but is never L or S: its card shows the principal (the interest weight would
+    // reveal the rate level), so "big" and "small" must mean what the player can see.
+    const focus = set.filter(x => !x.ir);
+    const noHedgeBoard = !!run.mandate && run.mandate.max === 0;
+    let wrongFocus = false;
+    if (!noHedgeBoard && focus.length >= 2) {
+        const big = focus.reduce((a, b) => (b.w > a.w ? b : a));
+        wrongFocus = focus.some(x => x !== big
+            && big.w >= WRONG_FOCUS_SIZE * x.w && x.h - big.h >= WRONG_FOCUS_GAP - EPS);
+    }
+    return { cover, wrongFocus, values };
+}
+
+// In policy (v3.1): the cover inside the band and not the wrong focus; vacuously in when nothing counts.
+export function coverInPolicy(mandate, { cover, wrongFocus }) {
+    if (!mandate || cover === null) return true;
+    return cover >= mandate.min - EPS && cover <= mandate.max + EPS && !wrongFocus;
+}
+
 // A9 (R43): a proposal is only valid on a no-policy board, before the final quarter (it applies from the next
 // quarter), and must be one of POLICY_OPTIONS.
 function validateProposal(run, proposal) {
@@ -146,12 +212,7 @@ export function simulateQuarter(run, decisions, market, content) {
     // 3. End rates at the next calendar quarter. First (I4), an active exposure whose underlying had no data at
     // the start year's Q1 has no rate yet: seed it from this quarter, the first with data (eligibleStartYears
     // guarantees data from its unlock quarter), as Pro does in GameLoop.initRatesForNewExposures. No RNG draw.
-    const now = calendar(run.startYear, run.quarter);
-    for (const exp of activeExposures(next)) {
-        if (usableRate(next.rates[exp.underlying])) continue;
-        const r = market.getRate(exp.underlying, now.year, now.quarter);
-        if (usableRate(r)) next.rates[exp.underlying] = r;
-    }
+    next.rates = quarterStartRates(next, market);
     const end = calendar(run.startYear, run.quarter + 1);
     const endRates = {};
     for (const [u, r] of Object.entries(next.rates)) {
@@ -164,8 +225,10 @@ export function simulateQuarter(run, decisions, market, content) {
     let playerMarket = 0;
     let benchmarkMarket = 0;
     let hedgeResult = 0;
-    // Only hedgeable exposures with a non-zero notional count toward the policy; vacuously in policy otherwise.
-    let inPolicy = true;
+    // v3.1: the policy is judged on the size-weighted cover of the hedgeable, non-zero exposures (and the wrong
+    // focus rule); vacuously in policy when none count.
+    const coverage = policyCover(next, hedges, quarterNotionalMult);
+    const inPolicy = coverInPolicy(next.mandate, coverage);
     const lines = [];
     for (const exp of activeExposures(next)) {
         const forecast = exp.quarterlyNotional * (quarterNotionalMult[exp.id] ?? 1);
@@ -196,8 +259,6 @@ export function simulateQuarter(run, decisions, market, content) {
         playerMarket += exposureImpact + hedgeImpact;
         benchmarkMarket += exposureImpact;
         hedgeResult += hedgeImpact;
-        if (next.mandate && forecast !== 0 && isHedgeable(next, exp)
-            && (h < next.mandate.min || h > next.mandate.max)) inPolicy = false;
         lines.push({
             exposureId: exp.id, movePct, exposureImpact, hedgeImpact,
             realisedNotional: realised, forecastNotional: forecast, hedgeRatio: h, clamped: requested > allowed
@@ -258,7 +319,12 @@ export function simulateQuarter(run, decisions, market, content) {
         lines,
         event: run.pendingEvent ? { id: run.pendingEvent, choice: decisions.eventChoice ?? null } : null,
         powerUp: decisions.buyPowerUp ?? null,
-        policyAdopted: proposal === null ? null : { min: proposal.min, max: proposal.max }
+        policyAdopted: proposal === null ? null : { min: proposal.min, max: proposal.max },
+        // v3.1: the size-weighted share hedged (null when nothing counts), the wrong-focus flag (on a no-policy board
+        // it only picks the board line) and each active exposure's size this quarter, for the screens.
+        riskCover: coverage.cover,
+        wrongFocus: coverage.wrongFocus,
+        exposureValues: coverage.values
     };
     next.history = [...next.history, summary];
 

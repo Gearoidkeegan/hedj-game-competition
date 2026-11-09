@@ -4,6 +4,7 @@
 import { UNLOCK_RULES } from '../engine/sim/progress.js';
 import { CRISES } from '../engine/sim/crises.js';
 import { CHAIRMAN_SPRITES } from './pixel/sprites.js';
+import { formatCash } from '../utils/formatters.js';
 
 // What each unlock takes. tests/ui/labels.test.js checks these against UNLOCK_RULES, so they can't drift.
 export const UNLOCK_HINTS = Object.freeze({
@@ -101,6 +102,15 @@ export function moveLabel(e) {
     if (e?.type === 'commodity') return titleCase(commodity(e));
     if (e?.type === 'ir') return 'Interest rates';
     return titleCase(single(e?.unit || ''));
+}
+
+// v3.1: the card's size line. FX and commodity: policyCover's value, "€750.0m this quarter". Floating debt: the
+// caller passes the principal, "€10.00bn floating debt" (never the interest, which would reveal the rate level and so
+// the era). Empty when there is no usable size.
+export function exposureSizeText(e, value, currency) {
+    if (!Number.isFinite(value)) return '';
+    const money = formatCash(Math.abs(value), currency);
+    return e?.type === 'ir' ? `${money} floating debt` : `${money} this quarter`;
 }
 
 // Why a dial is stuck at 0 before hedgeAccess. Empty for FX, which is always hedgeable.

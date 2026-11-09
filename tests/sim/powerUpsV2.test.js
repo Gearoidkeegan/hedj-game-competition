@@ -161,9 +161,13 @@ test('compliance ignores unhedgeable exposures but uses the real band even when 
     // Fuel at 0 is below the 25-50 band, but fuel cannot be hedged yet.
     const s = simulateQuarter(run, decide({ fuel: 0, 'usd-revenue': 0.5 }), marketEngine, content).summary;
     assert.equal(s.policy, 'in');
-    // With hedgeAccess, fuel counts.
+    // With hedgeAccess, fuel counts toward the size-weighted cover (v3.1): usd 750m at 50% alone covers
+    // 375/1350 = 28% of the risk (inside 25-50); at 25% it covers 14% (off).
     const access = applyPowerUp(run, 'hedgeAccess');
-    assert.equal(simulateQuarter(access, decide({ fuel: 0, 'usd-revenue': 0.5 }), marketEngine, content).summary.policy, 'off');
+    const half = simulateQuarter(access, decide({ fuel: 0, 'usd-revenue': 0.5 }), marketEngine, content).summary;
+    assert.ok(Math.abs(half.riskCover - 375 / 1350) < 1e-12, `${half.riskCover}`);
+    assert.equal(half.policy, 'in');
+    assert.equal(simulateQuarter(access, decide({ fuel: 0, 'usd-revenue': 0.25 }), marketEngine, content).summary.policy, 'off');
     // A 75-100 band without facilities: 0.75 is clamped to 0.5, which is off policy.
     const high = { ...run, mandate: { min: 0.75, max: 1 } };
     const capped = simulateQuarter(high, decide(hedgesAt(high, 0.75)), marketEngine, content).summary;

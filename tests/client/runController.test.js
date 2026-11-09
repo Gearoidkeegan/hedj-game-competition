@@ -7,7 +7,7 @@ import { emptyProgress } from '../../js/engine/sim/progress.js';
 import { CHAIRMAN_SPRITES } from '../../js/ui/pixel/sprites.js';
 import * as storage from '../../js/utils/storage.js';
 import {
-    RunController, boardLineKey, resultQuipKey, chairmanFor, CHAIRMAN_QUARTERS
+    RunController, boardLineKey, resultQuipKey, chairmanFor, CHAIRMAN_QUARTERS, CHAIRMAN_YIELDS_TO, expressionFor
 } from '../../js/screens/simple/RunController.js';
 
 marketEngine.loadFromObjects(loadMarketData());
@@ -233,7 +233,7 @@ test('the chairman speaks at Q1, Q4 and Q8 unless the board must answer a propos
         assert.ok(quip.text.length > 0, `quip for ${quip.key}`);
         assert.ok(['neutral', 'happy', 'angry'].includes(b.expression));
         const big = Math.abs(s.playerDelta - s.benchmarkDelta) > 0.03 * rc.run.startingCash;
-        const due = (CHAIRMAN_QUARTERS.includes(s.q) || big) && !['policyAdopted', 'breachLoss'].includes(b.key);
+        const due = (CHAIRMAN_QUARTERS.includes(s.q) || big) && !CHAIRMAN_YIELDS_TO.includes(b.key);
         assert.equal(b.speaker, due ? 'chairman' : 'board', `Q${s.q}`);
         if (due) {
             assert.equal(b.chairmanId, persona);
@@ -259,6 +259,47 @@ test('board line precedence', () => {
     assert.equal(key({ cashAfter: 1 }), 'redZone');
     assert.equal(key({}, 50), 'moodUp');
     assert.equal(key({}, 70), 'moodDown');
+});
+
+test('v3.1 wrong focus: its own board line on any board, after a proposal; old summaries without it are unaffected', () => {
+    const base = { policy: 'off', breach: 'loss', marketResult: -1, cashAfter: 1, redLine: 10, boardMoodAfter: 60,
+        policyAdopted: null, lines: [{ hedgeImpact: -5 }] };
+    const key = over => boardLineKey({ ...base, ...over }, 50);
+    assert.equal(key({ wrongFocus: true }), 'wrongFocus', 'beats breachLoss');
+    assert.equal(key({ wrongFocus: true, breach: 'lucky', marketResult: 1 }), 'wrongFocus');
+    assert.equal(key({ wrongFocus: true, policy: 'none', breach: 'none' }), 'wrongFocus', 'the no-policy board says it too');
+    assert.equal(key({ wrongFocus: true, policy: 'none', breach: 'none', policyAdopted: { min: 0.5, max: 0.75 } }),
+        'policyAdopted', 'the board answering a proposal comes first');
+    assert.equal(key({ wrongFocus: false }), 'breachLoss');
+    assert.equal(key({}), 'breachLoss', 'a summary saved before v3.1 has no wrongFocus');
+    assert.ok(CHAIRMAN_YIELDS_TO.includes('wrongFocus'));
+    assert.equal(expressionFor('wrongFocus', { breach: 'loss' }), 'angry');
+    assert.equal(expressionFor('wrongFocus', { breach: 'lucky' }), 'neutral');
+    assert.equal(expressionFor('wrongFocus', { breach: 'none' }), 'neutral');
+    assert.equal(expressionFor('wrongFocus'), 'neutral');
+    // Fix round 1 (minor 4): a no-policy wrong-focus quarter that lost on the hedge takes the -20 hit: angry.
+    assert.equal(expressionFor('wrongFocus', { policy: 'none', breach: 'none', lines: [{ hedgeImpact: -5 }] }), 'angry');
+    assert.equal(expressionFor('wrongFocus', { policy: 'none', breach: 'none', lines: [{ hedgeImpact: 5 }] }), 'neutral');
+});
+
+test('v3.1 wrong focus: a Q1 wrong-focus quarter gets the board wrongFocus line, not the chairman', () => {
+    const rc = controller();
+    rc.start('airline', { seed: 3 });
+    // A small fuel book (100m against 750m of dollar revenue) the bank can hedge: hedge the fuel, leave the dollars.
+    rc.run = {
+        ...structuredClone(rc.run),
+        pendingEvent: null,
+        powerUps: { owned: ['hedgeAccess'], used: [] },
+        exposures: rc.run.exposures.map(e => (e.id === 'fuel' ? { ...e, quarterlyNotional: 100e6 } : e))
+    };
+    const r = rc.playQuarter({ hedges: { fuel: 0.5, 'usd-revenue': 0 }, buyPowerUp: null, eventChoice: null, proposePolicy: null });
+    assert.equal(r.summary.q, 1, 'a chairman quarter');
+    assert.equal(r.summary.wrongFocus, true);
+    const b = r.boardReaction;
+    assert.equal(b.key, 'wrongFocus');
+    assert.equal(b.speaker, 'board', 'the chairman yields');
+    assert.ok(content.quips.board[b.member.personality].wrongFocus.includes(b.line), b.line);
+    assert.equal(b.expression, r.summary.breach === 'loss' ? 'angry' : 'neutral');
 });
 
 test('result quip selection follows the D1 rules', () => {

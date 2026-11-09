@@ -17,8 +17,9 @@ import { CHAIRMAN_SPRITES, spriteIdForMember } from '../../ui/pixel/sprites.js';
 // this quarter is above CHAIRMAN_DELTA_PCT of starting cash.
 export const CHAIRMAN_QUARTERS = Object.freeze([1, 4, 8]);
 export const CHAIRMAN_DELTA_PCT = 0.03;
-// Board lines the chairman never talks over: the board answering a proposal, and the angry losing-breach line.
-export const CHAIRMAN_YIELDS_TO = Object.freeze(['policyAdopted', 'breachLoss']);
+// Board lines the chairman never talks over: the board answering a proposal, the angry losing-breach line, and
+// (v3.1) the wrong-focus line, which explains why the quarter was off policy.
+export const CHAIRMAN_YIELDS_TO = Object.freeze(['policyAdopted', 'breachLoss', 'wrongFocus']);
 // D1 result-quip thresholds, as fractions of starting cash.
 export const BIG_MOVE_PCT = 0.02;
 export const OVER_HEDGE_FACTOR = 1.15;
@@ -48,9 +49,11 @@ export function chairmanFor(seed) {
     return CHAIRMAN_IDS[Math.floor(cosmeticRng(seed, PERSONA_SALT).next() * CHAIRMAN_IDS.length)];
 }
 
-// Board line selection (contract.md, A9). First match wins.
+// Board line selection (contract.md, A9). First match wins. v3.1: a wrong-focus quarter (the big exposure under-hedged
+// while a small one was hedged) gets its own line on any board; summaries without the flag never match.
 export function boardLineKey(summary, moodBefore) {
     if (summary.policyAdopted) return 'policyAdopted';
+    if (summary.wrongFocus === true) return 'wrongFocus';
     if (summary.policy === 'none') {
         const hedge = sum(summary.lines, 'hedgeImpact');
         return hedge < 0 ? 'noPolicyHedgeLoss' : hedge > 0 ? 'noPolicyHedgeWin' : 'noPolicyNudge';
@@ -63,7 +66,13 @@ export function boardLineKey(summary, moodBefore) {
 }
 
 // Sprite expression for a board line key. breachLoss is always angry; mixed and mild lines stay neutral.
-export function expressionFor(key) {
+// wrongFocus follows the quarter: angry when it was also a losing breach (the angry sprite always wins) or, on a
+// no-policy board, a hedge loss (the line it pre-empts is angry too); otherwise neutral.
+export function expressionFor(key, summary = null) {
+    if (key === 'wrongFocus') {
+        const hedgeLoss = summary?.policy === 'none' && sum(summary.lines, 'hedgeImpact') < 0;
+        return summary?.breach === 'loss' || hedgeLoss ? 'angry' : 'neutral';
+    }
     if (ANGRY_KEYS.has(key)) return 'angry';
     if (HAPPY_KEYS.has(key)) return 'happy';
     return 'neutral';
@@ -379,7 +388,7 @@ export class RunController {
 
     _boardReaction(run, summary, moodBefore, rng) {
         const key = boardLineKey(summary, moodBefore);
-        const expression = expressionFor(key);
+        const expression = expressionFor(key, summary);
         const quips = this.content.quips || {};
         const members = this._industry(run.industryId).boardMembers || [];
         const index = members.length ? Math.floor(rng.next() * members.length) : -1;

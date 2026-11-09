@@ -19,6 +19,15 @@ export function exposureCashImpact(exp, startRate, endRate, notional) {
     return impact;
 }
 
+// v3.1: the size of an exposure in the reporting currency, as exposureCashImpact sees it. FX and commodity notionals
+// are already reporting-currency amounts (the impact is the rate's relative move times the notional), so their size
+// is |notional|. Floating debt's notional is principal; what is at stake this quarter is one quarter of interest at
+// the start rate, |notional × rate × 0.25|. Never negative.
+export function exposureValue(exp, rate, notional) {
+    if (exp.type === 'ir') return Math.abs(notional * rate * IR_QUARTER);
+    return Math.abs(notional);
+}
+
 export function hedgeCashImpact(exp, startRate, endRate, hedgedNotional, product) {
     const forward = -exposureCashImpact(exp, startRate, endRate, hedgedNotional);
     if (product === 'forward') return forward;

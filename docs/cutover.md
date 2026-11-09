@@ -10,6 +10,10 @@ no-op and the site sync is idempotent. The frontend job never runs after a faile
 deploys never overlap. You can also run it by hand: Actions → "Deploy Competition (backend, then frontend)" → Run
 workflow → `both`, `backend` or `frontend`.
 
+**Deploy the frontend outside stand hours.** The site's JS files are cached for 5 minutes and aren't versioned, so a
+phone that already has the game open can load a mix of old and new files for up to 5 minutes after a frontend deploy,
+and fail to start until it reloads.
+
 **Live or free play (R66).** The backend decides from `COMP_EVENT_ID` and the event dates. The competition is live
 only while `COMP_EVENT_ID` is set and now is between `COMP_EVENT_START_ISO` (if set) and `COMP_EVENT_END_ISO` (if
 set). Any other time the site runs in **free play**: anyone can play without registering, nothing is submitted, and

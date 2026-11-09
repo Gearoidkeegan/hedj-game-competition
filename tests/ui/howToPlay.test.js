@@ -88,3 +88,9 @@ test('SKIP returns to the screen it came from, with a toast on the auto-show', (
     assert.deepEqual(app.shown, ['industry']);
     assert.equal(app.toasts.length, 1);
 });
+
+test('v3.1: the dial card says the policy is on total risk, weighted by size, as the quarter screen does', () => {
+    const { q } = make();
+    assert.equal(q('.gd-mock-note').textContent, 'Board policy: cover 50–75% of your risk. Bank lines cap you at 50%.');
+    assert.match(allText(), /bigger exposures count for more/i);
+});

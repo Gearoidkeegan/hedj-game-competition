@@ -8,19 +8,26 @@ import { CashMeter } from '../../ui/CashMeter.js';
 import { HedgeDial } from '../../ui/HedgeDial.js';
 import { SceneLoop } from '../../ui/pixel/Scene.js';
 import { drawSprite, CHAIRMAN_SPRITES, spriteIdForMember } from '../../ui/pixel/sprites.js';
-import { activeExposures, isRunOver, POLICY_OPTIONS } from '../../engine/sim/SimEngine.js';
+import {
+    activeExposures, coverInPolicy, isRunOver, policyCover, POLICY_OPTIONS, quarterStartRates
+} from '../../engine/sim/SimEngine.js';
 import {
     applyPowerUp, forecastAccuracy, hedgeCap, isHedgeable, maxHedgeRatio, powerUpCost, POWER_UP_IDS
 } from '../../engine/sim/powerUps.js';
 import { bandText, chairmanFor, cosmeticRng } from './RunController.js';
-import { exposureTitle, exposureCopy, exposureRisk, lockedReason } from '../../ui/labels.js';
+import { exposureTitle, exposureCopy, exposureRisk, exposureSizeText, lockedReason } from '../../ui/labels.js';
+import { RiskMeter, coverPercent } from '../../ui/RiskMeter.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
+import { chartSeries, chartInverted, mountPriceChart } from '../../ui/PriceChart.js';
+import { avatarMood } from '../../engine/sim/avatarMood.js';
+import { avatarCanvas, moodLabel, storedAvatar } from './AvatarPicker.js';
 
 export const OFF_POLICY_PROMPT = "Outside the board's policy — run anyway?";
 const EVENT_FIRST = 'Choose how to respond to the event first';
 const NUDGE_SALT = 20;   // RunController uses cosmetic salts 0..9
 const SPRITE_SCALE = 2;  // 32px sprites drawn at 64px
+export const AVATAR_PX = 48;   // the player's character beside the cash meter (v3.1)
 const PERSONALITIES = ['aggressive', 'cautious', 'operational'];
 // Board mood below this shows in red (quarter and result screens).
 export const LOW_MOOD = 30;
@@ -38,21 +45,34 @@ export function previewRun(run, buyPowerUp) {
     }
 }
 
-// Active exposures whose hedge would be outside the board's band, judged the way SimEngine judges it:
-// the ratio after clamping to the cap, only hedgeable exposures with a non-zero notional (after the chosen event
-// response), and nothing at all on a no-policy board.
-export function offPolicyExposures(run, decisions, events = []) {
-    if (!run?.mandate) return [];
+// The board's policy check for these decisions, judged exactly as SimEngine will (v3.1): the engine's own
+// policyCover on the run as it will be this quarter (a power-up bought now, the chosen event response's volumes, and
+// the start rates with the engine's seeding). { cover, wrongFocus, values, inPolicy }; inPolicy is always true on a
+// no-policy board.
+export function policyCheck(run, decisions, events = [], market = null) {
     const preview = previewRun(run, decisions.buyPowerUp);
     const event = run.pendingEvent ? events.find(e => e.id === run.pendingEvent) : null;
     const mult = event?.choices?.find(c => c.id === decisions.eventChoice)?.effects?.notionalMult || {};
-    const { min, max } = run.mandate;
-    return activeExposures(run).filter(e => {
-        const forecast = e.quarterlyNotional * (mult[e.id] ?? 1);
-        if (forecast === 0 || !isHedgeable(preview, e)) return false;
-        const ratio = Math.min(decisions.hedges?.[e.id] ?? 0, maxHedgeRatio(preview, e));
-        return ratio < min || ratio > max;
-    });
+    let rates = preview.rates;
+    if (market?.getRate) {
+        try {
+            rates = quarterStartRates(preview, market);
+        } catch (err) {
+            console.warn('QuarterScreen: start rates unavailable', err);
+        }
+    }
+    const coverage = policyCover({ ...preview, rates }, decisions.hedges || {}, mult);
+    return { ...coverage, inPolicy: coverInPolicy(run.mandate, coverage), notionalMult: mult };
+}
+
+// The status line for the policy check: why it is off, "Inside the board's policy", or nothing without a policy.
+// A noHedge board's only rule is "no hedging", so any cover is simply off (the engine reports no wrong focus there).
+function policyStatus(run, check) {
+    if (!run.mandate) return '';
+    if (check.inPolicy) return "Inside the board's policy";
+    if (run.mandate.max === 0) return 'Off policy: board wants 0%';
+    if (check.wrongFocus) return 'Off policy: big exposure under-hedged';
+    return `Off policy: ${coverPercent(check.cover, run.mandate)}% of risk covered, board wants ${bandText(run.mandate)}`;
 }
 
 // SceneState for the strip: the mood of last quarter's market result, cash, and the underlying that moved most.
@@ -71,10 +91,18 @@ export function sceneStateFor(run) {
     return { mood, cashLevel: clamp01(run.cash / (1.5 * run.startingCash)), highlight };
 }
 
+// The cash meter's host with the player's character beside it (v3.1), or the host alone when no character is
+// stored (a run saved before characters existed). `mood` is avatarMood() of the state to show.
+export function withAvatar(meterHost, mood) {
+    const id = storedAvatar();
+    if (!id) return meterHost;
+    return h('div', { class: 'q-cash-row' }, avatarCanvas(id, mood, AVATAR_PX, 'av-face', moodLabel(mood)), meterHost);
+}
+
 function policyText(run) {
     if (run.boardType === 'none' || !run.mandate) return 'No hedging policy yet';
     if (run.boardType === 'noHedge') return 'Board policy: no hedging (0%)';
-    return `Board policy: hedge ${bandText(run.mandate)} of each exposure`;
+    return `Board policy: cover ${bandText(run.mandate)} of your risk`;
 }
 
 export class QuarterScreen {
@@ -86,6 +114,9 @@ export class QuarterScreen {
         this.scene = null;
         this.meter = null;
         this.dials = new Map();
+        this.sparks = [];
+        this.charts = [];
+        this.env = env;
         this.decisions = null;
         this.confirming = false;
         this.busy = false;
@@ -120,12 +151,16 @@ export class QuarterScreen {
         this.capConflict = !!run.mandate && run.mandate.min > hedgeCap(run);
 
         this.meterHost = h('div', { class: 'q-cash' });
+        // v3.1: RISK COVERED, full width directly under the cash row; _refresh keeps it in step with the dials.
+        this.riskHost = h('div', { class: 'q-risk' });
+        this.riskMeter = new RiskMeter(this.riskHost);
         const head = h('header', { class: 'q-head' },
             h('div', { class: 'q-head-row' },
                 h('h1', { class: 'q-quarter', text: `Quarter ${run.quarter + 1} of ${run.maxQuarters}` }),
                 h('span', { class: `q-mood${run.boardMood < LOW_MOOD ? ' is-low' : ''}`, text: `Board mood ${Math.round(run.boardMood)}` })),
             this.industry ? h('p', { class: 'q-company', text: this.industry.name }) : null,
-            this.meterHost);
+            withAvatar(this.meterHost, avatarMood(run)),
+            this.riskHost);
 
         this.sceneCanvas = h('canvas', { class: 'q-scene-canvas', 'aria-hidden': 'true' });
         const body = h('div', { class: 'q-body' },
@@ -168,6 +203,14 @@ export class QuarterScreen {
             this.scene = null;
         }
         this._drawSprite();
+        // Sparklines need the card's laid-out width, so they mount here rather than in render().
+        for (const { host, series } of this.sparks) {
+            try {
+                this.charts.push(mountPriceChart(host, { ...series, variant: 'spark', tone: 'neutral', env: this.env }));
+            } catch (err) {
+                console.warn('QuarterScreen: sparkline unavailable', err);
+            }
+        }
     }
 
     unmount() {
@@ -263,15 +306,37 @@ export class QuarterScreen {
             h('div', { class: 'q-policy-opts' }, this.policyBtns));
     }
 
+    // A small static trend line of the year up to this quarter's start. Nothing after the start, no labels.
+    _sparkRow(run, exp) {
+        const market = this.rc?.market;
+        if (!market?.getDataset) return null;
+        let series = null;
+        try {
+            series = chartSeries(market.getDataset(exp.underlying), run.startYear, run.quarter,
+                { upTo: 'start', invert: chartInverted(exp) });
+        } catch (err) {
+            console.warn('QuarterScreen: sparkline unavailable', err);
+        }
+        if (!series) return null;
+        const host = h('div', { class: 'exp-spark', 'aria-hidden': 'true' });
+        this.sparks.push({ host, series });
+        return host;
+    }
+
     _exposureCard(run, exp) {
         const dialHost = h('div', { class: 'exp-dial' });
         const forecastEl = h('span', { class: 'exp-forecast' });
+        // v3.1: the size this quarter (filled in by _refresh, so an event response updates it), above the copy and
+        // well clear of the sparkline.
+        const sizeEl = h('p', { class: 'exp-size' });
         const card = h('section', { class: 'exp-card', 'data-exposure': exp.id },
             h('div', { class: 'exp-head' },
                 h('h2', { class: 'exp-title', text: exposureTitle(exp) }),
                 forecastEl),
+            sizeEl,
             h('p', { class: 'exp-copy', text: exposureCopy(exp, run.baseCurrency) }),
             h('p', { class: 'exp-risk', text: exposureRisk(exp) }),
+            this._sparkRow(run, exp),
             dialHost);
         const dial = new HedgeDial(dialHost, {
             value: this.decisions.hedges[exp.id] ?? 0,
@@ -281,7 +346,7 @@ export class QuarterScreen {
             label: `${exposureTitle(exp)}: share hedged`,
             onChange: v => this._update(d => { d.hedges[exp.id] = v; })
         });
-        this.dials.set(exp.id, { dial, exp, forecastEl });
+        this.dials.set(exp.id, { dial, exp, forecastEl, sizeEl });
         return card;
     }
 
@@ -367,19 +432,38 @@ export class QuarterScreen {
         }
         for (const b of this.powerBtns || []) b.setAttribute('aria-pressed', String(b.getAttribute('data-powerup') === d.buyPowerUp));
 
+        // v3.1: one policy check drives the sizes, the RISK COVERED meter, the status and the confirm prompt.
+        const check = this._check();
+        this.coverage = check;
+        for (const { exp, sizeEl } of this.dials.values()) {
+            // Floating debt shows its principal: the interest weight would reveal the rate level, and so the era.
+            const size = exp.type === 'ir'
+                ? exp.quarterlyNotional * (check.notionalMult[exp.id] ?? 1)
+                : check.values[exp.id];
+            sizeEl.textContent = exposureSizeText(exp, size, run.baseCurrency);
+            sizeEl.hidden = !sizeEl.textContent;
+            sizeEl.classList.toggle('is-locked', !isHedgeable(preview, exp));
+        }
+        this.riskMeter?.set({
+            cover: check.cover, mandate: run.mandate, wrongFocus: check.wrongFocus, warn: check.wrongFocus || !check.inPolicy
+        });
+
         const needsChoice = !!this.event && !d.eventChoice;
         const blocked = this.eventBlocked;
-        const off = offPolicyExposures(run, d, this.app.content?.events || []);
+        const off = !check.inPolicy;
         this.runBtn.disabled = needsChoice || blocked || this.busy;
         this.runBtn.hidden = this.confirming;
         this.confirmEl.hidden = !this.confirming;
         let status = '';
         if (blocked) status = "Couldn't load this event";
         else if (needsChoice) status = EVENT_FIRST;
-        else if (off.length) status = `Off policy: ${off.map(exposureTitle).join(', ')}`;
-        else if (run.mandate) status = "Inside the board's policy";
+        else status = policyStatus(run, check);
         this.statusEl.textContent = status;
-        this.statusEl.classList.toggle('is-warning', !needsChoice && off.length > 0);
+        this.statusEl.classList.toggle('is-warning', !needsChoice && !blocked && off);
+    }
+
+    _check() {
+        return policyCheck(this.run, this.decisions, this.app.content?.events || [], this.rc?.market);
     }
 
     _forecastText(run, preview) {
@@ -390,8 +474,8 @@ export class QuarterScreen {
 
     _onRun() {
         if (this.busy || this.eventBlocked || (this.event && !this.decisions.eventChoice)) return;
-        const off = offPolicyExposures(this.run, this.decisions, this.app.content?.events || []);
-        if (off.length && !this.confirming) {
+        const off = !this._check().inPolicy;
+        if (off && !this.confirming) {
             this.confirming = true;
             // RUN ANYWAY appears in RUN's footer slot: re-arm so a double tap can't confirm the off-policy quarter.
             this.tapGuard.arm();
@@ -434,6 +518,9 @@ export class QuarterScreen {
     }
 
     _teardown() {
+        for (const c of this.charts || []) c.destroy();
+        this.charts = [];
+        this.sparks = [];
         if (this.scene) this.scene.stop();
         this.scene = null;
         if (this.meter) this.meter.destroy();
@@ -445,5 +532,7 @@ export class QuarterScreen {
         this.powerBtns = null;
         this.spriteCanvas = null;
         this.spriteId = null;
+        this.riskMeter = null;
+        this.coverage = null;
     }
 }

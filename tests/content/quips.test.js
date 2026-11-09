@@ -7,7 +7,7 @@ const RESULT_KEYS = ['bigSave', 'bigMiss', 'overHedged', 'nearBankrupt', 'calm',
 const PERSONALITIES = ['aggressive', 'cautious', 'operational'];
 const BOARD_KEYS = [
     'moodUp', 'moodDown', 'redZone', 'luckyBreach', 'breachLoss',
-    'inPolicyBad', 'noPolicyHedgeLoss', 'noPolicyHedgeWin', 'noPolicyNudge', 'policyAdopted',
+    'inPolicyBad', 'noPolicyHedgeLoss', 'noPolicyHedgeWin', 'noPolicyNudge', 'policyAdopted', 'wrongFocus',
 ];
 const BOARD_INTRO_KEYS = ['band', 'noHedge', 'none'];
 const CHAIRMEN = ['jameson', 'musk', 'oleary', 'dimon', 'buffett', 'jobs', 'dorsey', 'ackman'];
@@ -86,4 +86,19 @@ test('every board-dialogue.json string is non-empty and at most 90 characters', 
 test('board-dialogue.json keeps its pinned shape (keys, nesting, array lengths)', () => {
     const expected = loadJson('tests/content/fixtures/board-dialogue.shape.json');
     assert.deepEqual(jsonShape(loadJson('data/board-dialogue.json')), expected);
+});
+
+test('v3.1 wrongFocus: exactly 6 lines per persona, each 90 characters or fewer', () => {
+    const q = loadJson('data/quips.json');
+    for (const p of PERSONALITIES) {
+        const pool = q.board[p].wrongFocus;
+        assert.equal(pool.length, 6, `board.${p}.wrongFocus`);
+        for (const l of pool) assert.ok(l.length > 0 && l.length <= 90, `${l.length}: ${l}`);
+        assert.equal(new Set(pool).size, 6, `board.${p}.wrongFocus has no repeats`);
+    }
+});
+
+test('final M3: no wrongFocus line mentions "the policy" (the no-policy board says them too)', () => {
+    const q = loadJson('data/quips.json');
+    for (const p of PERSONALITIES) for (const l of q.board[p].wrongFocus) assert.doesNotMatch(l, /\bpolicy\b/i, l);
 });
