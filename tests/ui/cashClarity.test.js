@@ -113,7 +113,7 @@ test('volumeText: on forecast under a 2% miss, otherwise N% under or over; over-
     // 100% hedged on 91% realised: the hedge is bigger than what came in.
     assert.equal(volumeText(fx, line(91e6, 1)), 'Volume 9% under forecast (over-hedged)');
     assert.equal(volumeText(fx, line(91e6, 0.9)), 'Volume 9% under forecast', '90 hedged of 91: not over');
-    assert.equal(volumeText(fx, line(99e6, 1)), 'Volume on forecast (over-hedged)');
+    assert.equal(volumeText(fx, line(99e6, 1)), 'Volume on forecast', 'a miss under 2% is never called over-hedged (W3)');
     assert.equal(volumeText(fx, line(100e6, 1)), 'Volume on forecast', 'exactly on forecast is not over-hedged');
     assert.equal(volumeText(exp('fuel'), line(120e6, 0.5)), 'Volume 20% over forecast');
     // Debt principal is contractual; and old or empty lines say nothing.

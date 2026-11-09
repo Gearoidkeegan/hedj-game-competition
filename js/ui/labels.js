@@ -153,7 +153,7 @@ export function volumeText(exposure, line) {
         : `Volume ${Math.round(Math.abs(miss) * 100)}% ${miss < 0 ? 'under' : 'over'} forecast`;
     const h = Number.isFinite(line.hedgeRatio) ? line.hedgeRatio : 0;
     const over = h * forecast > realised * (1 + OVER_HEDGE_EPS) + OVER_HEDGE_EPS;
-    return over ? `${text} (over-hedged)` : text;
+    return over && Math.abs(miss) >= VOLUME_ON_FORECAST ? `${text} (over-hedged)` : text;   // W3: only on a real miss
 }
 
 // The result screen's opening line: the board-policy status of the quarter, judged as the engine judged it.
