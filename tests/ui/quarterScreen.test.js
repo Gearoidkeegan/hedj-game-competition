@@ -547,6 +547,6 @@ test('each exposure card has a static sparkline when market data exists', () => 
     const cards = qa('.exp-card');
     assert.ok(cards.length > 0);
     assert.ok(cards.every(c => c.querySelector('.exp-spark canvas')), 'one sparkline per card');
-    assert.ok(!/\b(19|20)\d\d\b/.test(qa('.exp-spark').map(s => s.textContent).join(' ')), 'no labels on a sparkline');
+    assert.deepEqual(qa('.exp-spark').map(s => s.textContent).filter(Boolean), [], 'a sparkline holds a canvas and no text');
     screen.unmount();
 });

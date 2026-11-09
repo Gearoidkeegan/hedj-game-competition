@@ -19,13 +19,14 @@ import { moveLabel } from '../../ui/labels.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
 import { sceneStateFor, LOW_MOOD } from './QuarterScreen.js';
-import { chartSeries, chartInverted, chartLabel, mountPriceChart } from '../../ui/PriceChart.js';
+import { chartSeries, chartInverted, chartLabel, mountPriceChart, createChartTicker, CHART_MS } from '../../ui/PriceChart.js';
 
 export const METER_MS = 1200;       // cash count-up
 const LINE_START_MS = 900;          // first exposure line
 const LINE_STEP_MS = 450;           // between lines
 const BOARD_AFTER_MS = 500;         // board card after the last line
 const SPRITE_SCALE = 2;             // 32px sprites drawn at 64px
+const CHART_GRACE_MS = 300;       // slack before a stalled chart loop is forced to its end
 const NOISE = 0.5;                  // money below half a unit is no impact
 
 // The move of the exposure's foreign currency (or price, or rate) as the player feels it. FX rates are quoted
@@ -92,6 +93,8 @@ export class ResultScreen {
         this.revealed = false;
         this.charts = [];
         this.rows = [];
+        this.ticker = null;
+        this.boardReady = false;
     }
 
     get rc() { return this.app.runController; }
@@ -100,6 +103,7 @@ export class ResultScreen {
         this._teardown();
         this.done = false;
         this.revealed = false;
+        this.boardReady = false;
         this.charts = [];
         this.el = h('div', { class: 'screen active v3 result-screen' });
         const lq = this.app.lastQuarter;
@@ -186,9 +190,14 @@ export class ResultScreen {
         }
         this._drawSprite();
 
+        this.ticker = createChartTicker(env);
         this.rows.forEach((row, i) => this._after(LINE_START_MS + i * LINE_STEP_MS, () => this._showRow(row)));
         const boardAt = LINE_START_MS + Math.max(0, this.lineEls.length - 1) * LINE_STEP_MS + BOARD_AFTER_MS;
-        this._after(boardAt, () => this._revealAll());
+        // The board line waits for the last chart to finish its run; a player tap completes everything at once.
+        this._after(boardAt, () => { this.boardReady = true; this._maybeShowBoard(); });
+        // Safety net if the frame loop stalls: finish the charts shortly after they should have ended.
+        const lastLineAt = LINE_START_MS + Math.max(0, this.lineEls.length - 1) * LINE_STEP_MS;
+        this._after(lastLineAt + CHART_MS + CHART_GRACE_MS, () => this._revealAll());
     }
 
     unmount() {
@@ -203,12 +212,26 @@ export class ResultScreen {
         else this._advance();
     }
 
+    // A tap: show every line, finish every chart, show the board.
     _revealAll() {
         if (this.revealed || !this.el) return;
-        this.revealed = true;
         for (const row of this.rows) this._showRow(row);
-        for (const c of this.charts) c.skip();
+        for (const c of [...this.charts]) c.skip();
+        this._showBoard();
+    }
+
+    _showBoard() {
+        if (this.revealed || !this.el) return;
+        this.revealed = true;
         this.boardEl.hidden = false;
+    }
+
+    // Natural reveal: once the last line is up and every chart has finished playing.
+    _maybeShowBoard() {
+        if (this.revealed || !this.boardReady || this.done) return;
+        if (this.rows.some(r => r.chart && !r.chart.done)) return;
+        for (const row of this.rows) this._showRow(row);
+        this._showBoard();
     }
 
     // The chart's host row, for an exposure with usable market data (otherwise null and the line stands alone).
@@ -242,8 +265,12 @@ export class ResultScreen {
         if (!c || !c.li.hidden) return;
         c.li.hidden = false;
         try {
-            this.charts.push(mountPriceChart(c.host, { ...c.series, hedgeRatio: c.hedge, tone: c.tone, label: c.label, env: this.env }));
+            this.charts.push(mountPriceChart(c.host, {
+                ...c.series, hedgeRatio: c.hedge, tone: c.tone, label: c.label, env: this.env, ticker: this.ticker,
+                onDone: () => { c.done = true; this._maybeShowBoard(); }
+            }));
         } catch (err) {
+            c.done = true;
             console.warn('ResultScreen: chart unavailable', err);
         }
     }
@@ -288,6 +315,8 @@ export class ResultScreen {
         this._clearTimers();
         for (const c of this.charts || []) c.destroy();
         this.charts = [];
+        if (this.ticker) this.ticker.destroy();
+        this.ticker = null;
         if (this.scene) this.scene.stop();
         this.scene = null;
         if (this.meter) this.meter.destroy();

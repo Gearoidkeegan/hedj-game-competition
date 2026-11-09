@@ -13,9 +13,11 @@ import { calendar } from '../engine/sim/SimEngine.js';
 
 const HISTORY_MONTHS = 12;
 const QUARTER_MONTHS = 3;
-const DEFAULT_MS = 1800;
+export const CHART_MS = 1800;
+const DEFAULT_MS = CHART_MS;
 const PAD = { top: 8, bottom: 8, left: 4, right: 4 };
-const LABEL_W = 56;
+const SPARK_PAD = { top: 2, bottom: 2, left: 1, right: 1 };
+const LABEL_FONT = 'bold 14px system-ui, sans-serif';
 
 const keyFor = idx => `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}-01`;
 const usable = v => typeof v === 'number' && Number.isFinite(v);
@@ -61,7 +63,10 @@ export function chartLabel(exposure, movePct) {
         if (Math.abs(m) < 0.005) return '0.00pp';
         return `${m > 0 ? '+' : '-'}${Math.abs(m).toFixed(2)}pp`;
     }
-    if (chartInverted(exposure) && m > -100) m = 100 / (1 + m / 100) - 100;
+    if (chartInverted(exposure)) {
+        // A pair that lost 100% or more has no finite reverse; cap it so the text is never Infinity or NaN.
+        m = m <= -100 ? 999 : 100 / (1 + m / 100) - 100;
+    }
     if (Math.abs(m) < 0.05) return '0.0%';
     return `${m > 0 ? '+' : '-'}${Math.abs(m).toFixed(1)}%`;
 }
@@ -101,10 +106,18 @@ export function drawPriceChart(ctx, opts = {}) {
     if (!w || !h || all.length < 2) return;
 
     const showLabel = !spark && !!opts.label;
-    const left = PAD.left;
-    const right = w - (showLabel ? LABEL_W : PAD.right);
-    const top = PAD.top;
-    const bottom = h - PAD.bottom;
+    const pad = spark ? SPARK_PAD : PAD;
+    // Reserve exactly the room the label needs (measured), so a long one like "+123.4%" is never clipped.
+    let labelW = 0;
+    if (showLabel) {
+        ctx.font = LABEL_FONT;
+        const m = ctx.measureText?.(opts.label)?.width;
+        labelW = Math.ceil(Number.isFinite(m) ? m : opts.label.length * 9) + 10;
+    }
+    const left = pad.left;
+    const right = Math.max(left + 1, w - (showLabel ? labelW : pad.right));
+    const top = pad.top;
+    const bottom = h - pad.bottom;
     const lo = Math.min(...all);
     const hi = Math.max(...all);
     const span = hi - lo;
@@ -129,7 +142,7 @@ export function drawPriceChart(ctx, opts = {}) {
     if (hist.length > 1) {
         ctx.globalAlpha = spark ? 1 : 0.4;
         ctx.strokeStyle = spark ? accent : colors.faint;
-        ctx.lineWidth = spark ? 1.5 : 1.5;
+        ctx.lineWidth = 1.5;
         trace(hist);
         ctx.stroke();
     }
@@ -152,8 +165,8 @@ export function drawPriceChart(ctx, opts = {}) {
     if (!spark && shown.length > 1 && hedge > 0) {
         // The locked rate is the price at the quarter's start. Shade the gap between it and the price.
         const lockY = quar[0][1];
-        ctx.globalAlpha = 0.18 + 0.3 * Math.min(1, hedge);
-        ctx.fillStyle = accent;
+        ctx.globalAlpha = 0.16 + 0.24 * Math.min(1, hedge);
+        ctx.fillStyle = colors.lock;
         ctx.beginPath();
         ctx.moveTo(shown[0][0], lockY);
         for (const [x, y] of shown) ctx.lineTo(x, y);
@@ -192,26 +205,76 @@ export function drawPriceChart(ctx, opts = {}) {
             ctx.closePath();
             ctx.fill();
             if (showLabel && progress >= 1) {
-                ctx.font = 'bold 14px system-ui, sans-serif';
+                ctx.font = LABEL_FONT;
                 ctx.textBaseline = 'middle';
                 ctx.textAlign = 'left';
                 ctx.fillStyle = accent;
-                ctx.fillText(opts.label, Math.min(end[0] + 8, w - 2 - LABEL_W + 8), Math.min(Math.max(end[1], 10), h - 10));
+                ctx.fillText(opts.label, Math.min(end[0] + 8, Math.max(0, w - labelW + 8)), Math.min(Math.max(end[1], 10), h - 10));
             }
         }
     }
     ctx.restore();
 }
+// One animation loop for a set of charts (the screen owns it). Charts add themselves; the ticker advances them all
+// from a single requestAnimationFrame, pauses while the tab is hidden (hidden time does not count) and stops when
+// nothing is left to animate. env (tests): requestAnimationFrame, cancelAnimationFrame, document.
+export function createChartTicker(env = {}) {
+    const g = globalThis;
+    const raf = env.requestAnimationFrame || (g.requestAnimationFrame ? fn => g.requestAnimationFrame(fn) : null);
+    const caf = env.cancelAnimationFrame || (g.cancelAnimationFrame ? id => g.cancelAnimationFrame(id) : () => {});
+    const doc = env.document || g.document || null;
+    const items = new Set();
+    let handle = null;
+    let last = null;
+    let listening = false;
+
+    const frame = t => {
+        handle = null;
+        if (!items.size) return;
+        const dt = last === null ? 0 : Math.max(0, t - last);
+        last = t;
+        for (const item of [...items]) item.advance(dt);
+        schedule();
+    };
+    function schedule() {
+        if (handle === null && items.size && raf && !(doc && doc.hidden)) handle = raf(frame);
+    }
+    function stopFrame() {
+        if (handle !== null) { caf(handle); handle = null; }
+        last = null;
+    }
+    function onVisibility() {
+        if (doc.hidden) stopFrame();
+        else schedule();
+    }
+    function unlisten() {
+        if (listening && doc?.removeEventListener) doc.removeEventListener('visibilitychange', onVisibility);
+        listening = false;
+    }
+    return {
+        available: !!raf,
+        add(item) {
+            items.add(item);
+            if (!listening && doc?.addEventListener) { doc.addEventListener('visibilitychange', onVisibility); listening = true; }
+            schedule();
+        },
+        remove(item) {
+            items.delete(item);
+            if (!items.size) { stopFrame(); unlisten(); }
+        },
+        destroy() { items.clear(); stopFrame(); unlisten(); }
+    };
+}
 
 // Draws into a new canvas inside `container`. opts: history, quarter, hedgeRatio, tone, label, variant ('spark' =
-// static line only), height (CSS px), durationMs, onDone, env (tests: requestAnimationFrame, cancelAnimationFrame,
-// document, matchMedia, createCanvas).
+// static line only), height (CSS px), durationMs, onDone, ticker (a shared createChartTicker; otherwise the chart
+// makes its own), env (tests: requestAnimationFrame, cancelAnimationFrame, document, matchMedia, createCanvas, window).
+// The canvas follows the container's laid-out width, including after a resize or an orientation change.
 export function mountPriceChart(container, opts = {}) {
     const env = opts.env || {};
     const g = globalThis;
     const doc = env.document || g.document || null;
-    const raf = env.requestAnimationFrame || (g.requestAnimationFrame ? fn => g.requestAnimationFrame(fn) : null);
-    const caf = env.cancelAnimationFrame || (g.cancelAnimationFrame ? id => g.cancelAnimationFrame(id) : () => {});
+    const win = env.window || g.window || null;
     const matchMedia = env.matchMedia || (g.matchMedia ? q => g.matchMedia(q) : null);
     const spark = opts.variant === 'spark';
 
@@ -221,80 +284,88 @@ export function mountPriceChart(container, opts = {}) {
     let ctx = null;
     try { ctx = canvas.getContext('2d'); } catch { ctx = null; }
 
-    const cssW = Math.max(40, container.clientWidth || 300);
     const cssH = opts.height || (spark ? 24 : 72);
     const dpr = Math.min(3, g.devicePixelRatio || 1);
-    canvas.width = Math.round(cssW * dpr);
-    canvas.height = Math.round(cssH * dpr);
-    if (canvas.style) {
-        canvas.style.width = `${cssW}px`;
-        canvas.style.height = `${cssH}px`;
-    }
+    let cssW = 0;
+    const measure = () => Math.max(40, Math.floor(container.clientWidth || 280));
+    const size = () => {
+        cssW = measure();
+        canvas.width = Math.round(cssW * dpr);
+        canvas.height = Math.round(cssH * dpr);
+        if (canvas.style) {
+            canvas.style.width = `${cssW}px`;
+            canvas.style.height = `${cssH}px`;
+        }
+    };
+    size();
     canvas.setAttribute?.('aria-hidden', 'true');
     container.appendChild(canvas);
 
     const colors = colorsFor(container);
-    const draw = progress => {
+    let progress = 0;
+    const draw = () => {
         if (!ctx) return;
         ctx.setTransform?.(dpr, 0, 0, dpr, 0, 0);
         drawPriceChart(ctx, { ...opts, progress, w: cssW, h: cssH, colors });
     };
+    const onResize = () => {
+        if (measure() === cssW) return;
+        size();
+        draw();
+    };
+    if (win?.addEventListener) {
+        win.addEventListener('resize', onResize);
+        win.addEventListener('orientationchange', onResize);
+    }
 
     const duration = opts.durationMs > 0 ? opts.durationMs : DEFAULT_MS;
-    let handle = null;
-    let running = false;
+    const ticker = opts.ticker || ((spark || !(opts.quarter || []).length) ? null : createChartTicker(env));
+    const ownTicker = !opts.ticker;
     let finished = false;
     let elapsed = 0;
-    let last = null;
 
+    const cleanup = () => {
+        ticker?.remove?.(item);
+        if (ownTicker) ticker?.destroy?.();
+    };
     const finish = () => {
         if (finished) return;
         finished = true;
-        running = false;
-        if (handle !== null) { caf(handle); handle = null; }
-        if (doc?.removeEventListener) doc.removeEventListener('visibilitychange', onVisibility);
-        draw(1);
+        cleanup();
+        progress = 1;
+        draw();
         opts.onDone?.();
     };
-    const frame = t => {
-        handle = null;
-        if (!running) return;
-        if (last === null) last = t;
-        elapsed += t - last;
-        last = t;
-        if (elapsed >= duration) { finish(); return; }
-        draw(1 - (1 - elapsed / duration) ** 2);
-        schedule();
-    };
-    const schedule = () => { if (handle === null && running) handle = raf(frame); };
-    function onVisibility() {
-        if (doc.hidden) {
-            if (handle !== null) { caf(handle); handle = null; }
-            last = null;
-        } else {
-            schedule();
+    const item = {
+        advance(dt) {
+            if (finished) return;
+            elapsed += dt;
+            if (elapsed >= duration) { finish(); return; }
+            progress = 1 - (1 - elapsed / duration) ** 2;
+            draw();
         }
-    }
+    };
 
     const reduced = !!matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-    if (spark || reduced || !raf || (opts.quarter || []).length < 2) {
+    const destroy = () => {
         finished = true;
-        draw(1);
-        return { skip() {}, destroy() { canvas.remove?.(); } };
+        cleanup();
+        if (win?.removeEventListener) {
+            win.removeEventListener('resize', onResize);
+            win.removeEventListener('orientationchange', onResize);
+        }
+        canvas.remove?.();
+    };
+    if (!ticker || !ticker.available || reduced || (opts.quarter || []).length < 2) {
+        finished = true;
+        progress = 1;
+        draw();
+        if (ownTicker) ticker?.destroy?.();
+        if (!spark) opts.onDone?.();
+        return { skip() {}, destroy };
     }
 
-    running = true;
-    draw(0);
-    if (doc?.addEventListener) doc.addEventListener('visibilitychange', onVisibility);
-    if (!doc || !doc.hidden) schedule();
-    return {
-        skip: finish,
-        destroy() {
-            running = false;
-            finished = true;
-            if (handle !== null) { caf(handle); handle = null; }
-            if (doc?.removeEventListener) doc.removeEventListener('visibilitychange', onVisibility);
-            canvas.remove?.();
-        }
-    };
+    draw();
+    ticker.add(item);
+    return { skip: finish, destroy };
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chartSeries, drawPriceChart, mountPriceChart, chartLabel, chartInverted } from '../../js/ui/PriceChart.js';
+import { chartSeries, drawPriceChart, mountPriceChart, chartLabel, chartInverted, createChartTicker } from '../../js/ui/PriceChart.js';
 
 // Monthly series 2000-01 .. 2003-12 where the value is the month index + 1 (so slices are easy to read).
 function series(fromIdx = 0, toIdx = 47, skip = []) {
@@ -74,6 +74,11 @@ test('chartInverted and chartLabel follow the result-line wording', () => {
     assert.equal(chartLabel({ type: 'ir' }, 0.25), '+0.25pp');
     assert.equal(chartLabel({ type: 'fx', underlying: 'EURUSD', unit: 'USD' }, 10), '-9.1%');
     assert.equal(chartLabel({ type: 'commodity' }, NaN), '0.0%');
+    // A pair that lost 100% or more has no finite reverse: never Infinity or NaN text.
+    for (const m of [-100, -150, -1e9]) {
+        const t = chartLabel({ type: 'fx', underlying: 'EURUSD', unit: 'USD' }, m);
+        assert.ok(/^[+-][0-9]+([.][0-9])?%$/.test(t), t);
+    }
 });
 
 // A recording canvas context.
@@ -82,8 +87,10 @@ function fakeCtx() {
     const ctx = { calls, canvas: { width: 0, height: 0 } };
     for (const m of ['save', 'restore', 'beginPath', 'moveTo', 'lineTo', 'closePath', 'stroke', 'fill', 'clearRect',
         'setLineDash', 'setTransform', 'scale', 'fillRect']) ctx[m] = (...a) => calls.push([m, ...a]);
+    ctx.fill = () => calls.push(['fill', ctx.fillStyle]);
     ctx.fillText = (...a) => calls.push(['fillText', ...a]);
     ctx.measureText = t => ({ width: t.length * 7 });
+    ctx.strokeStyle = ''; ctx.fillStyle = '';
     return ctx;
 }
 const DATA = chartSeries(series(), 2001, 1);
@@ -199,4 +206,81 @@ test('mountPriceChart: static variant draws once and never loops; no context is 
     const none = host(null);
     const chart = mountPriceChart(none.el, { ...DATA, env: { ...c.env, createCanvas: () => none.canvas } });
     chart.skip(); chart.destroy();
+});
+
+test('the protected shading uses the lock colour, not the move colour', () => {
+    const ctx = fakeCtx();
+    drawPriceChart(ctx, { ...DATA, progress: 1, hedgeRatio: 0.75, tone: 'down', label: '-3.0%', w: 320, h: 72,
+        colors: { down: '#ff0000', lock: '#ffcc00' } });
+    const fills = ctx.calls.filter(c => c[0] === 'fill').map(c => c[1]);
+    assert.ok(fills.includes('#ffcc00'), 'shade is gold');
+    assert.ok(fills.includes('#ff0000'), 'end marker keeps the move colour');
+    assert.equal(fills.filter(f => f === '#ff0000').length, 1, 'only the marker, not the shade');
+});
+
+test('the sparkline uses most of its 24 px height', () => {
+    const ctx = fakeCtx();
+    drawPriceChart(ctx, { history: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], quarter: [], variant: 'spark', w: 200, h: 24 });
+    const ys = ctx.calls.filter(c => c[0] === 'moveTo' || c[0] === 'lineTo').map(c => c[2]);
+    assert.ok(Math.max(...ys) - Math.min(...ys) >= 18, `range ${Math.max(...ys) - Math.min(...ys)}`);
+});
+
+test('the end label always fits inside the canvas, even a long one', () => {
+    for (const label of ['+6.2%', '+123.4%', '-100.0%']) {
+        const ctx = fakeCtx();
+        drawPriceChart(ctx, { ...DATA, progress: 1, tone: 'up', label, w: 200, h: 72 });
+        const [, , x] = texts(ctx)[0];
+        assert.ok(x + ctx.measureText(label).width <= 200, `${label} at ${x}`);
+        assert.ok(x >= 0);
+    }
+});
+
+test('a shared ticker drives many charts from one frame loop and stops when they finish', () => {
+    const c = clock();
+    const ticker = createChartTicker(c.env);
+    const ctxs = [fakeCtx(), fakeCtx(), fakeCtx()];
+    const charts = ctxs.map(ctx => {
+        const { el, canvas } = host(ctx);
+        return mountPriceChart(el, { ...DATA, tone: 'up', label: '+1.0%', ticker, env: { ...c.env, createCanvas: () => canvas } });
+    });
+    assert.equal(c.pending(), 1, 'one frame request for three charts');
+    c.tick(16); c.tick(1000);
+    assert.ok(ctxs.every(x => texts(x).length === 0));
+    c.tick(1000);
+    assert.ok(ctxs.every(x => texts(x).length === 1), 'all finished');
+    assert.equal(c.pending(), 0, 'loop stops');
+    assert.equal(c.listeners.visibilitychange, undefined);
+    charts.forEach(ch => ch.destroy());
+});
+
+test('a shared ticker pauses when hidden and destroy() cancels it', () => {
+    const c = clock();
+    const ticker = createChartTicker(c.env);
+    const { el, canvas } = host(fakeCtx());
+    mountPriceChart(el, { ...DATA, ticker, env: { ...c.env, createCanvas: () => canvas } });
+    c.doc.hidden = true; c.listeners.visibilitychange();
+    assert.equal(c.pending(), 0);
+    c.doc.hidden = false; c.listeners.visibilitychange();
+    assert.equal(c.pending(), 1);
+    ticker.destroy();
+    assert.equal(c.pending(), 0);
+    assert.equal(c.listeners.visibilitychange, undefined);
+});
+
+test('the canvas follows the laid-out width and re-measures on resize and orientation change', () => {
+    const c = clock();
+    const ctx = fakeCtx();
+    const { el, canvas } = host(ctx);
+    const win = { l: {}, addEventListener(e, f) { this.l[e] = f; }, removeEventListener(e) { delete this.l[e]; } };
+    el.clientWidth = 336;
+    const chart = mountPriceChart(el, { ...DATA, tone: 'up', label: '+1.0%', env: { ...c.env, window: win, createCanvas: () => canvas } });
+    assert.equal(canvas.style.width, '336px');
+    el.clientWidth = 640;   // rotated
+    win.l.orientationchange();
+    assert.equal(canvas.style.width, '640px');
+    el.clientWidth = 300;
+    win.l.resize();
+    assert.equal(canvas.style.width, '300px');
+    chart.destroy();
+    assert.deepEqual(Object.keys(win.l), [], 'listeners removed');
 });
