@@ -1449,7 +1449,7 @@ export class DashboardScreen {
                     <td>${formatCurrency(hedge.notional, '', true)}</td>
                     <td>${formatRate(hedge.contractRate, 4, hedge.assetClass)}</td>
                     <td class="${pnlClass(mtm)}">${formatPnL(mtm, state.industry?.baseCurrency)}</td>
-                    <td style="color:var(--text-muted);font-size:12px;">${bank?.shortName || '-'}</td>
+                    <td style="color:var(--text-muted);font-size:12px;">${bank?.shortName || '–'}</td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -1752,7 +1752,7 @@ export class DashboardScreen {
                     const msg = result.boardReaction === 'positive'
                         ? `TMS module ${result.moduleCount} installed. Board impressed!`
                         : result.boardReaction === 'negative'
-                        ? `TMS module ${result.moduleCount} installed. Board concerned about spending`
+                        ? `TMS module ${result.moduleCount} installed. Board concerned about spending.`
                         : `TMS module ${result.moduleCount} installed`;
                     const type = result.boardReaction === 'negative' ? 'warning' : 'success';
                     this.app.showToast(msg, type);

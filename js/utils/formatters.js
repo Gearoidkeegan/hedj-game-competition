@@ -34,7 +34,7 @@ export function formatQuarter(yearOffset, quarter) {
 }
 
 export function formatChange(current, previous) {
-    if (previous === 0) return '—';
+    if (previous === 0) return '–';
     const change = (current - previous) / previous;
     const sign = change >= 0 ? '+' : '';
     return `${sign}${(change * 100).toFixed(2)}%`;

@@ -35,7 +35,7 @@ export class RiskMeter {
     constructor(host) {
         this.host = host;
         this.cover = null;
-        this.valueEl = h('span', { class: 'rk-value', text: '—' });
+        this.valueEl = h('span', { class: 'rk-value', text: '–' });
         this.bandEl = h('div', { class: 'rk-band', hidden: true, 'aria-hidden': 'true' });
         this.fillEl = h('div', { class: 'rk-fill' });
         this.noteEl = h('p', { class: 'rk-note', hidden: true });
@@ -52,7 +52,7 @@ export class RiskMeter {
         const usable = typeof cover === 'number' && Number.isFinite(cover);
         this.cover = usable ? cover : null;
         const pct = coverPercent(cover, mandate);
-        this.valueEl.textContent = usable ? `${pct}%` : '—';
+        this.valueEl.textContent = usable ? `${pct}%` : '–';
         this.fillEl.style.width = pctStyle(usable ? cover : 0);
         if (usable) {
             this.root.setAttribute('aria-valuenow', String(pct));

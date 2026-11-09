@@ -27,7 +27,7 @@
         },
         "jobs": {
             "name": "Steve Jobs Type",
-            "description": "Design obsessive, worships simplicity, reality distortion field, bans his kids' gadgets",
+            "description": "Design obsessive, worships simplicity, reality distortion field, hates clutter",
             "signature": "People don't know what they want until you show it to them."
         },
         "dorsey": {
@@ -97,7 +97,7 @@
             "Treading water isn't a strategy.",
             "The market gave you opportunities and you just... sat there?",
             "Average. And in this business, average gets you fired.",
-            "You're not Michael O'Leary. You can't do whatever you want.",
+            "You're not Michael O'Scary. You can't do whatever you want.",
             "Flat and forgettable. Just like our last three treasurers.",
             "I don't pay for 'fine.' I pay for 'spectacular.'",
             "Standing still is just losing slowly. Pick up the pace.",
@@ -507,7 +507,7 @@
                 "Why are we buying off-the-shelf? We should build our own TMS. From scratch. In a weekend.",
                 "I've seen the TMS code. It's terrible. I could write better treasury software in my sleep.",
                 "What if the TMS was also a social network? Just thinking out loud.",
-                "Delete 80% of the TMS features. If we don't add 20% back, we didn't delete enough.",
+                "Delete half the TMS features. Then half of what's left. Then tweet about it.",
                 "I want the TMS to have a 'hardcore' mode. Make hedging feel dangerous.",
                 "The TMS should talk to my car, my rocket, and my fridge. Synergy."
             ]
@@ -594,9 +594,9 @@
                 "Short-term losses I can tolerate. Poor process I cannot.",
                 "In the short run the market sulks. In the long run it counts. You flinched at the sulk.",
                 "This too shall pass. But let's not make it a habit.",
-                "You only find out who built a sea wall when the storm shows up. We built a sandcastle.",
+                "That hedge book was a sandcastle with a nice brochure. The tide hasn't read it.",
                 "I don't chase the ball. I wait where it lands. You chased it, and look where we are.",
-                "A reputation is built one boring quarter at a time and lost in one exciting one.",
+                "Our name with the banks took decades. One quarter like this gets it discussed at lunch.",
                 "Nobody is praised for noticing rain. The praise goes to whoever brought an umbrella."
             ],
             "big_win": [
@@ -608,21 +608,21 @@
                 "I hold a good position until the paint dries, then a while longer. Don't squander it."
             ],
             "general": [
-                "The price of a burger is on the menu. Whether it was worth it, you learn at three o'clock.",
+                "The price is on the menu. Whether the burger was worth it, you find out an hour later.",
                 "Most risk is ignorance in a nice suit. Do you know what we hold?",
-                "A rough answer I understand beats a decimal I can't explain.",
+                "Explain the hedge like you're ordering my lunch. Slowly, and with no acronyms.",
                 "You don't need many good ideas. You need to avoid the dumb ones for a very long time.",
-                "Be patient. Money drifts from the fidgety to the calm, like pennies out of a pocket.",
+                "Patience is a muscle. You skipped the gym on every trade this quarter.",
                 "Dip one toe in the river before you jump. Keep a dry sock in reserve.",
-                "A cheap advisor costs you twice. Once on the invoice, once on the advice.",
-                "If the boat leaks every week, stop buying buckets. Buy a boat."
+                "I once hired the cheapest adviser I could find. Priciest hire I ever made.",
+                "I've owned the same hat for thirty years. You've changed hedging strategy three times."
             ],
             "tms_comment": [
                 "I've never needed a computer to tell me what I already know. But you do you.",
                 "If it helps you think more clearly, I suppose it's a reasonable investment.",
                 "Systems don't make decisions. People do. Don't forget that.",
                 "What I want from a treasurer is temperament. Software can't supply it.",
-                "A spreadsheet is a fine servant and a poor boss. Don't let it sign anything.",
+                "Spreadsheets are helpful. I still don't let mine sign cheques.",
                 "Fancy tools are fine. Just don't let them replace plain common sense."
             ]
         },
@@ -630,12 +630,12 @@
             "big_loss": [
                 "Unacceptable. Not the loss, the inelegance. A beautiful hedge book doesn't lose money.",
                 "The exposure isn't the product. The HEDGE is the product. And your product is ugly.",
-                "I don't let my kids use our treasury system. Looking at these numbers, I was right.",
+                "I wear one outfit every day to remove decisions. You have somehow created two hundred.",
                 "Simplify. Too many positions, too many banks, too much complexity. Strip it back.",
-                "Real treasurers ship results. This isn't shipping. This is a prototype that caught fire.",
+                "A hedge book should be a finished product. This one is a prototype that caught fire.",
                 "A loss this messy tells me the thinking behind it was messy. Fix the thinking first.",
                 "I don't want a hedge book. I want THE hedge book. The one everyone copies. This isn't it.",
-                "Deciding what NOT to hedge is as important as deciding what to hedge. You decided wrong."
+                "Half of design is what you leave out. You left out the wrong half of the book."
             ],
             "big_win": [
                 "Simplicity. One clear strategy, beautifully executed. That's what separates us.",
@@ -643,12 +643,12 @@
                 "Someone has to be unreasonable about the P&L. Today it was you. Annoyingly.",
                 "That's the feeling. A strategy so simple it looks obvious in hindsight.",
                 "Beautiful. The number is fine. It's the clarity behind it that I love.",
-                "Now THIS I'd let my kids use. Don't tell them, it'll go to your head."
+                "Now THIS I'd put on a slide. One slide. Don't let it go to your head."
             ],
             "general": [
                 "We need to reimagine hedging from the ground up. Start with the business, work back.",
                 "Pretty is easy. Working is the hard part. This treasury desk manages neither.",
-                "I wouldn't let my own children use this hedge book. Think about what that means.",
+                "I would not demo this hedge book. Not even to a friendly crowd. Think about that.",
                 "You're reading it wrong. The hedge book, I mean. Metaphorically.",
                 "Say no to nine trades out of ten. Focus. What's the ONE position that matters?",
                 "We're here to change how treasurers think. Not to post a mediocre P&L.",
@@ -658,7 +658,7 @@
             "tms_comment": [
                 "The TMS interface is hideous. The functionality is acceptable. Ship it, then redesign.",
                 "Why does treasury software look designed by accountants? Because it was. Start over.",
-                "My kids aren't allowed to use any TMS. Not because of the data. Because of the fonts.",
+                "The data is fine. The fonts are a crime. Fix the fonts and we have a product.",
                 "A great TMS should disappear. You shouldn't notice it. You should just... know.",
                 "Too many buttons. Too many menus. If it takes a manual, we've already failed.",
                 "I'd take one perfectly designed screen over a hundred mediocre dashboards."

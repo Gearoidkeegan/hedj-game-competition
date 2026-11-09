@@ -290,7 +290,7 @@ export class QuarterSummaryScreen {
         return `
             <div style="margin-top:8px;text-align:center;">
                 <div class="pixel-text" style="font-size:7px;color:var(--text-muted);margin-bottom:2px;">HEDGE EFFECTIVENESS</div>
-                <div class="pixel-text" style="font-size:9px;color:${color};">${offsetPct}%: ${commentary}</div>
+                <div class="pixel-text" style="font-size:9px;color:${color};">${offsetPct}% (${commentary.toLowerCase()})</div>
             </div>
         `;
     }

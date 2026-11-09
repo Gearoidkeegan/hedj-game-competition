@@ -16,8 +16,13 @@ const JSON_FILES = [
 const JS_FILES = [
     ...fs.readdirSync(path.join(ROOT, 'js/screens')).filter(f => f.endsWith('.js')).map(f => `js/screens/${f}`),
     ...fs.readdirSync(path.join(ROOT, 'js/screens/simple')).filter(f => f.endsWith('.js')).map(f => `js/screens/simple/${f}`),
-    'js/ui/labels.js', 'js/ui/pixel/sprites.js', 'js/stand.js', 'js/admin.js',
+    ...fs.readdirSync(path.join(ROOT, 'js/ui')).filter(f => f.endsWith('.js')).map(f => `js/ui/${f}`),
+    'js/ui/pixel/sprites.js', 'js/utils/constants.js', 'js/utils/formatters.js', 'js/main.js', 'js/stand.js', 'js/admin.js',
 ];
+// EraPopup's em dash imitates the real Outlook title bar of the era it parodies, so it stays.
+const DASH_ALLOWED = new Set(['js/ui/EraPopup.js']);
+// EraPopup also mocks Outlook and Teams chrome with decorative icons; those are not game copy.
+const EMOJI_ALLOWED = new Set(['js/ui/EraPopup.js']);
 const HTML_FILES = ['index.html', 'stand.html', 'privacy.html', 'admin.html'];
 
 // TODO(Task 3a): remove this allow-list when Task 3a (Simple feedback rules, quips.json, sprites,
@@ -37,7 +42,9 @@ const BANNED = [
 const BANNED_RE = new RegExp('(?<![\\w-])(' + BANNED.join('|') + ')(?![\\w-])', 'i');
 // "unlock" as a verb is banned in data copy; the Unlocks feature label lives in code strings, which are exempt.
 const UNLOCK_RE = /\bunlock(s|ed|ing)?\b/i;
-const MIRROR_RE = /\bnot just\b[^.]*\bit's\b|\bIt's not [^.]+\. It's\b/i;
+const MIRROR_RE = /\bnot just\b[^.]*\bit's\b|\bIt's not [^.]+\. It's\b|\b(isn't|aren't|not just|not merely)\b[^.!?]{0,60}[,:;]\s*(it's|it is|they're|they are|that's)\b/i;
+// An em dash in any spelling: the character, &mdash;, &#8212;, &#x2014; or a JS escape.
+const DASH_RE = new RegExp([String.fromCharCode(0x2014), '&mdash;', '&#8212;', '&#x2014;', BS + BS + 'u2014', BS + BS + 'u\\{2014\\}'].join('|'), 'i');
 
 function jsonStrings(node, out = []) {
     if (typeof node === 'string') out.push(node);
@@ -66,6 +73,19 @@ function jsStrings(src) {
     return out;
 }
 
+// JS source with comments removed but everything else kept verbatim (escapes and nested templates included),
+// so the dash check also sees JS escapes and the text of nested template literals.
+function jsCode(src) {
+    let out = '', i = 0;
+    while (i < src.length) {
+        const c = src[i];
+        if (c === '/' && src[i + 1] === '/') { while (i < src.length && src[i] !== '\n') i++; continue; }
+        if (c === '/' && src[i + 1] === '*') { i = src.indexOf('*/', i + 2); i = i < 0 ? src.length : i + 2; continue; }
+        out += c; i++;
+    }
+    return out.replace(/<!--[\s\S]*?-->/g, ' ');
+}
+
 function htmlText(src) {
     // <link> tags (favicon data URIs) are not copy.
     const noLinks = src.split(String.fromCharCode(10)).filter(l => !l.includes('<link ')).join(' ');
@@ -84,19 +104,28 @@ function offenders(test) {
     const bad = [];
     for (const { file, kind, strings } of collect()) {
         for (const s of strings) {
-            const why = test(s, kind);
+            const why = test(s, kind, file);
             if (why) bad.push(`${file}: ${why}: ${s.slice(0, 100).replace(/\s+/g, ' ')}`);
         }
     }
     return bad;
 }
 
+// Known limitation: the banned-word scan reads string and template literals one level deep, so words inside a
+// template nested in a ${} expression are not word-checked. The em dash check reads raw code, so nesting is covered.
 test('no em dashes in player-facing copy', () => {
-    assert.deepEqual(offenders(s => { const i = s.indexOf('—'); return i >= 0 && 'em dash near "' + s.slice(Math.max(0, i - 40), i + 40).replace(/\s+/g, ' ') + '"'; }), []);
+    const bad = [];
+    const near = s => { const m = DASH_RE.exec(s); return s.slice(Math.max(0, m.index - 40), m.index + 40).replace(/\s+/g, ' '); };
+    for (const { file, kind, strings } of collect()) {
+        if (DASH_ALLOWED.has(file)) continue;
+        const texts = kind === 'js' ? [jsCode(fs.readFileSync(path.join(ROOT, file), 'utf8'))] : strings;
+        for (const t of texts) if (DASH_RE.test(t)) bad.push(`${file}: em dash near "${near(t)}"`);
+    }
+    assert.deepEqual(bad, []);
 });
 
 test('no emoji', () => {
-    assert.deepEqual(offenders(s => /\p{Emoji_Presentation}|️/u.test(s) && 'emoji'), []);
+    assert.deepEqual(offenders((s, kind, file) => !EMOJI_ALLOWED.has(file) && /\p{Emoji_Presentation}|️/u.test(s) && 'emoji'), []);
 });
 
 test('no banned words or phrases', () => {
@@ -121,5 +150,12 @@ test('the scanner itself catches what it should', () => {
     assert.ok(BANNED_RE.test('A rich tapestry of risk'));
     assert.ok(BANNED_RE.test("Let's dive in"));
     assert.ok(!BANNED_RE.test('The navigator arrives'));
+    assert.ok(DASH_RE.test('a ' + String.fromCharCode(0x2014) + ' b'));
+    assert.ok(DASH_RE.test('<td>&mdash;</td>') && DASH_RE.test('x &#8212; y') && DASH_RE.test("'" + BS + "u2014'"));
+    assert.ok(!DASH_RE.test('range 50' + String.fromCharCode(0x2013) + '75%'));
+    assert.ok(DASH_RE.test(jsCode('const a = `x ${c ? `b ' + String.fromCharCode(0x2014) + '` : ""}`; // gone')));
+    assert.ok(!DASH_RE.test(jsCode('// ' + String.fromCharCode(0x2014) + ' comment')));
+    assert.ok(MIRROR_RE.test("It isn't a hedge, it's a bet") && MIRROR_RE.test("Not just a loss, it's a lesson"));
+    assert.ok(!MIRROR_RE.test('Hedge it. It is fine.'));
     assert.deepEqual(jsStrings("const a = 'x " + BS + "' y'; // 'no'" + String.fromCharCode(10) + "const b = `t ${1}`;"), ["x ' y", 't ${1}']);
 });
