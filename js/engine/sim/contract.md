@@ -58,7 +58,7 @@ The proposal is adopted after the quarter resolves: this quarter is still judged
   event: { id, choice } | null, powerUp: string|null,
   policyAdopted: { min, max } | null,   // A9 (R43): the proposal adopted at the end of this quarter
   riskCover: number|null,               // v3.1 Simple only: size-weighted share hedged (policyCover); null when nothing counts
-  wrongFocus: boolean,                  // v3.1 Simple only: the biggest exposure left open while a small one is hedged
+  wrongFocus: boolean,                  // v3.1 Simple only: the biggest exposure under-hedged next to a small one
   exposureValues: { [exposureId]: number } }   // v3.1 Simple only: each active exposure's size this quarter
 ```
 
@@ -298,7 +298,7 @@ Result-quip selection rules (B3):
 Board line selection (B1; D3 writes the lines). First match wins:
 
 1. `summary.policyAdopted` set → `policyAdopted` (the board welcomes the proposal).
-1a. `summary.wrongFocus === true` → `wrongFocus` (v3.1: the small thing hedged, the big one left open), on a band or
+1a. `summary.wrongFocus === true` → `wrongFocus` (v3.1: the small thing hedged far more than the big one), on a band or
    no-policy board (never set on a noHedge board). The chairman yields to it. Angry when the quarter was also a losing
    breach or, on a no-policy board, a hedge loss; otherwise neutral.
 2. `policy === 'none'` → `noPolicyHedgeLoss` if `Σ lines[].hedgeImpact < 0`; `noPolicyHedgeWin` if `> 0`; otherwise

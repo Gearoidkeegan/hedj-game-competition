@@ -402,7 +402,7 @@ test('v3.1: inside the band the meter is not amber and the status says so', () =
     assert.equal(q('.q-status').textContent, "Inside the board's policy");
 });
 
-test('v3.1: wrong focus turns the meter amber with "Big exposure left open", and RUN asks to confirm', () => {
+test('v3.1: wrong focus turns the meter amber with "Big exposure under-hedged", and RUN asks to confirm', () => {
     // A 300m fuel book against 750m of dollars: hedging the fuel fully and the dollars at 25% covers 46% (inside
     // 25–50%), but the big exposure is left open.
     const { rc, q, card, run, played } = setup(SEED.band2550, { patch: { powerUps: { owned: ['facilities', 'hedgeAccess'], used: [] } } });
@@ -413,7 +413,7 @@ test('v3.1: wrong focus turns the meter amber with "Big exposure left open", and
     assert.equal(q('.risk-meter').classList.contains('is-warn'), true);
     assert.equal(q('.rk-note').hidden, false);
     assert.equal(q('.rk-note').textContent, WRONG_FOCUS_NOTE);
-    assert.equal(q('.q-status').textContent, 'Off policy: big exposure left open');
+    assert.equal(q('.q-status').textContent, 'Off policy: big exposure under-hedged');
     run.click();
     assert.equal(played.length, 0);
     assert.equal(q('.q-confirm').hidden, false);
@@ -658,7 +658,7 @@ test('fix 1: on a noHedge board a small hedge is just off policy: "board wants 0
     card('fuel').querySelector('[data-step="0.5"]').click();
     assert.equal(q('.q-status').textContent, 'Off policy: board wants 0%');
     assert.equal(q('.risk-meter').classList.contains('is-warn'), true);
-    assert.equal(q('.rk-note').hidden, true, 'no "Big exposure left open" advice to hedge more');
+    assert.equal(q('.rk-note').hidden, true, 'no "Big exposure under-hedged" advice to hedge more');
     assert.ok(!q('.q-quarter').parentNode.parentNode.textContent.includes(WRONG_FOCUS_NOTE));
     run.click();
     assert.equal(played.length, 0);
@@ -686,4 +686,15 @@ test('fix 2: the floating-debt card shows the principal, never an interest amoun
         }
     }
     assert.doesNotMatch(risk.textContent, /[€$£¥]|interest/i);
+});
+
+test('final M2: the off-policy status never shows a cover that reads as inside the band', () => {
+    // 50–75% band, fuel 600m at 75% and usd 615m at 25%: cover (450 + 153.75) / 1215 = 49.69%, which rounds to 50%.
+    const { rc, q, card } = setup(SEED.band5075, { patch: { powerUps: { owned: ['facilities', 'hedgeAccess'], used: [] } } });
+    rc.run.exposures = rc.run.exposures.map(e => (e.id === 'usd-revenue' ? { ...e, quarterlyNotional: 615e6 } : e));
+    card('fuel').querySelector('[data-step="0.75"]').click();
+    card('usd-revenue').querySelector('[data-step="0.25"]').click();
+    assert.equal(Math.round(policyCheck(rc.run, { hedges: { fuel: 0.75, 'usd-revenue': 0.25 } }, [], marketEngine).cover * 100), 50);
+    assert.equal(q('.q-status').textContent, 'Off policy: 49% of risk covered, board wants 50–75%');
+    assert.equal(q('.rk-value').textContent, '49%', 'the meter and the status agree');
 });

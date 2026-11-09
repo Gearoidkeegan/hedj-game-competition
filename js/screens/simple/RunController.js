@@ -49,7 +49,7 @@ export function chairmanFor(seed) {
     return CHAIRMAN_IDS[Math.floor(cosmeticRng(seed, PERSONA_SALT).next() * CHAIRMAN_IDS.length)];
 }
 
-// Board line selection (contract.md, A9). First match wins. v3.1: a wrong-focus quarter (the big exposure left open
+// Board line selection (contract.md, A9). First match wins. v3.1: a wrong-focus quarter (the big exposure under-hedged
 // while a small one was hedged) gets its own line on any board; summaries without the flag never match.
 export function boardLineKey(summary, moodBefore) {
     if (summary.policyAdopted) return 'policyAdopted';

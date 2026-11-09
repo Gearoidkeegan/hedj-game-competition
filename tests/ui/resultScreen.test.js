@@ -465,3 +465,9 @@ test('final I3: with more than 3 exposure lines the charts are compact', () => {
     few.q('.r-body').click();
     assert.ok(few.qa('.r-chart canvas').every(c => c.style.height === '72px'));
 });
+
+test('final M1: the wrong-focus note does not claim the big exposure was unhedged', () => {
+    assert.doesNotMatch(WRONG_FOCUS_RESULT, /left the big one open|unhedged/i);
+    assert.match(WRONG_FOCUS_RESULT, /big/i);
+    assert.ok(WRONG_FOCUS_RESULT.length <= 90);
+});

@@ -97,3 +97,8 @@ test('v3.1 wrongFocus: exactly 6 lines per persona, each 90 characters or fewer'
         assert.equal(new Set(pool).size, 6, `board.${p}.wrongFocus has no repeats`);
     }
 });
+
+test('final M3: no wrongFocus line mentions "the policy" (the no-policy board says them too)', () => {
+    const q = loadJson('data/quips.json');
+    for (const p of PERSONALITIES) for (const l of q.board[p].wrongFocus) assert.doesNotMatch(l, /\bpolicy\b/i, l);
+});

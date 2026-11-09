@@ -25,8 +25,8 @@ import { chartSeries, chartInverted, chartLabel, mountPriceChart, createChartTic
 import { avatarMood } from '../../engine/sim/avatarMood.js';
 import { paintAvatar } from './AvatarPicker.js';
 
-// v3.1: shown with the board reaction when the quarter's biggest exposure was left open (summary.wrongFocus).
-export const WRONG_FOCUS_RESULT = 'Wrong focus: you hedged the small risk and left the big one open.';
+// v3.1: shown with the board reaction when a small exposure got far more cover than the biggest (summary.wrongFocus).
+export const WRONG_FOCUS_RESULT = 'Wrong focus: the small risk got more cover than the big one.';
 export const METER_MS = 1200;       // cash count-up
 const LINE_START_MS = 900;          // first exposure line
 const LINE_STEP_MS = 450;           // between lines

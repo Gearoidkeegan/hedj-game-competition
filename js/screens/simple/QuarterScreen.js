@@ -16,7 +16,7 @@ import {
 } from '../../engine/sim/powerUps.js';
 import { bandText, chairmanFor, cosmeticRng } from './RunController.js';
 import { exposureTitle, exposureCopy, exposureRisk, exposureSizeText, lockedReason } from '../../ui/labels.js';
-import { RiskMeter } from '../../ui/RiskMeter.js';
+import { RiskMeter, coverPercent } from '../../ui/RiskMeter.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
 import { chartSeries, chartInverted, mountPriceChart } from '../../ui/PriceChart.js';
@@ -71,8 +71,8 @@ function policyStatus(run, check) {
     if (!run.mandate) return '';
     if (check.inPolicy) return "Inside the board's policy";
     if (run.mandate.max === 0) return 'Off policy: board wants 0%';
-    if (check.wrongFocus) return 'Off policy: big exposure left open';
-    return `Off policy: ${pct(check.cover)} of risk covered, board wants ${bandText(run.mandate)}`;
+    if (check.wrongFocus) return 'Off policy: big exposure under-hedged';
+    return `Off policy: ${coverPercent(check.cover, run.mandate)}% of risk covered, board wants ${bandText(run.mandate)}`;
 }
 
 // SceneState for the strip: the mood of last quarter's market result, cash, and the underlying that moved most.

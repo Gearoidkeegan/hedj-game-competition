@@ -2,7 +2,7 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { installFakeDom } from '../helpers/fakeDom.js';
-import { RiskMeter, WRONG_FOCUS_NOTE } from '../../js/ui/RiskMeter.js';
+import { RiskMeter, WRONG_FOCUS_NOTE, coverPercent } from '../../js/ui/RiskMeter.js';
 
 let dom;
 beforeEach(() => { dom = installFakeDom(); });
@@ -41,7 +41,7 @@ test('amber when the check would fail; the wrong-focus line shows only for wrong
     assert.equal(q('.risk-meter').classList.contains('is-warn'), true);
     assert.equal(q('.rk-note').hidden, false);
     assert.equal(q('.rk-note').textContent, WRONG_FOCUS_NOTE);
-    assert.equal(WRONG_FOCUS_NOTE, 'Big exposure left open');
+    assert.equal(WRONG_FOCUS_NOTE, 'Big exposure under-hedged');
     m.set({ cover: 0.6, mandate: { min: 0.5, max: 0.75 }, wrongFocus: false, warn: false });
     assert.equal(q('.risk-meter').classList.contains('is-warn'), false);
     assert.equal(q('.rk-note').hidden, true);
@@ -70,4 +70,19 @@ test('nothing hedgeable (all locked or zero this quarter): a dash, an empty bar 
     m.set({ cover: NaN, mandate: null });
     assert.equal(q('.rk-value').textContent, '—');
     assert.ok(!host.textContent.includes('NaN'));
+});
+
+test('final M2: the shown percentage never rounds onto the band when the cover is outside it', () => {
+    const band = { min: 0.5, max: 0.75 };
+    assert.equal(coverPercent(0.497, band), 49, 'just under: floor');
+    assert.equal(coverPercent(0.7504, band), 76, 'just over: ceil');
+    assert.equal(coverPercent(0.5 - 1e-12, band), 50, 'inside the engine tolerance counts as in');
+    assert.equal(coverPercent(0.604, band), 60);
+    assert.equal(coverPercent(0.004, { min: 0, max: 0 }), 1, 'a sliver on a no-hedge board is not "0%"');
+    assert.equal(coverPercent(0.497, null), 50, 'no band: plain rounding');
+    assert.equal(coverPercent(null, band), null);
+    const { m, q } = meter();
+    m.set({ cover: 0.497, mandate: band, wrongFocus: false, warn: true });
+    assert.equal(q('.rk-value').textContent, '49%');
+    assert.equal(q('.risk-meter').getAttribute('aria-valuenow'), '49');
 });
