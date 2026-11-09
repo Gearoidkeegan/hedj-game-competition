@@ -534,18 +534,28 @@ test('storage: a failed save wins over an older value still in the store', () =>
 
 // Crisp pixels (review Important 1): every avatar canvas is 32 x an integer scale, drawn at that scale, so each
 // source pixel is the same whole number of device pixels and none is dropped.
-test('avatar canvases draw at an integer scale with no row or column dropped (24px and 48px, DPR 1 to 3)', () => {
+test('avatar canvases draw at an integer scale, 1:1 with device pixels, no row or column dropped (24-64px, DPR 1 to 3)', () => {
     const saved = globalThis.devicePixelRatio;
     try {
         for (const css of [24, 48, 64]) {
             for (const dpr of [1, 1.5, 2, 3]) {
                 const s = avatarScale(css, dpr);
                 assert.ok(Number.isInteger(s) && s >= 1, `${css}px @${dpr}: scale ${s}`);
-                assert.ok(32 * s >= css * dpr, `${css}px @${dpr}: at least one device pixel per CSS pixel`);
                 globalThis.devicePixelRatio = dpr;
-                const canvas = avatarCanvas('p1', 'angry', css);
+                const slot = avatarCanvas('p1', 'angry', css);
+                const canvas = slot.querySelector('canvas');
                 assert.equal(canvas.getAttribute('width'), String(32 * s));
                 assert.equal(canvas.getAttribute('height'), String(32 * s));
+                // device pixels map 1:1: the CSS size x dpr is exactly the backing size
+                for (const side of ['width', 'height']) {
+                    const cssSide = parseFloat(canvas.style[side]);
+                    assert.ok(Math.abs(cssSide * dpr - 32 * s) < 1e-6, `${css}px @${dpr}: ${side} ${canvas.style[side]}`);
+                    assert.ok(Math.abs(cssSide - css) <= css / 3 + 1e-9, `${css}px @${dpr}: shown ${cssSide}px`);
+                }
+                // the slot keeps the nominal size, so layouts don't jump
+                assert.ok(slot.classList.contains('av-slot'));
+                assert.equal(slot.style.width, `${css}px`);
+                assert.equal(slot.style.height, `${css}px`);
                 for (const id of AVATAR_IDS) {
                     const ctx = recordingContext();
                     drawAvatar(ctx, id, 'angry', 0, 0, s);

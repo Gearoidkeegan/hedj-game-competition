@@ -36,17 +36,20 @@ export function needsAvatar(storage = realStorage) {
     return !!player && storedAvatar(storage, player) === null;
 }
 
-// The whole-number drawing scale for a character shown `cssPx` wide at `dpr`: at least one device pixel per CSS
-// pixel. The canvas is 32 x scale square and CSS sizes it to cssPx (image-rendering: pixelated), so every source
-// pixel is the same whole number of device pixels and none is dropped.
+// The whole-number drawing scale for a character shown about `cssPx` wide at `dpr`: the nearest integer to
+// cssPx x dpr / 32, at least 1.
 export function avatarScale(cssPx, dpr) {
     const d = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
     const css = Number.isFinite(cssPx) && cssPx > 0 ? cssPx : AVATAR_SIZE;
-    return Math.max(1, Math.ceil((css * d) / AVATAR_SIZE));
+    return Math.max(1, Math.round((css * d) / AVATAR_SIZE));
 }
 
-// A canvas showing the character at an integer scale (avatarScale). Drawing is cosmetic: without a 2D context
-// (tests) the canvas is simply left blank.
+// The character in a fixed slot of the nominal `cssPx` size (so layouts never jump), with the canvas centred in it.
+// The canvas is 32 x scale device pixels and shown at exactly (32 x scale / dpr) CSS pixels, so every source pixel
+// is the same whole number of device pixels (1:1, crisp). The shown size can differ from cssPx by up to about a
+// third. The scale is measured when the screen is built (each render). Returns the slot; the canvas inside carries
+// `className` and the data-avatar / data-mood attributes. Drawing is cosmetic: without a 2D context (tests) the
+// canvas is simply left blank.
 export function avatarCanvas(id, mood, cssPx, className = 'av-face', label = null) {
     const dpr = Math.min(3, Math.max(1, Number(globalThis.devicePixelRatio) || 1));
     const px = AVATAR_SIZE * avatarScale(cssPx, dpr);
@@ -54,8 +57,14 @@ export function avatarCanvas(id, mood, cssPx, className = 'av-face', label = nul
         class: className, width: String(px), height: String(px), 'data-avatar': id, 'data-mood': mood,
         role: label ? 'img' : null, 'aria-label': label, 'aria-hidden': label ? null : 'true'
     });
+    const shown = `${px / dpr}px`;
+    canvas.style.width = shown;
+    canvas.style.height = shown;
+    const slot = h('span', { class: 'av-slot' }, canvas);
+    slot.style.width = `${cssPx}px`;
+    slot.style.height = `${cssPx}px`;
     paintAvatar(canvas, id, mood);
-    return canvas;
+    return slot;
 }
 
 // Redraws an avatarCanvas with a new mood.

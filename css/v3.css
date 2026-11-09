@@ -659,13 +659,14 @@
 }
 
 /* ---------- Player character (v3.1) ---------- */
-/* The canvases are drawn at the device pixel ratio; CSS sets their size. */
-.av-face { display: block; width: 48px; height: 48px; image-rendering: pixelated; }
+/* avatarCanvas: a fixed slot of the nominal size, the canvas centred in it. The canvas's own size is set inline to
+   (32 x scale / dpr) px, so device pixels map 1:1; it may overhang the slot slightly, never moving the layout. */
+.av-slot { display: inline-grid; place-items: center; flex: none; vertical-align: middle; }
+.av-slot canvas { display: block; image-rendering: pixelated; max-width: none; }
 .q-cash-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: center; }
-.go-avatar { width: 64px; height: 64px; margin: 0 auto 6px; }
+.go-ending .av-slot { display: grid; margin: 0 auto 6px; }
 .t-more-one { display: grid; }
 .t-more .t-character { display: flex; align-items: center; justify-content: center; gap: 8px; }
-.t-character-face { width: 24px; height: 24px; }
 
 /* Picker: four pictures a row, a radio group; fits 360px wide. */
 .av-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
@@ -681,4 +682,3 @@
 .av-option:hover { background: var(--v3-panel-2); }
 .av-option[aria-checked="true"] { border-color: var(--v3-gold); background: var(--v3-gold-soft); }
 .v3 .av-option:focus-visible { outline: 2px solid var(--v3-cyan); outline-offset: 2px; }
-.av-pic { display: block; width: 100%; max-width: 64px; height: auto; aspect-ratio: 1; image-rendering: pixelated; }
