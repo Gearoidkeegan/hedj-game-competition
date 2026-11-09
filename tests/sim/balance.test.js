@@ -32,3 +32,9 @@ test('scores stay well under the clamp', () => {
     const max = Math.max(...Object.values(res).flatMap(r => r.scores));
     assert.ok(max < 9000, `max score ${max}`);
 });
+
+// v3.1 fix round 1: wrong-focus play (smallFirst) must trail the policy follower by a clear margin, not a hair.
+test('smallFirst scores at least 10% below the policy follower', () => {
+    const c = criteria(res).find(x => x.name === 'mean(smallFirst) < mean(policy)');
+    assert.ok(c && c.pass && c.margin >= 0.1, `${c?.value}; margin ${c?.margin}`);
+});
