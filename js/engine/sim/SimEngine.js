@@ -201,6 +201,9 @@ export function simulateQuarter(run, decisions, market, content) {
         }
         next = applyPowerUp(next, decisions.buyPowerUp);
     }
+    // v3.2: the parts of the cash change, for the result screen. Measured from the cash itself, so they add up.
+    const cashAfterAddOn = next.cash;
+    const addOnCost = run.cash - cashAfterAddOn;   // the power-up's cost, net of any Cash Visibility cash
     let quarterNotionalMult = {};
     let quarterVarianceMult = 1;
     if (next.pendingEvent) {
@@ -208,6 +211,7 @@ export function simulateQuarter(run, decisions, market, content) {
         if (!decisions.eventChoice) throw new Error('eventChoice required while an event is pending');
         ({ run: next, quarterNotionalMult, quarterVarianceMult } = applyEventChoice(next, event, decisions.eventChoice));
     }
+    const eventCash = next.cash - cashAfterAddOn;
 
     // 3. End rates at the next calendar quarter. First (I4), an active exposure whose underlying had no data at
     // the start year's Q1 has no rate yet: seed it from this quarter, the first with data (eligibleStartYears
@@ -324,7 +328,14 @@ export function simulateQuarter(run, decisions, market, content) {
         // it only picks the board line) and each active exposure's size this quarter, for the screens.
         riskCover: coverage.cover,
         wrongFocus: coverage.wrongFocus,
-        exposureValues: coverage.values
+        exposureValues: coverage.values,
+        // v3.2: cashBefore + ocf + exposureTotal + hedgeTotal + eventCash − addOnCost = cashAfter (to float precision).
+        cashBefore: run.cash,
+        ocf: baseOcf,
+        exposureTotal: benchmarkMarket,
+        hedgeTotal: hedgeResult,
+        eventCash: eventCash + 0,
+        addOnCost: addOnCost + 0
     };
     next.history = [...next.history, summary];
 

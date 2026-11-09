@@ -59,8 +59,18 @@ The proposal is adopted after the quarter resolves: this quarter is still judged
   policyAdopted: { min, max } | null,   // A9 (R43): the proposal adopted at the end of this quarter
   riskCover: number|null,               // v3.1 Simple only: size-weighted share hedged (policyCover); null when nothing counts
   wrongFocus: boolean,                  // v3.1 Simple only: the biggest exposure under-hedged next to a small one
-  exposureValues: { [exposureId]: number } }   // v3.1 Simple only: each active exposure's size this quarter
+  exposureValues: { [exposureId]: number },   // v3.1 Simple only: each active exposure's size this quarter
+  // v3.2 Simple only: the parts of the cash change (the result screen's breakdown)
+  cashBefore: number,      // run.cash before the quarter
+  ocf: number,             // BALANCE.baseOcfPct × startingCash
+  exposureTotal: number,   // Σ lines[].exposureImpact (the market move on realised volumes)
+  hedgeTotal: number,      // Σ lines[].hedgeImpact (on forecast × hedge ratio)
+  eventCash: number,       // the event response's cashPct × startingCash; 0 without one
+  addOnCost: number }      // the power-up's cost net of Cash Visibility's cash (negative when it pays more); 0 without one
 ```
+
+v3.2: `cashBefore + ocf + exposureTotal + hedgeTotal + eventCash − addOnCost = cashAfter` (to float precision). Summaries
+saved before v3.2 (and every Pro summary) have none of these; the result screen then hides the breakdown.
 
 Summaries saved before v3.1 (and every Pro summary) have no `riskCover`, `wrongFocus` or `exposureValues`; readers
 treat them as absent (`wrongFocus` falsy) and never require them.
