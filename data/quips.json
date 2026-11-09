@@ -1,71 +1,87 @@
 {
     "result": {
-        "bigSave": [
-            "The hedge paid out. Somewhere, a sceptical CFO quietly deletes an angry email.",
-            "Hedged before the storm. Treasury is briefly the most popular department in the building.",
-            "Your forwards earned their keep. Expect zero thanks and one extra audit question.",
-            "The market swung. Your hedges swung back. Nobody outside treasury will ever know.",
-            "Saved by the hedge. That's the slide for next year's conference panel.",
-            "A textbook save. Someone will put it in a textbook and misspell your name.",
-            "Protected. The kind of quarter that makes 'boring' sound like a compliment.",
-            "Hedge accounting just became a pleasure. Remember this feeling. It's rare."
-        ],
-        "bigMiss": [
-            "The market went your way. You politely hedged it away.",
-            "Unhedged would have won. Hindsight is 20/20 and it's sitting on the board.",
-            "You bought an umbrella. It was sunny. The board would like a word about umbrellas.",
-            "Opportunity cost: never on an invoice, always in the board pack.",
-            "The hedge did its job. Unfortunately, this quarter its job was to cost money.",
-            "Somewhere a speculator is buying a boat with the move you hedged away.",
-            "Insurance this quarter, and the house didn't burn down. Annoying, isn't it?"
-        ],
-        "overHedged": [
-            "You hedged more than you sold. That's not a hedge, it's a hobby.",
-            "Forecast optimism meets reality. The extra forwards are now a position. Congratulations.",
-            "Over-hedged. The excess is speculation, and the auditors have a word for it.",
-            "Sales came in light; the hedges didn't. 'Forecast' and 'wish' are different words.",
-            "You hedged 100% of a forecast that turned out to be fan fiction.",
-            "The business sold less than it promised. Shocking. Nobody has ever seen that before.",
-            "Hedged above actuals. The board calls that a bet with extra paperwork."
-        ],
         "nearBankrupt": [
             "Below the red line. Your relationship manager has stopped returning calls.",
-            "Liquidity: low. Like your phone battery at 3% during the closing keynote.",
-            "The red line is behind you. The overdraft is in front of you. Choose wisely.",
-            "Below the red line. The credit insurers have started using the word 'concerned'.",
             "Cash is so tight the office plants are on a watering rota.",
-            "The lenders are reading the covenants aloud. Slowly. With emphasis.",
-            "Treasury now forecasts cash by the hour. Daily was for the good times."
+            "The lenders are reading the covenants aloud. Slowly, with emphasis.",
+            "Treasury now forecasts cash by the hour. Daily was for the good times.",
+            "Under the red line. The credit insurers have started using the word 'concerned'.",
+            "Liquidity is at the 3% battery stage. Find a charger, and find it fast.",
+            "The overdraft has a name now. Everyone in finance is on first-name terms with it.",
+            "Below the red line. Accounts payable has started paying suppliers in apologies."
         ],
-        "calm": [
-            "A quiet quarter. The most underrated outcome in treasury.",
-            "Nothing dramatic happened. Frame it. It won't last.",
-            "Markets moved, you didn't panic. Quietly excellent. Nobody will mention it.",
-            "Calm, like the coffee queue five minutes before the keynote ends.",
-            "Steady. The board barely looked up from their phones. That's a win.",
-            "Volatility took the quarter off. Probably stuck in the lanyard queue.",
-            "Uneventful. In treasury, that's the highest form of praise.",
-            "Nothing to see here. Exactly how a treasurer likes it."
+        "overHedged": [
+            "You hedged more than you sold. The extra forwards are now a position of their own.",
+            "Sales came in light and the hedges didn't. 'Forecast' and 'wish' are different words.",
+            "Hedged above actuals. Your auditor calls that speculation with extra paperwork.",
+            "You hedged a forecast that turned out to be fan fiction.",
+            "The business sold less than it promised. Your forwards didn't get the memo.",
+            "Volumes fell short, so part of your hedge was hedging nothing at all.",
+            "More forwards than invoices. Next quarter, ask sales for the real number first.",
+            "Your hedge was sized for a busier quarter than the one that turned up."
+        ],
+        "bigSave": [
+            "The hedge paid out. Somewhere, a sceptical CFO quietly deletes an angry email.",
+            "Your forwards earned their keep. Expect zero thanks and one extra audit question.",
+            "The market swung at you and the hedge swung back.",
+            "A textbook save. Someone will put it in a textbook and misspell your name.",
+            "The hedge made money because the exposure lost it. That's the whole idea, working.",
+            "Treasury is briefly the most popular department in the building. Enjoy the ten minutes.",
+            "Hedged before the move. Write down what you did, because someone will ask.",
+            "The forwards came good. Frame the confirmation and hang it by the coffee machine."
+        ],
+        "bigMiss": [
+            "The market went your way and the hedge politely handed some of it back.",
+            "You bought an umbrella and it was sunny. The umbrella still cost money.",
+            "Opportunity cost never shows on an invoice. It shows up in every meeting after.",
+            "The hedge did its job. This quarter, its job was to cost money.",
+            "Somewhere a speculator is buying a boat with the move you hedged away.",
+            "Insurance that didn't pay out. The house is fine, and the premium is gone.",
+            "The forwards lost roughly what the exposure gained. Correct, and still annoying.",
+            "Hindsight says leave it open. Hindsight has never had to explain a bad quarter."
         ],
         "boom": [
             "The market moved your way. Act like you planned it. Everyone else does.",
-            "A tailwind quarter. Accept the compliments. Deflect the questions.",
+            "A tailwind quarter. Accept the compliments and deflect the questions.",
             "A big favourable move. The CEO will call it 'strategy' on the earnings call.",
-            "Windfall! Sales will claim it by Friday. Procurement by Thursday.",
+            "Windfall. Sales will claim it by Friday, procurement by Thursday.",
             "Lovely move. Enjoy it before someone asks you to forecast the next one.",
-            "Lucky market, happy board. Don't tell them those two things are related.",
-            "Boom. The board is so pleased they almost read the treasury report."
+            "The rate went your way and the open exposure kept the gain. Nice while it lasts.",
+            "Money from the market, no thanks to anyone in particular. Bank it quickly.",
+            "The market was kind this time. It never sends notice before it stops."
+        ],
+        "storm": [
+            "The market moved against you and very little stood in its way.",
+            "The rate went the wrong way and the open exposure took the hit.",
+            "That move cost real money. A hedge would have made this a shorter conversation.",
+            "A bad move on an open exposure. The market sent the bill straight to you.",
+            "The forecast was fine. The rate wasn't.",
+            "Somewhere a forward contract sits unsigned, feeling smug.",
+            "Rough quarter. The exposure was out in the rain without a coat.",
+            "The market took its cut this quarter. It never asks first."
+        ],
+        "calm": [
+            "A quiet quarter. The most underrated outcome in treasury.",
+            "Nothing dramatic happened. Frame it, because it won't last.",
+            "Calm, like the coffee queue five minutes before the keynote ends.",
+            "Volatility took the quarter off. Probably stuck in the lanyard queue.",
+            "Small moves, small numbers. Exactly how a treasurer likes it.",
+            "Rates barely twitched. The dealing room is reduced to discussing lunch.",
+            "A flat quarter. Your bank's FX salesperson is crying into a tote bag.",
+            "Nothing moved enough to mention, so this sentence is the whole story."
         ]
     },
     "board": {
         "aggressive": {
             "moodUp": [
-                "Good. Our competitors would kill for that quarter. Let them.",
+                "Good. Our competitors would kill for that quarter. Let them try.",
                 "That's the treasurer I hired. Don't make me regret saying it out loud.",
                 "Finally, numbers I can wave at the analysts. Keep them coming.",
                 "Decent. Now do it again, faster, and with fewer meetings.",
                 "I'll be taking credit for this at the AGM. You understand.",
-                "Acceptable. I'm upgrading you from 'concern' to 'watch list'."
+                "Acceptable. I'm moving you from 'concern' to 'watch list'.",
+                "Inside the lines and in the black. I hate admitting that works.",
+                "Good quarter. I've already told the chairman it was my idea."
             ],
             "moodDown": [
                 "That's not a quarter. That's an apology with a spreadsheet attached.",
@@ -73,23 +89,67 @@
                 "I didn't fly in for this. Well, I flew in for the golf. But still.",
                 "Explain it to me slowly. Then explain it faster, so I can leave.",
                 "If this is a strategy, it's hiding very well.",
-                "Do better. I don't care how. That's literally your job."
+                "Do better. I don't care how. That's literally your job.",
+                "My confidence in you went down this quarter. So did my golf handicap, at least.",
+                "The analysts will ask about this. I'll be pointing at you."
             ],
             "redZone": [
-                "We're below the red line. I want cash, a plan, and nobody hearing about it.",
-                "The bank phoned ME. Do you know how rarely that's good news?",
-                "Red line breached. I'm cancelling the Christmas party. And possibly Christmas.",
+                "We're below the red line. Get cash back above it before the press hears.",
+                "The bank phoned me. Do you know how rarely that's good news?",
+                "Red line breached. I'm cancelling the Christmas party, and possibly Christmas.",
                 "Cash this low makes me nervous. I don't do nervous. I do shouting.",
                 "Fix the cash, or I fix the org chart.",
-                "The red line exists for a reason. Get back above it. Today."
+                "The red line exists for a reason. Get back above it. Today.",
+                "Below the red line. The company jet is staying in the hangar. Unfuelled.",
+                "We're short of cash and long on excuses. I only want one of those."
+            ],
+            "overLucky": [
+                "You hedged past the board's limit. It worked out, so I'll only shout a little.",
+                "More cover than the limit allows. Fine result, wrong method. Don't make it a habit.",
+                "Over the limit and still in the black. I'm impressed and I'm annoyed.",
+                "The cap is there for a reason, even when breaking it doesn't cost us.",
+                "You hedged beyond what we signed off. Next time, ask me before you get creative.",
+                "Too much cover, and the quarter survived it. The minutes will survive it less well.",
+                "We set a maximum. You found it and kept going.",
+                "Above the band. I like a result. I don't like surprises in the hedge book."
+            ],
+            "underLucky": [
+                "You hedged less than we asked for. It paid off. Don't let it go to your head.",
+                "Below the minimum and you still made money. The money can stay. The habit goes.",
+                "The policy says hedge at least the minimum. Winning doesn't change what it says.",
+                "You left it open and got away with it. I can't put that in the annual report.",
+                "Not enough cover. The market let you off this time. It won't send a warning.",
+                "Below the band and in the black. I'll take the money. The minutes will take you.",
+                "We asked for a minimum. You treated it like a suggestion.",
+                "Too little hedging. The result's fine. My blood pressure isn't."
+            ],
+            "overLoss": [
+                "Past the limit and still losing money. HR has found a slot this afternoon.",
+                "Over the cap and in the red. Leave your lanyard with reception on the way out.",
+                "More cover than the limit, and it cost us. Your exit interview is at four.",
+                "You went beyond the policy and lost. I've started drafting the announcement.",
+                "Too much hedging, the wrong way round. HR has your file open.",
+                "The maximum is a maximum. You ignored it and burned cash. Check your access card.",
+                "Over-hedged and losing. I didn't think that was possible. You've shown me.",
+                "Above the band and below zero. I'll be explaining this at the AGM. Without you."
+            ],
+            "underLoss": [
+                "Less cover than we asked for, and the market bit. HR is booking a room.",
+                "Below the minimum and losing money. I'll need that lanyard back.",
+                "Open against policy, and it torched our cash. I'm calling HR now.",
+                "Not enough cover and a loss to match. Your replacement's CV is on my desk.",
+                "Unhedged against policy and losing? That's speculating, and you're done doing it here.",
+                "The policy set a minimum and you stayed under it. Security will see you out.",
+                "Too little hedging in a bad market. The search firm is on line two.",
+                "Under water and below the band. Somebody is leaving this building. It isn't me."
             ],
             "luckyBreach": [
-                "Great result. Never do that again. Or do it again, but tell me first.",
+                "Outside the policy and in profit. Never do that again, or tell me first.",
                 "Superb numbers, shocking method. I'm proud and furious. Pick one.",
-                "You broke the mandate and made money. I'll applaud quietly. Then I'll shout.",
-                "Brilliant outcome. Terrible precedent. The minutes record both, in capitals.",
-                "I love the profit. I hate the route. Keep one of those.",
-                "It worked, you cowboy. Next time, work inside the lines. Well done though."
+                "You broke the mandate and made money. I'll applaud quietly, then I'll shout.",
+                "A result from outside the policy. The minutes record the profit and the breach.",
+                "I love the profit. I hate that it came from outside the lines. Keep one of those.",
+                "It worked, you cowboy. Next time, work inside the policy."
             ],
             "breachLoss": [
                 "Outside the mandate AND losing money? HR is booking a meeting room. A small one.",
@@ -101,39 +161,44 @@
                 "The policy exists so this never happens. It happened. Check your access card works."
             ],
             "inPolicyBad": [
-                "We agreed the policy. I still hate it. Quarter's noted. Move on.",
+                "We agreed the policy and I still hate it. Noted. Move on.",
                 "Bad quarter, but we stayed in the lines. I'll shout at the market instead.",
                 "The policy did its job. My blood pressure did not.",
-                "Painful. But nobody can say you broke the rules. Annoying, that.",
+                "Painful. But nobody can say you broke the rules, which annoys me.",
                 "I'm irritated, not furious. The policy gets the credit. You get the blame.",
-                "Rough. The hedge did what we signed up for. I just wanted a better quarter.",
-                "Within policy, so I can't even shout at you. I'm shouting at the market."
+                "Rough. We did what we signed up for. I just wanted a better quarter.",
+                "You followed the policy and we still lost money. Find me a policy that only wins.",
+                "A loss inside the band. Tell the analysts it was 'disciplined'. They love that word."
             ],
             "noPolicyHedgeLoss": [
-                "The hedge LOST money? Who approved this? Oh. You did.",
-                "We hedged and we lost. Why did we pay for protection that costs money?",
-                "A loss on the hedge! Unwind it. Unwind all of it. Immediately.",
+                "The hedge lost money? Who approved this? Oh. You did.",
+                "We hedged and we lost. Why are we paying for protection that costs money?",
+                "A loss on the hedge. Unwind it. Unwind all of it. Immediately.",
                 "I don't care what it protected. The hedge line is red. Fix the line.",
                 "Explain this hedge loss. Slowly. Without the word 'offset'.",
                 "Hedging is meant to make money. This one didn't. I'm writing that down.",
-                "The business is fine, you say? Then why is this one number red?"
+                "The business is fine, you say? Then why is this one number red?",
+                "Give me a policy so I know when to shout. Right now I shout by default."
             ],
             "noPolicyHedgeWin": [
-                "The hedge made money. So... we should hedge everything? Is that how it works?",
+                "The hedge made money. So we should hedge everything? Is that how it works?",
                 "A hedge gain. Good. Do that again. Every quarter. Nothing else.",
-                "We won on the hedge! Why did you wait so long? I'm joking. Mostly.",
+                "We won on the hedge. Why did you wait so long? I'm joking. Mostly.",
                 "Fine, it paid off. I still don't understand why. Don't explain it.",
                 "Hedge profit. I'm told that's a coincidence. I'm calling it skill.",
                 "The hedge went up. I'd like it to go up more, please.",
-                "Well, that's a number I can show the analysts. Whatever it is."
+                "Well, that's a number I can show the analysts. Whatever it is.",
+                "Green on the hedge line. Write a policy so I can take proper credit for it."
             ],
             "noPolicyNudge": [
                 "We have no hedging policy. Draw one up, and make it quick.",
                 "Every quarter we argue about hedges. A policy would end that. Propose one.",
-                "Bring me a hedging policy. One page. Big font. Pictures welcome.",
+                "Bring me a hedging policy. One page, big font. Pictures welcome.",
                 "No policy means I judge each hedge alone. You won't enjoy it. Propose one.",
-                "Write a hedging policy and I'll sign it. Probably. Maybe without reading.",
-                "Right now we're winging it. Propose a policy before I start winging you."
+                "Write a hedging policy and I'll sign it. Probably without reading it.",
+                "Right now we're winging it. Propose a policy before I start winging you.",
+                "Our rivals have a hedging policy. I've read their annual report. Get us one.",
+                "Propose a band and I'll back it. Leave it to me and I'll pick a random number."
             ],
             "policyAdopted": [
                 "Policy adopted from next quarter. I'd like it noted that this was my idea.",
@@ -141,15 +206,19 @@
                 "Policy accepted. Now we have rules, and I get to enforce them.",
                 "Done. From next quarter we're a grown-up board. Don't let it show.",
                 "Adopted unanimously, because I was the only one who read it.",
-                "A policy! The analysts will love this. I'll tell them I wrote it."
+                "A policy. The analysts will love this. I'll tell them I wrote it.",
+                "Signed. If it works, it was my vision. If it doesn't, it was your draft.",
+                "Policy approved. I've already had it framed for my office."
             ],
             "wrongFocus": [
-                "You hedged the loose change and left the vault door open. Bold. Wrong, but bold.",
+                "You hedged the loose change and left the vault door open. Bold, and wrong.",
                 "Small thing locked down, big thing swinging in the wind. That's backwards, champ.",
                 "You guarded the petty cash and gambled the house. I like risk. Not that kind.",
                 "Hedged up on the tiny one? The big one was the whole game, and you left it hanging.",
                 "Wrong target. Nobody gets a bonus for protecting the small stuff.",
-                "You hedged the side bet and let the main bet ride. Pick your fights better."
+                "You hedged the side bet and let the main bet ride. Pick your fights better.",
+                "The big exposure moves our numbers. Cover that first, then play with the small one.",
+                "You put the armour on the mascot and sent the striker out in a vest."
             ]
         },
         "cautious": {
@@ -157,17 +226,21 @@
                 "The figures reconcile. I've checked twice. Well done.",
                 "Within limits and profitable. I may permit myself a second biscuit.",
                 "A clean quarter. The auditors will be almost disappointed.",
-                "Variance within tolerance. My favourite four words.",
+                "Variance within tolerance. My favourite three words.",
                 "I've minuted this as 'satisfactory'. Please don't let it go to your head.",
-                "Disciplined and documented. Exactly as the policy intended."
+                "Disciplined and documented, exactly as the policy intended.",
+                "Inside the band with nothing to footnote. I hardly know what to do with my afternoon.",
+                "A compliant quarter with a positive result. I'll file it under 'rare'."
             ],
             "moodDown": [
                 "I'd like a root-cause analysis. And then an analysis of the analysis.",
                 "This variance will need a footnote. Possibly a chapter.",
                 "I flagged this risk two quarters ago. Page 14 of the minutes.",
-                "The risk committee will want a word. Several words. Mostly 'why'.",
+                "The risk committee will want a word. Several words, mostly 'why'.",
                 "I don't enjoy surprises. This one was expensive and unscheduled.",
-                "We'll need a lessons-learned session. I've booked three."
+                "We'll need a lessons-learned session. I've booked three.",
+                "My confidence has dropped. I've recorded by how much, to two decimal places.",
+                "Please send the reconciliation tonight. I'll be reading it in bed."
             ],
             "redZone": [
                 "Cash is below the red line. I've already drafted the covenant waiver request.",
@@ -175,15 +248,57 @@
                 "Below the red line. Cash forecasting moves to daily. Then hourly.",
                 "The bank has asked for management accounts early. That's never good.",
                 "We're under the red line. I'd like a 13-week cash flow forecast by tonight.",
-                "Red line breached. I haven't slept, and I've made a spreadsheet about it."
+                "Red line breached. I haven't slept, and I've made a spreadsheet about it.",
+                "Please add 'liquidity' to every agenda until further notice. In bold.",
+                "Our auditors may raise going concern. I'd prefer they raised nothing at all."
+            ],
+            "overLucky": [
+                "A fine result, and a clear breach: you hedged above the approved limit.",
+                "Cover exceeded the policy maximum. I commend the result and minute the breach.",
+                "You went past the board's limit. Profitable, yes. Authorised, no.",
+                "Over-hedged against policy. I shall thank you and write you up in the same email.",
+                "The band has a ceiling. This quarter you were above it. Please come back down.",
+                "Excess cover is still a breach, even when the numbers are kind.",
+                "I've recorded a breach of the maximum. The result is noted separately, in smaller type.",
+                "Hedging above what we approved. The audit committee will ask why, and so do I."
+            ],
+            "underLucky": [
+                "You hedged less than the board asked for. The gain doesn't change the breach.",
+                "Cover fell below the approved minimum. I've recorded the breach in full.",
+                "Under-hedged against policy. A good outcome, and a written reprimand.",
+                "The band has a floor. You were under it. The market's generosity is not a control.",
+                "An open exposure the policy said to cover. Praise for the result, a note for the file.",
+                "Below the minimum. Please explain the gap in writing, however pleasant the result.",
+                "Profitable but uncovered. Please don't confuse the two.",
+                "Not enough cover. If the market had turned, this would be a very different meeting."
+            ],
+            "overLoss": [
+                "Cover above the approved limit, with losses. I'm putting your dismissal to the board.",
+                "Above the ceiling and at a loss. I've informed the audit committee and HR.",
+                "Hedges beyond policy, and the excess lost money. Your dealing rights are gone.",
+                "This is exactly what the ceiling forbids. Your access card stops working at five.",
+                "I've documented a breach above the band. Legal has the file and HR has the date.",
+                "Excess hedges, realised losses. I'd expect a unanimous vote on your future.",
+                "You hedged beyond what we approved, and it cost us. I've drafted the minutes already.",
+                "Cover past the permitted maximum and a loss to show for it. I have no mitigating notes."
+            ],
+            "underLoss": [
+                "Losses, on cover under the minimum. The audit committee and HR are informed.",
+                "Cover short of policy, with realised losses. Dismissal is on the agenda.",
+                "This is exactly the open risk the policy forbids. Your P45 is being prepared.",
+                "Unhedged beyond what we allow, and it lost. Your dealing access is suspended.",
+                "I've documented cover below the minimum and the loss. HR has asked for both.",
+                "Not enough cover, as the policy feared. Your exit interview has been scheduled.",
+                "The minimum exists for quarters like this one. You were below it.",
+                "An uncovered exposure the policy required us to hedge. The loss is now in the minutes."
             ],
             "luckyBreach": [
                 "A fine result, and a clear breach. I commend the one and minute the other.",
                 "Welcome profit, unwelcome process. Praise and a reprimand, in the same memo.",
-                "Good outcome. Poor controls. I'll thank you and write you up in one email.",
-                "Commendable return. Unacceptable authority. I shall send two letters.",
-                "The result pleases me. The method disturbs me. The audit committee agrees with both.",
-                "Well done on the gain. Do not do it again. I have underlined 'not'."
+                "Good outcome, poor controls. I'll thank you and reprimand you in one email.",
+                "Commendable return, unapproved positions. I shall send two letters.",
+                "The result pleases me. The breach disturbs me. The audit committee agrees with both.",
+                "Well done on the gain. Do not breach the policy again. I have underlined 'not'."
             ],
             "breachLoss": [
                 "A breach AND a loss. I've informed the audit committee and, frankly, HR.",
@@ -194,13 +309,14 @@
                 "Off-mandate losses. The committee will vote on replacing you. Unanimously, I expect."
             ],
             "inPolicyBad": [
-                "A loss, but within the approved bands. The policy has worked as designed.",
+                "A loss, but within the approved band. The policy worked as designed.",
                 "Disappointing, yet compliant. I'll minute it as 'unfortunate, not improper'.",
-                "We agreed the policy. I still hate it. But the process held.",
-                "The variance is regrettable. The control environment is intact. Slightly consoled.",
-                "Within policy, so no breach is recorded. The loss is recorded with sighing.",
+                "The process held. I'd have liked the result to hold as well.",
+                "The variance is regrettable. The control environment is intact. I'm slightly consoled.",
+                "Within policy, so no breach is recorded. The loss is recorded, with sighing.",
                 "I'd have preferred a profit. I'd have preferred a better market too.",
-                "Adverse outcome, correct process. A lessons-learned session, but a short one."
+                "Adverse outcome, correct process. A lessons-learned session, but a short one.",
+                "We did what the band permits, and the band permitted this. Noted, with regret."
             ],
             "noPolicyHedgeLoss": [
                 "A hedge loss with no policy to explain it? This will need a formal inquiry.",
@@ -209,7 +325,8 @@
                 "A loss on the hedging line. I'm opening an incident. And a second one.",
                 "Hedge P&L is negative. We have no policy to blame, so I'm blaming you.",
                 "Who approved a transaction that loses money by design? Oh, it's by design?",
-                "Without a policy, every hedge loss is a finding. This is finding number one."
+                "Without a policy, every hedge loss is a finding. This is finding number one.",
+                "I cannot tell whether this hedge was prudent. A written policy would tell me."
             ],
             "noPolicyHedgeWin": [
                 "The hedge gained. In the absence of a policy, I don't know how to feel.",
@@ -217,7 +334,9 @@
                 "Positive hedge P&L. Please don't mention this until we have a policy.",
                 "A gain, without a policy. I don't enjoy unsupervised good news.",
                 "The hedge made money, apparently. I'll add 'understand why' to the agenda.",
-                "Hedge gains are welcome. Unexplained hedge gains go on the risk register."
+                "Hedge gains are welcome. Unexplained hedge gains go on the risk register.",
+                "Profitable, but on whose authority? I'd sleep better with a signed policy.",
+                "A gain measured against no policy at all. I find that sentence troubling."
             ],
             "noPolicyNudge": [
                 "We have no hedging policy. This is an audit finding waiting to be written.",
@@ -225,15 +344,19 @@
                 "Without a policy, nothing you do can be called compliant. Propose one.",
                 "A hedging policy is overdue. I've left a draft template on your desk. Blank.",
                 "I'm unable to approve hedges against no policy. Please propose a policy.",
-                "The committee will consider any policy you propose. We have no other agenda."
+                "The committee will consider any policy you propose. We have no other agenda.",
+                "A policy gives us a band to measure you against. At present we measure by feel.",
+                "I've reserved a ring binder for our hedging policy. It awaits your proposal."
             ],
             "policyAdopted": [
                 "Policy adopted from next quarter. I have already filed it. Twice.",
                 "Approved and minuted. We now have a framework. I feel eight years younger.",
                 "The policy is adopted. I've scheduled its first review. For next week.",
-                "At last, a document. I shall read it, annotate it and laminate it.",
+                "At last, a document. I shall read it closely and then laminate it.",
                 "Policy ratified. The auditors will send flowers. Possibly a questionnaire too.",
-                "Adopted. From next quarter, we may call things 'compliant' again."
+                "Adopted. From next quarter, we may call things 'compliant' again.",
+                "Motion carried. I haven't been this happy since the last clean audit.",
+                "The band is clear and the wording is tidy. I have nothing to add, which is a first."
             ],
             "wrongFocus": [
                 "The small exposure got far more cover than the large one. That is the wrong way round.",
@@ -241,75 +364,127 @@
                 "Our largest exposure was barely hedged. Covering the small one does not offset that.",
                 "Seatbelts on the bicycle, barely any on the lorry. Please review your priorities.",
                 "Our total risk is what matters. The biggest exposure was left far too open.",
-                "Hedged where it mattered least, exposed where it mattered most. Unacceptable."
+                "Hedged where it mattered least, exposed where it mattered most. Unacceptable.",
+                "The largest risk should carry the most cover. This quarter it carried the least.",
+                "I note that the minor exposure was well protected. That is the only good news."
             ]
         },
         "operational": {
             "moodUp": [
                 "Good quarter. Can I have my capex request back out of the bin?",
-                "Stable costs! The factory floor might actually believe a forecast.",
+                "Stable costs. The factory floor might actually believe a forecast.",
                 "Nice. Procurement can stop hiding from the suppliers.",
                 "Predictable cash. I can plan production without crossing my fingers.",
                 "Good. The warehouse lights stay on another quarter.",
-                "Helpful. Suppliers love us when we pay on time."
+                "Suppliers paid on time, and they noticed. Thanks for that.",
+                "That's the sort of quarter that gets the forklift repaired.",
+                "Nobody on the floor will thank you. I will. Quietly."
             ],
             "moodDown": [
-                "That loss just ate my maintenance budget. Again.",
-                "Every pound lost here is a pound I can't spend on spare parts.",
+                "That just ate my maintenance budget. Again.",
+                "Every penny lost here is a penny I can't spend on spare parts.",
                 "Suppliers will hear about this. They always do. Then prices go up.",
                 "I don't understand derivatives, but I understand 'less money'.",
-                "My team's been asking for new kit. I'll tell them 'next year'. Again.",
-                "That makes Monday's supplier negotiation a lot harder."
+                "My team's been asking for new kit. They'll be asking a while longer.",
+                "That makes Monday's supplier negotiation a lot harder.",
+                "The night shift asked how treasury did. I changed the subject.",
+                "Not the quarter I'd hoped for. The conveyor belt shares my mood."
             ],
             "redZone": [
                 "Cash under the red line? I've got payroll on Friday.",
                 "Suppliers want paying up front now. Thanks for that.",
                 "We're so short on cash I'm rationing pallets. Actual pallets.",
                 "Below the red line. I've delayed a machine repair. It's making noises.",
-                "The bank's nervous, the suppliers are nervous, and now I'm nervous.",
-                "Low cash means the factory runs on hope. Hope is not a raw material."
+                "The bank's nervous and the suppliers are nervous. I've caught it off them.",
+                "Low cash means the factory runs on hope. Hope is not a raw material.",
+                "I've asked the canteen to stop buying the good biscuits. That's how low we are.",
+                "Payroll goes out before anything else. Tell me we can still do that."
+            ],
+            "overLucky": [
+                "You hedged more than the board allows. Good result, but rules are rules.",
+                "Over the limit. On the floor, you don't run a machine past its rating, even if it copes.",
+                "Too much cover. It came out fine, but the policy says otherwise.",
+                "You went past the cap. Cheers for the result. Now back inside the line, please.",
+                "The board set a maximum for a reason. You found the reason by ignoring it.",
+                "More hedges than the limit. Next time, ask before you pile them on.",
+                "Above the band and nobody got hurt. That's how near-misses start.",
+                "Extra cover we didn't approve. If it were a safety issue I'd write it up. It's close."
+            ],
+            "underLucky": [
+                "You hedged less than the board asked for. It paid, but it's still a breach.",
+                "Under the minimum. On the floor, that's running the saw with the guard off.",
+                "Not enough cover. Good result, but I wouldn't sign off that risk on a forklift.",
+                "Below the band and it came good. Next time, cover what we agreed.",
+                "You left too much open. The market went your way. Don't count on it twice.",
+                "The policy sets a floor. You were under it. Back up next quarter, please.",
+                "Unhedged past what we allow. I'll take the cash, but put the guard back on.",
+                "Too little cover, plenty of profit. Swap those round and we're in trouble."
+            ],
+            "overLoss": [
+                "More hedging than the board allows, and a loss on top. HR is waiting in my office.",
+                "Over the limit and in the red. Hand your pass in at the gate.",
+                "Too much hedging and it cost us. That was my new machine. HR has questions.",
+                "Past the cap, and it backfired. Don't bother coming in on Monday.",
+                "Past the limit and it cost us. Consider this a final written warning.",
+                "You piled on extra cover and it lost. Who signed that off? Nobody did.",
+                "Above the band and below budget. I've cancelled the overtime to pay for it.",
+                "Hedging above the limit, and now less cash. I'm not covering for you on this one."
+            ],
+            "underLoss": [
+                "Less cover than we agreed, and my payroll money gone. HR is on the phone.",
+                "Below the minimum and in the red. That's working without the guard, and it hurt.",
+                "That open exposure cancelled my new machine. Security has your name.",
+                "Too little cover where the policy wanted some, and now no money. HR has a form.",
+                "Too little hedging, and the bill landed on us. You'll be getting a letter from HR.",
+                "You left it open and the supplier payments took the hit. HR has booked the room.",
+                "Not enough cover. The market came for the gap and found it.",
+                "Below the band and over budget on losses. I'm out of ways to explain this to the team."
             ],
             "luckyBreach": [
-                "Great result. The CFO's eye is twitching. Please don't repeat it.",
-                "Good money, wrong route. The floor cheers, the rulebook weeps.",
-                "Nice gain, and I'm pleased. But we don't skip the checklist. Not even then.",
+                "Great result. Off policy, though. Please don't repeat it.",
+                "Good money, wrong route. The floor cheers and the rulebook weeps.",
+                "Nice gain, and I'm pleased. But we don't skip the checklist, not even then.",
                 "You got the result, and a verbal warning. I'd take both, honestly.",
-                "It paid off, which I like. It was off-policy, which I don't. Thanks, and don't.",
+                "It paid off, which I like. It was off-policy, which I don't.",
                 "Cheers for the cash. Now put the rules back where you found them."
             ],
             "breachLoss": [
                 "You broke the rules and lost my payroll money. HR wants a chat. Today.",
                 "Off-policy and in the red. On the floor, that's how you lose your pass.",
                 "That loss cancelled my new machine. HR has asked me about your 'judgement'.",
-                "No checklist, no policy, no money. I've asked HR what happens next.",
+                "Off policy and out of money. I've asked HR what happens next.",
                 "Rule-breaking that costs money? Where I work, that's a final written warning.",
                 "You gambled the supplier payments and lost. Security has asked for your lanyard."
             ],
             "inPolicyBad": [
                 "Bad quarter, but we followed the policy. I'll live. The kit won't.",
-                "We agreed the policy. I still hate it. At least nobody broke anything.",
-                "Money's tight, but the hedge did what it said. I can budget around that.",
+                "Followed the rules and still lost money. At least the rules are intact.",
+                "Money's tight, but we stuck to what we agreed. I can budget around that.",
                 "A loss inside the rules. I can explain that to the floor. Just about.",
                 "Stung, not shocked. The policy held. Maintenance gets cut by half instead of all.",
                 "Not great. But no surprises, and surprises are what scare me.",
-                "Policy worked, market didn't. I'll tell the team it's weather."
+                "Policy worked, market didn't. I'll tell the team it's weather.",
+                "We played it by the book and still came out down. I'll move some orders around."
             ],
             "noPolicyHedgeLoss": [
-                "The hedge LOST money? Who approved this? That was my spare-parts budget.",
+                "We lost money on a hedge? That was my spare-parts budget.",
                 "We paid for protection and it cost us? I'm not saying fire someone, but.",
                 "A hedge loss. I thought hedges were like insurance. Insurance doesn't lose.",
-                "The hedge is down. The fuel bill is steady. Why are we upset? Because red.",
+                "The hedge is down and the bills are steady. Why am I upset? Because it's red.",
                 "Hedge lost money. Cancel it. Cancel them all. I'm busy.",
-                "I don't care what it protected. That number is a machine I can't buy.",
-                "So we spent money to avoid spending money? And it cost money? Unwind it."
+                "Whatever it protected, that number is a machine I can't buy.",
+                "So we spent money to avoid spending money, and it cost money? Unwind it.",
+                "Write down when we hedge and why. Then I'll stop asking every quarter."
             ],
             "noPolicyHedgeWin": [
                 "The hedge made money? Where was that when I needed a new forklift?",
                 "A hedge gain. Excellent. Can we hedge the canteen next?",
-                "We made money on a hedge. I'm told this is not what hedges are for. Fine.",
+                "We made money on a hedge. I'm told that's not what hedges are for. Fine.",
                 "The hedge paid. My team wants to know if we can do that every week.",
-                "A gain! I'll spend it before anybody explains it away.",
-                "Hedge profit. Nobody tell Procurement. They'll want a cut."
+                "A gain. I'll spend it before anybody explains it away.",
+                "Hedge profit. Nobody tell procurement. They'll want a cut.",
+                "Good result on the hedge. Write down how you chose it, so we can do it on purpose.",
+                "The hedge paid for the new safety boots. I'll take it."
             ],
             "noPolicyNudge": [
                 "We've got no hedging policy. Propose one so I can stop guessing.",
@@ -317,15 +492,19 @@
                 "A hedging policy would save me ten meetings a quarter. Please propose one.",
                 "Every shop floor has rules. Treasury should too. Propose a policy.",
                 "No policy, no plan. Table a policy and I'll stop asking awkward questions.",
-                "Give us a hedging policy. Even a rough one. I'll laminate it myself."
+                "Give us a hedging policy. Even a rough one. I'll laminate it myself.",
+                "We hedge or we don't, and nobody knows why. A policy would sort that out.",
+                "Write a band down and I'll pin it next to the fire drill notice."
             ],
             "policyAdopted": [
                 "Policy adopted from next quarter. Finally, a rulebook I can pin on the wall.",
-                "Approved. Now everyone knows what the line is. Even me.",
+                "Approved. Now everyone knows where the line is. Even me.",
                 "Done. We have a policy. I'll tell the floor. They won't care. I do.",
                 "Adopted. It's like a safety sign, but for money.",
-                "A policy! I can plan production around that. Or at least plan a tea break.",
-                "Policy in place from next quarter. I feel safer already. Slightly."
+                "A policy. I can plan production around that. Or at least plan a tea break.",
+                "Policy in place from next quarter. I feel safer already. Slightly.",
+                "Good. Now when someone asks why we hedged, I'll point at the wall.",
+                "Approved. One page, plain words. That's how I like my rules."
             ],
             "wrongFocus": [
                 "You padlocked the shed and left the hangar open. Hedge the big one first.",
@@ -333,62 +512,333 @@
                 "The big exposure is where the money is. You hedged the bit that hardly moves us.",
                 "Insured the toolbox, not the factory. Flip that round next quarter, please.",
                 "Small risk sorted, big risk running loose. On the floor we call that busywork.",
-                "Hedge what can hurt us. The small one couldn't. The big one still can."
+                "Hedge what can hurt us. The small one couldn't. The big one still can.",
+                "You fixed the squeaky door and ignored the leaking roof.",
+                "Most of our money rides on the big one. That's the one I want covered."
             ]
         }
     },
     "chairman": {
-        "jameson": [
-            "THIS KEYNOTE IS 40 MINUTES OVER! GET ME THE HEDGE NUMBERS! AND A SANDWICH!",
-            "I DON'T WANT A LANYARD! I WANT RESULTS!",
-            "HEDGE IT! UNHEDGE IT! I DON'T CARE! JUST GET ME A HEADLINE!",
-            "COFFEE! NUMBERS! IN THAT ORDER! MOVE!",
-            "Networking? I don't network. I SHOUT. There's a difference!"
-        ],
-        "musk": [
-            "What if the hedge book was a rocket? Just thinking out loud.",
-            "I've renamed the treasury department 'T'. New logo tonight.",
-            "Forwards are legacy tech. We're hedging with memes now.",
-            "I polled my followers. 60% voted to unhedge everything. Democracy.",
-            "Skipped the keynote. Gave my own in the coffee queue. Standing room only."
-        ],
-        "oleary": [
-            "Free conference coffee? I've taken forty. Someone bring the van round.",
-            "Options? You want to PAY for a maybe? Absolutely not.",
-            "From next quarter the board pays to sit in the boardroom chairs. Fair's fair.",
-            "The lanyard was free. That's the only reason I'm wearing it.",
-            "Hedging's like legroom. Lovely to have. Now, who's paying for it?"
-        ],
-        "dimon": [
-            "Fortress balance sheet. That's the whole strategy. Write it down.",
-            "A good outcome isn't a good decision. Ask me how I know.",
-            "Show me the real risk report. Not the conference-stand version.",
-            "I've seen every crisis since '87. Your hedge ratio worries me more."
-        ],
-        "buffett": [
-            "Price is what you pay for a hedge. Value is sleeping at night.",
-            "When the tide goes out, you find out who forgot to hedge.",
-            "I'd rather be approximately hedged than precisely wrong.",
-            "Our favourite holding period is forever. Our favourite keynote is short."
-        ],
-        "jobs": [
-            "One more thing. Your hedge book has too many buttons.",
-            "Simplicity. One exposure, one hedge, one beautiful slide.",
-            "I wouldn't let my kids use this hedge book. That's a compliment. Mostly.",
-            "Design is how it works. Your hedges work. They just look terrible."
-        ],
-        "dorsey": [
-            "I meditated through the market crash. The crash did not notice.",
-            "Day four of my fast, I understood basis risk. Day five, I forgot it.",
-            "Ice bath at 5am, board meeting at 9. Both equally cold.",
-            "Let's move the reserves into Bitcoin. I moved mine. I am very calm about it."
-        ],
-        "ackman": [
-            "A brief comment. Page one of forty-seven.",
-            "I've posted my hedging thesis online. It's a thread. It's 112 posts long.",
-            "I'll keep it short. Slide one of my second deck.",
-            "High conviction: we're mispriced. Low conviction: we'll finish on time."
-        ]
+        "jameson": {
+            "positive": [
+                "NOT BAD! Don't let it go to your head. I've got a front page to fill!",
+                "GOOD NUMBERS! Somebody get me a headline that isn't about us going bust!",
+                "Fine work. Now DO IT AGAIN or you're out!",
+                "I'll allow a small celebration. VERY small. Back to work!",
+                "THAT'S a story! 'Treasury does its job.' Page twelve, but it's a story!",
+                "Hmph. Not terrible. Don't expect me to say that twice!",
+                "I'd give you a raise but then you'd get COMFORTABLE. So NO.",
+                "Hold the presses! No, don't. Ink costs money. But GOOD QUARTER!"
+            ],
+            "negative": [
+                "I DON'T WANT EXCUSES! I WANT SOMEONE TO FIX THIS!",
+                "Red ink on my desk? GET ME GREEN INK! GET ME A NEW TREASURER!",
+                "I've seen better results from a coin flip! At least a coin TRIES!",
+                "That's the sound of my patience LEAVING THE BUILDING!",
+                "LOSSES? On MY watch? Who wrote this quarter? Get them in here!",
+                "Get out of my office! No, stay! No, just FIX IT, whatever it is!",
+                "The headline writes itself: 'CFO LOSES MONEY'. I HATE it when they write themselves!",
+                "Turn this around by Monday or your photo goes on page one!"
+            ],
+            "offPolicy": {
+                "over": [
+                    "MORE hedging than the board's LIMIT? Who approved that? NOBODY, that's who!",
+                    "Over the limit! Get me a ruler and someone who can read it!",
+                    "The board set a MAXIMUM! It's in the dictionary! Look it up!",
+                    "You blew past the cap! The numbers survived. Your reputation is on page two!",
+                    "Too much cover! I want hedges, not a hedge MAZE!",
+                    "Above the band? I don't care if it worked! RULES are the story!"
+                ],
+                "under": [
+                    "LESS cover than the board asked for? Get me the policy and a highlighter!",
+                    "Below the minimum! The market let you off. I WON'T next time!",
+                    "Unhedged? With MY money? Get me a hedge and a strong coffee!",
+                    "Not enough cover! It came good, but I don't print rumours, I print RULES!",
+                    "Left it open? What is this, a sandwich shop? HEDGE IT!",
+                    "Under the minimum! Next quarter I want the band, in bold, on my desk!"
+                ]
+            }
+        },
+        "musk": {
+            "positive": [
+                "Great quarter. I've renamed treasury 'T'. New logo drops at 3am.",
+                "Good numbers. Posting a chart of them with no axes.",
+                "This proves my thesis. I'll explain the thesis on a podcast later.",
+                "Solid. Let's 10x it. I don't know what that means for treasury yet.",
+                "I polled my followers. 61% say you're doing fine. Democracy has spoken.",
+                "Good result. Celebrating by announcing a product that doesn't exist.",
+                "To the moon! Okay, to the next quarter. Small steps for a rocket.",
+                "Nice numbers. Launching a commemorative token. Please don't buy it."
+            ],
+            "negative": [
+                "This is fine. I'm going to post about it at 3am.",
+                "Losses are just gains that haven't shipped yet.",
+                "Bold of the market to lose us money. I respect the audacity.",
+                "What if the loss is a feature? Running a poll on it now.",
+                "I'll sleep under my desk until we fix this. Joking. Maybe.",
+                "We need to pivot. Has anyone tried hedging with a rocket?",
+                "I've decided this loss is beta testing for a much bigger win.",
+                "Bad quarter. New rule: every loss gets a code name and a launch date."
+            ],
+            "offPolicy": {
+                "over": [
+                    "Hedged past the board's limit? I respect the energy. The board does not.",
+                    "More cover than the limit. You built a rocket to go to the shops.",
+                    "Over the cap. I polled the board. 100% said no. Tough crowd.",
+                    "Excess hedging. Interesting pivot. Unapproved pivot, though.",
+                    "Too much cover. Delete some. Fewer parts, fewer things to break.",
+                    "Above the band. Move fast, sure, but past the limit the lawyers move faster."
+                ],
+                "under": [
+                    "Hedged under the board's minimum. Very first principles of you. Still a breach.",
+                    "Unhedged. Bold. The board wants a minimum, sadly, not vibes.",
+                    "Below the minimum. I'm calling it a successful test flight. The board isn't.",
+                    "Not enough cover. The rocket landed, but you skipped the checklist.",
+                    "Left it open and the market went your way. Posting that would be a mistake. Posting.",
+                    "Under the minimum. The board wanted more hedges. I wanted more chaos. They win."
+                ]
+            }
+        },
+        "oleary": {
+            "positive": [
+                "Good. Now spend absolutely none of it.",
+                "Decent numbers. I'll celebrate by charging the board for the biscuits.",
+                "We made money? Quick, hide it before someone books a team offsite.",
+                "Profit is just a fee nobody's noticed yet. Keep finding them.",
+                "Finally, a quarter that made me money instead of asking for it. A miracle.",
+                "Good result. I've turned the heating down a degree to mark the occasion.",
+                "Nice work. Your reward is a window seat. That'll be extra, obviously.",
+                "That's a quarter I'd fly. Hand luggage only, but I'd fly it."
+            ],
+            "negative": [
+                "Every cent of that loss is coming out of someone's bonus.",
+                "You know what that loss could have bought? Three planes. Used, but planes.",
+                "If this were my airline, I'd charge the losses to the passengers.",
+                "That loss is the most expensive thing we bought all year, and we got nothing.",
+                "I'd fine you for this if I thought I could collect it.",
+                "I've cancelled the office biscuits to recover this. That's how serious it is.",
+                "There's a fee for losing money here. You've just paid it, several times over.",
+                "That's a refund to the market. We don't do refunds."
+            ],
+            "offPolicy": {
+                "over": [
+                    "More hedging than the limit? That's paying for extra legroom you never booked.",
+                    "You went past the limit. Even I don't sell that many add-ons.",
+                    "Over the cap. You bought travel insurance twice for the same flight.",
+                    "Too much cover. Every extra hedge is a seat nobody's sitting in.",
+                    "Above the band. Excess baggage, mate. There's a charge for that.",
+                    "Hedged beyond the limit. I'd have charged you for the privilege, if I'd known."
+                ],
+                "under": [
+                    "Under the board's minimum to save money? Saving money I like. Breaking rules I fine.",
+                    "Below the minimum. You flew without a seatbelt to save weight. Clever. Banned.",
+                    "Unhedged to save the cost? That's my instinct too, and the board still says no.",
+                    "Not enough cover. Even my cheapest fare comes with a seatbelt.",
+                    "Left it open to save a few quid? Respect. Now put the hedge back in the locker.",
+                    "Under the minimum. The board wants hedges. I want them too, if they're free."
+                ]
+            }
+        },
+        "dimon": {
+            "positive": [
+                "Solid execution. Now tell me how much of it was skill.",
+                "Good discipline. That's what separates us from the amateurs.",
+                "Risk-adjusted, this is decent work. I did adjust it. Twice.",
+                "Good quarter. Don't confuse it with permission to take more risk.",
+                "Clean book, clean result. My risk team will find something anyway.",
+                "I read the term sheets. They were in order, which surprised me.",
+                "That's the kind of quarter that builds a franchise. Do forty more.",
+                "Good. I'll remember this when you ask for a bigger limit. I'll still say no."
+            ],
+            "negative": [
+                "Walk me through every position. I'll find where this went wrong.",
+                "I don't mind losing money. I mind not knowing why we lost it.",
+                "This is a process failure, not a market failure. Let's be honest about that.",
+                "A loss is tuition. The question is whether you actually learned anything.",
+                "Show me the risk report. The real one, not the conference-stand version.",
+                "I've read your hedge confirmations. I'd like that hour back.",
+                "We've been through worse. I still expect a plan on my desk by Monday.",
+                "Tell me what keeps you up at night. Tonight, I suspect, it's this."
+            ],
+            "offPolicy": {
+                "over": [
+                    "Hedged above the board's limit. I can read a confirmation. Can you read a policy?",
+                    "Over the cap. Derivatives you didn't need are just a position with a nice name.",
+                    "More cover than the mandate's maximum. My traders lose their desks for that.",
+                    "Past the limit. The P&L held up. Compliance doesn't grade on P&L.",
+                    "Excess hedges against a forecast. I've seen that film. It ends in a write-down.",
+                    "Above the band. Sloppy. Fix it before someone like me notices. I noticed."
+                ],
+                "under": [
+                    "You hedged less than the board asked for. An open position needs a reason. Give me one.",
+                    "Below the minimum. The market forgave you. I keep better records than the market.",
+                    "Unhedged beyond policy. In my world that's a trading position with no trader.",
+                    "Not enough cover. It worked. Working isn't the same as being allowed.",
+                    "Below the band. I'd like the risk memo that explains it. I suspect there isn't one.",
+                    "Left too much open. Try that at a bank and the regulator moves in for a month."
+                ]
+            }
+        },
+        "buffett": {
+            "positive": [
+                "Steady as a Sunday roast. I like a quarter you can set your watch by.",
+                "Good. Now leave it alone. Money rises best when you stop opening the oven.",
+                "Patient, sensible hedging. That's all I ever ask, besides a cheeseburger.",
+                "Fine quarter. Forget about it and focus on the next twenty.",
+                "My grandfather said a dull ledger is a happy ledger. This one's nearly asleep.",
+                "Nice work. I'll celebrate with a cola. A small one. I'm not made of money.",
+                "You didn't try to be clever. That's the cleverest thing you could have done.",
+                "Good. The cash is growing slowly, which is the only speed I trust."
+            ],
+            "negative": [
+                "We lost money. I'm going to need a second burger to think about this.",
+                "Short-term losses I can stomach. Sloppy thinking gives me heartburn.",
+                "A cow that won't milk isn't a reason to sell the farm. But I'd like to know why.",
+                "This too will pass. Let's not make it a habit.",
+                "The ledger looks like my porch after a storm. Sweep it up and let's talk.",
+                "A loss this quarter. My cola's gone flat in sympathy.",
+                "A bad quarter is a good teacher with an expensive fee. Did you take notes?",
+                "Spilled milk is fine. Leaving the fridge open is how you get more of it."
+            ],
+            "offPolicy": {
+                "over": [
+                    "Hedged past the board's limit. Too much insurance is a slower way to lose money.",
+                    "More cover than the limit allows. That's three umbrellas for one rainy day.",
+                    "Over the cap. Never hedge more than you own. My mother taught me that with jam.",
+                    "Excess hedges. You can't eat more burgers than you've got buns for.",
+                    "Above the band. Doing more than you need is just fidgeting with a bigger bill.",
+                    "Hedged beyond what we agreed. Good fences make good boards, and you climbed ours."
+                ],
+                "under": [
+                    "Short of the board's minimum. Skip the umbrella and you're dry until you aren't.",
+                    "Below the minimum. The market was kind. Kindness is not a plan.",
+                    "Unhedged past what we allow. That's speculating, and it gives me indigestion.",
+                    "Not enough cover. You can't buy a fire extinguisher once the kitchen's alight.",
+                    "Under the minimum. My old boss said, 'Leave the door open and the wind decides.'",
+                    "Left too much open. It came good, and that's what worries me most."
+                ]
+            }
+        },
+        "jobs": {
+            "positive": [
+                "Simple. One clear hedge, beautifully done. That's the whole keynote.",
+                "Beautiful. Not the number, the clarity behind it. The number is also fine.",
+                "This quarter has one button and it works. I love it.",
+                "Good. I'd put this hedge book on a stage under a single spotlight.",
+                "Clean. Nothing extra. You removed the clutter and the cash showed up.",
+                "One more thing. It was a good quarter.",
+                "This is what happens when you say no to ninety ideas and yes to one.",
+                "Elegant. I'm wearing black to celebrate. Same as always, but celebrating."
+            ],
+            "negative": [
+                "Unacceptable. Not the loss itself. The inelegance of it.",
+                "Too many moving parts, and every one of them moved the wrong way.",
+                "One more thing. This quarter. Never again.",
+                "This P&L has the design sense of a fax machine.",
+                "A loss this messy tells me the thinking was messy. Fix the thinking first.",
+                "I wanted magic. I got a spreadsheet with a red cell.",
+                "Real treasurers ship results. This is a prototype that caught fire.",
+                "Explain this quarter to me in one sentence. Now explain why I hate the sentence."
+            ],
+            "offPolicy": {
+                "over": [
+                    "More hedging than the limit allows. Every extra forward is a button nobody needs.",
+                    "You went past the limit. Restraint is a feature. Ship it next time.",
+                    "Over the cap. I count more forwards than the design calls for.",
+                    "Excess cover. I'd delete it, then delete the meeting where you decided on it.",
+                    "Above the band. Simplicity means doing what was agreed, and nothing extra.",
+                    "Hedged beyond the limit. It works, but it's ugly, and ugly is a breach too."
+                ],
+                "under": [
+                    "Less hedging than the board asked for. Minimal is beautiful. This is just missing.",
+                    "Below the minimum. You removed a feature the board needed.",
+                    "Unhedged. Very clean. Also against policy, which is the opposite of clean.",
+                    "Not enough cover. The design had a hedge in it. Where did it go?",
+                    "Under the minimum. Simplicity is a choice. Leaving it open was a shortcut.",
+                    "One more thing. You were below the minimum. That's the thing."
+                ]
+            }
+        },
+        "dorsey": {
+            "positive": [
+                "Beautiful. I sensed this quarter during my 5am ice bath.",
+                "Gratitude. That's what I'm feeling. Also, shall we move the reserves into Bitcoin?",
+                "The cash flowed because we stopped forcing it. We simply allowed it.",
+                "Day three of my fast, and this result tastes better than food.",
+                "Namaste. And well hedged. Mostly namaste.",
+                "I felt this coming on my barefoot walk across the car park.",
+                "Good quarter. It's in my gratitude journal, between 'beard oil' and 'Bitcoin'.",
+                "Calm money, calm mind. I'm going to go and hum about it."
+            ],
+            "negative": [
+                "Deep breath with me. In. Out. Now, these losses.",
+                "I sat with this number in silence for an hour. It did not improve. I did.",
+                "Let's not call it a loss. Let's call it negative abundance. Lighter, no?",
+                "I fasted through this whole downturn. By day three the loss felt theoretical.",
+                "The universe is rebalancing our energy. Also our balance sheet, sadly.",
+                "Forty minutes in the sauna and I still can't sweat this one out.",
+                "This quarter needs an ice bath. So do you, frankly.",
+                "My beard went grey reading this. One hair. But I noticed."
+            ],
+            "offPolicy": {
+                "over": [
+                    "Hedged past the board's limit. Too much protection is its own kind of fear.",
+                    "More cover than the limit allows. Let go a little. The policy already holds you.",
+                    "Over the cap. Even my fasts have a maximum, and I respect it.",
+                    "Excess hedges. Release them. Then release the urge to buy more.",
+                    "Above the band. Over-hedging is clinging. I learned that on a silent retreat.",
+                    "Beyond the limit. My breathwork has more discipline than this hedge book."
+                ],
+                "under": [
+                    "Less cover than the board asked for. Openness is a virtue. Open exposure isn't.",
+                    "Below the minimum. I meditate unhedged. The company shouldn't.",
+                    "Unhedged and at peace? The board is not at peace. I can feel it from here.",
+                    "Not enough cover. Even in an ice bath I wear the little hat.",
+                    "Below the band. Intention matters, and the intention was 'hedge more'.",
+                    "Left it open and it came good. The universe was generous. The policy is less spiritual."
+                ]
+            }
+        },
+        "ackman": {
+            "positive": [
+                "A strong result. Explaining why will take twenty minutes. Slide one, please.",
+                "Excellent quarter. Some brief thoughts: fifteen pages, three pillars. Actually, four.",
+                "This validates my thesis. Let me restate the thesis, in full, for the minutes.",
+                "Good work. I've drafted a 26-page memo: 'The Danger of a Good Quarter'.",
+                "High conviction: you did well. Medium conviction: I'll take some credit.",
+                "A victory lap, documented. 'I told you so' appears, tastefully, on slide 19.",
+                "I've posted a thread about your quarter. It's 112 posts. You're in post 87.",
+                "Well done. I'll keep it short. The short version is on slide 40."
+            ],
+            "negative": [
+                "I've written a 47-page memo on this loss. Key finding: the market is wrong.",
+                "My thesis was correct. The quarter disagrees. I'm drafting a reply to the quarter.",
+                "A teachable moment. I've blocked out ninety minutes and brought a laser pointer.",
+                "This loss vindicates what I said at the last three meetings. I have transcripts.",
+                "Before anyone panics: a 31-page memo, 'Why This Loss Is Actually Bullish'.",
+                "I've written a self-critique. Nineteen pages. I was mostly right. See Appendix C.",
+                "Low conviction in this quarter. High conviction in my deck about this quarter.",
+                "I'd like to read you an open letter about this loss. It's open. It's also long."
+            ],
+            "offPolicy": {
+                "over": [
+                    "Hedged above the board's limit. I modelled 14 scenarios. All 14 call it a breach.",
+                    "More cover than the limit permits. My memo on why is 22 pages. Page one: the limit.",
+                    "Over the cap. I'm a conviction investor. My conviction is that you read the policy.",
+                    "Excess hedging. I've drafted an open letter. It is addressed to your forwards.",
+                    "Above the band. Slide 214 of my deck covers this exact mistake. Back to slide 1.",
+                    "Past the limit. It worked, which I will now explain is irrelevant, at length."
+                ],
+                "under": [
+                    "Less cover than the board asked for. My thesis: the minimum exists. Slides 1 to 40.",
+                    "Below the minimum. I wrote a thread. Post 1: 'Why is this open?' Posts 2 to 300: same.",
+                    "Unhedged against policy. I hold positions with conviction. You held one with none.",
+                    "Not enough cover. I've prepared a 35-page memo. The summary is 'more cover'.",
+                    "Under the minimum. Call it activism if you like. Activists publish a deck first.",
+                    "Left it open and it paid. Allow me a brief rebuttal. Forty minutes, no questions."
+                ]
+            }
+        }
     },
     "gameOverTitles": [
         {
@@ -440,15 +890,15 @@
     "bankrupt": [
         "Out of cash. The CFO has been replaced, mostly by an administrator.",
         "The bank has called. Nobody answered, because you were already in the lift.",
-        "Cash: zero. The CFO has been replaced. The replacement is a spreadsheet.",
-        "The bank has called the loans. Your lanyard still works until 5pm.",
+        "Cash: zero. Your replacement is a spreadsheet with better judgement.",
+        "The loans have been called. Your lanyard still works until 5pm.",
         "Insolvent. The banks stopped returning calls and started sending lawyers.",
-        "Bust. The CFO has been replaced, and the administrators brought their own biscuits.",
-        "Out of cash, out of time. The bank has called, and so has your replacement."
+        "Bust. The administrators arrived with their own biscuits, which felt pointed.",
+        "Out of cash and out of time. Your replacement starts on Monday."
     ],
     "fired": [
         "The board has lost confidence in your results. Security will walk you out.",
-        "Overall results fell short, and one bet cost us dearly. The board is 'moving on'.",
+        "Your results fell short, and one bet cost us dearly. The board is 'moving on'.",
         "You're fired. The numbers didn't add up, and neither did your explanations.",
         "The board's confidence has collapsed. So has your access card.",
         "One catastrophic off-policy bet. The board is going in a different direction. Away.",

@@ -3,6 +3,7 @@
 // No DOM here, so it runs under Node tests. Quips and the chairman use a cosmetic SeededRandom derived from
 // `run.seed ^ 0xC0FFEE`; the simulation RNG (inside SimEngine) is never touched.
 
+import { BALANCE } from '../../engine/sim/balance.js';
 import { createRun, simulateQuarter, isRunOver, activeExposures } from '../../engine/sim/SimEngine.js';
 import { maxHedgeRatio, canBuyPowerUp } from '../../engine/sim/powerUps.js';
 import { finalScore } from '../../engine/sim/score.js';
@@ -17,11 +18,14 @@ import { CHAIRMAN_SPRITES, spriteIdForMember } from '../../ui/pixel/sprites.js';
 // this quarter is above CHAIRMAN_DELTA_PCT of starting cash.
 export const CHAIRMAN_QUARTERS = Object.freeze([1, 4, 8]);
 export const CHAIRMAN_DELTA_PCT = 0.03;
-// Board lines the chairman never talks over: the board answering a proposal, the angry losing-breach line, and
-// (v3.1) the wrong-focus line, which explains why the quarter was off policy.
-export const CHAIRMAN_YIELDS_TO = Object.freeze(['policyAdopted', 'breachLoss', 'wrongFocus']);
-// D1 result-quip thresholds, as fractions of starting cash.
-export const BIG_MOVE_PCT = 0.02;
+// Board lines the chairman never talks over: the board answering a proposal, the wrong-focus line (it explains why
+// the quarter was off policy) and the losing breaches (v3.2: split by direction; breachLoss is Pro's direction-free
+// one). On a breach whose market result held up he speaks only an off-policy line that names the breach.
+export const CHAIRMAN_YIELDS_TO = Object.freeze(['policyAdopted', 'wrongFocus', 'overLoss', 'underLoss', 'breachLoss']);
+// v3.2 outcome thresholds, as fractions of starting cash: a market result (exposures plus hedges) smaller than
+// QUARTER_FLAT_PCT is a flat quarter, and a hedge result smaller than HEDGE_RESULT_PCT is no hedge result.
+export const QUARTER_FLAT_PCT = 0.005;
+export const HEDGE_RESULT_PCT = 0.005;
 export const OVER_HEDGE_FACTOR = 1.15;
 
 const COSMETIC_SALT = 0xC0FFEE;
@@ -30,8 +34,13 @@ const INTRO_SALT = 9;        // quarters use salts 1..8
 const CHAIRMAN_IDS = Object.keys(CHAIRMAN_SPRITES);
 const FREE_UNLOCKS = emptyProgress().unlocked;
 const PERSONALITIES = ['aggressive', 'cautious', 'operational'];
-const ANGRY_KEYS = new Set(['breachLoss', 'noPolicyHedgeLoss', 'redZone', 'moodDown']);
+const ANGRY_KEYS = new Set(['breachLoss', 'overLoss', 'underLoss', 'noPolicyHedgeLoss', 'redZone', 'moodDown']);
 const HAPPY_KEYS = new Set(['policyAdopted', 'moodUp']);
+// Breaches whose market result held up: the chairman may speak, but only an off-policy line.
+const OFF_POLICY_KEYS = new Set(['overLucky', 'underLucky', 'luckyBreach']);
+// On a flat quarter the chairman frowns at these board keys and approves of the rest.
+const FLAT_NEGATIVE_KEYS = new Set(['inPolicyBad', 'noPolicyHedgeLoss', 'redZone', 'moodDown']);
+const TONE_EXPRESSION = Object.freeze({ positive: 'happy', negative: 'angry', offPolicy: 'neutral' });
 
 const sum = (lines, field) => (lines || []).reduce((s, l) => s + (Number.isFinite(l[field]) ? l[field] : 0), 0);
 
@@ -44,28 +53,84 @@ function pickLine(rng, lines) {
     return Array.isArray(lines) && lines.length ? rng.pick(lines) : '';
 }
 
+// FNV-1a: a stable 32-bit hash of a pool id.
+function strHash(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+}
+
+// v3.2: the line for the `uses`-th use of a pool in this run (counting from 0). Each pool has its own seeded
+// permutation from the run seed and the pool id, so the first pool.length uses are all different lines, and the
+// same run, pool and count always give the same line (resume-stable). Cosmetic only: never the simulation RNG.
+export function linePick(seed, poolId, pool, uses) {
+    if (!Array.isArray(pool) || !pool.length) return '';
+    const order = cosmeticRng(seed, strHash(String(poolId))).shuffle(pool.map((_, i) => i));
+    const n = Number.isInteger(uses) && uses > 0 ? uses : 0;
+    return pool[order[n % pool.length]];
+}
+
 // The run's chairman persona (one of CHAIRMAN_SPRITES), fixed by the run seed.
 export function chairmanFor(seed) {
     return CHAIRMAN_IDS[Math.floor(cosmeticRng(seed, PERSONA_SALT).next() * CHAIRMAN_IDS.length)];
 }
 
-// Board line selection (contract.md, A9). First match wins. v3.1: a wrong-focus quarter (the big exposure under-hedged
-// while a small one was hedged) gets its own line on any board; summaries without the flag never match.
-export function boardLineKey(summary, moodBefore) {
+// 'over' or 'under' for an off-policy quarter: the cover above the band's max, or below it. null when the cover or
+// the band is unknown (Pro summaries carry no riskCover, and Pro passes no band).
+function breachDirection(summary, mandate) {
+    if (summary.policy !== 'off' || !mandate || !Number.isFinite(summary.riskCover)) return null;
+    return summary.riskCover > mandate.max ? 'over' : 'under';
+}
+
+// v3.2: what actually happened in a quarter, for the feedback lines. `mandate` is the band the quarter was judged
+// on (run.mandate: it only ever changes from none to an adopted band, so every in or off quarter has today's band).
+//   policyState: 'adopted' (a proposal this quarter) | 'wrongFocus' | 'none' (no policy) | 'in' | 'over' | 'under'
+//                (cover above or below the band), or 'off' when the direction is unknown (Pro, or no band given).
+//   quarter:     'good' | 'bad' | 'flat': the market result (exposures plus hedges) against QUARTER_FLAT_PCT.
+//   hedge:       'won' | 'lost' | 'none': Σ hedgeImpact against HEDGE_RESULT_PCT.
+export function outcomeFor(summary, startingCash, mandate = null) {
+    const market = Number.isFinite(summary.marketResult)
+        ? summary.marketResult
+        : sum(summary.lines, 'exposureImpact') + sum(summary.lines, 'hedgeImpact');
+    const flat = QUARTER_FLAT_PCT * startingCash;
+    const quarter = market >= flat ? 'good' : market <= -flat ? 'bad' : 'flat';
+    const hedgeResult = sum(summary.lines, 'hedgeImpact');
+    const notable = HEDGE_RESULT_PCT * startingCash;
+    const hedge = hedgeResult >= notable ? 'won' : hedgeResult <= -notable ? 'lost' : 'none';
+    let policyState;
+    if (summary.policyAdopted) policyState = 'adopted';
+    else if (summary.wrongFocus === true) policyState = 'wrongFocus';
+    else if (summary.policy === 'none') policyState = 'none';
+    else if (summary.policy === 'in') policyState = 'in';
+    else policyState = breachDirection(summary, mandate) ?? 'off';
+    return { policyState, quarter, hedge };
+}
+
+// Board line selection (contract.md). First match wins. v3.1: a wrong-focus quarter (the big exposure under-hedged
+// while a small one was hedged) gets its own line on any board; summaries without the flag never match. v3.2: given
+// the band (`mandate`), a breach is named by its direction (overLucky, underLucky, overLoss, underLoss). Pro passes
+// no band and keeps the direction-free luckyBreach and breachLoss.
+export function boardLineKey(summary, moodBefore, mandate = null) {
     if (summary.policyAdopted) return 'policyAdopted';
     if (summary.wrongFocus === true) return 'wrongFocus';
     if (summary.policy === 'none') {
         const hedge = sum(summary.lines, 'hedgeImpact');
         return hedge < 0 ? 'noPolicyHedgeLoss' : hedge > 0 ? 'noPolicyHedgeWin' : 'noPolicyNudge';
     }
-    if (summary.breach === 'loss') return 'breachLoss';
-    if (summary.breach === 'lucky') return 'luckyBreach';
+    if (summary.breach === 'loss' || summary.breach === 'lucky') {
+        const dir = breachDirection(summary, mandate);
+        if (dir) return `${dir}${summary.breach === 'loss' ? 'Loss' : 'Lucky'}`;
+        return summary.breach === 'loss' ? 'breachLoss' : 'luckyBreach';
+    }
     if (summary.policy === 'in' && summary.marketResult < 0) return 'inPolicyBad';
     if (summary.cashAfter < summary.redLine) return 'redZone';
     return summary.boardMoodAfter >= moodBefore ? 'moodUp' : 'moodDown';
 }
 
-// Sprite expression for a board line key. breachLoss is always angry; mixed and mild lines stay neutral.
+// Sprite expression for a board line key. Losing breaches are always angry; mixed and mild lines stay neutral.
 // wrongFocus follows the quarter: angry when it was also a losing breach (the angry sprite always wins) or, on a
 // no-policy board, a hedge loss (the line it pre-empts is angry too); otherwise neutral.
 export function expressionFor(key, summary = null) {
@@ -78,17 +143,99 @@ export function expressionFor(key, summary = null) {
     return 'neutral';
 }
 
-// Result quip selection (D1 rules, in order). `boom` is a favourable underlying move (Σ exposureImpact) above
-// BIG_MOVE_PCT of starting cash that the hedge did not give away.
+// Result quip selection (v3.2, in order). The quip speaks about the market and the hedge only (the board line
+// covers the policy), so it can't contradict the facts line: the red line, then a real volume over-hedge, then the
+// hedge's result, then the quarter's. `calm` only for a flat quarter with no hedge result worth naming.
 export function resultQuipKey(summary, startingCash) {
-    const big = BIG_MOVE_PCT * startingCash;
-    if (sum(summary.lines, 'hedgeImpact') > big) return 'bigSave';
-    if (summary.benchmarkDelta - summary.playerDelta > big) return 'bigMiss';
+    if (summary.cashAfter < summary.redLine) return 'nearBankrupt';
     if ((summary.lines || []).some(l => l.hedgeRatio * l.forecastNotional > OVER_HEDGE_FACTOR * l.realisedNotional)) {
         return 'overHedged';
     }
-    if (summary.cashAfter < summary.redLine) return 'nearBankrupt';
-    return sum(summary.lines, 'exposureImpact') > big ? 'boom' : 'calm';
+    const { quarter, hedge } = outcomeFor(summary, startingCash);
+    if (hedge === 'won') return 'bigSave';
+    if (hedge === 'lost') return 'bigMiss';
+    return quarter === 'good' ? 'boom' : quarter === 'bad' ? 'storm' : 'calm';
+}
+
+// The chairman's tone: null when he yields to the board line, 'offPolicy' on a breach whose market result held up,
+// otherwise 'positive' or 'negative' by the quarter (a flat quarter goes by the board key).
+export function chairmanTone(key, outcome) {
+    if (CHAIRMAN_YIELDS_TO.includes(key)) return null;
+    if (OFF_POLICY_KEYS.has(key)) return 'offPolicy';
+    if (outcome.quarter === 'good') return 'positive';
+    if (outcome.quarter === 'bad') return 'negative';
+    return FLAT_NEGATIVE_KEYS.has(key) ? 'negative' : 'positive';
+}
+
+// The chairman's pool for a tone and board key: { id, lines }, or null. Off-policy lines follow the breach's
+// direction; Pro's direction-free luckyBreach has none, so there he yields.
+function chairmanPool(quips, chairmanId, tone, key) {
+    const pools = quips?.chairman?.[chairmanId];
+    if (!pools || !tone) return null;
+    if (tone !== 'offPolicy') return { id: `chairman.${chairmanId}.${tone}`, lines: pools[tone] };
+    const dir = key.startsWith('over') ? 'over' : key.startsWith('under') ? 'under' : null;
+    return dir ? { id: `chairman.${chairmanId}.offPolicy.${dir}`, lines: pools.offPolicy?.[dir] } : null;
+}
+
+// One quarter's quip and board reaction, and the pool ids they used. `uses` maps pool id -> earlier uses this run.
+// The chairman only speaks while his pool still has an unused line, so he never repeats himself in a run.
+function feedbackStep(ctx, summary, moodBefore, uses) {
+    const { seed, startingCash, mandate, members, quips } = ctx;
+    const count = id => uses.get(id) || 0;
+    const quipKey = resultQuipKey(summary, startingCash);
+    const quipPool = `result.${quipKey}`;
+    const quip = { key: quipKey, text: linePick(seed, quipPool, quips?.result?.[quipKey], count(quipPool)) };
+
+    const key = boardLineKey(summary, moodBefore, mandate);
+    const rng = cosmeticRng(seed, summary.q);
+    const index = members.length ? Math.floor(rng.next() * members.length) : -1;
+    const member = index >= 0 ? members[index] : null;
+    const personality = PERSONALITIES.includes(member?.personality) ? member.personality : 'operational';
+
+    if (chairmanAppears(summary, startingCash)) {
+        const chairmanId = chairmanFor(seed);
+        const tone = chairmanTone(key, outcomeFor(summary, startingCash, mandate));
+        const pool = chairmanPool(quips, chairmanId, tone, key);
+        if (pool && Array.isArray(pool.lines) && count(pool.id) < pool.lines.length) {
+            return {
+                quip, pools: [quipPool, pool.id],
+                boardReaction: {
+                    speaker: 'chairman', key, tone, expression: TONE_EXPRESSION[tone],
+                    line: linePick(seed, pool.id, pool.lines, count(pool.id)),
+                    chairmanId, spriteId: chairmanId, member: null
+                }
+            };
+        }
+    }
+    const boardPool = `board.${personality}.${key}`;
+    return {
+        quip, pools: [quipPool, boardPool],
+        boardReaction: {
+            speaker: 'board', key, expression: expressionFor(key, summary),
+            line: linePick(seed, boardPool, quips?.board?.[personality]?.[key], count(boardPool)),
+            chairmanId: null,
+            spriteId: member ? spriteIdForMember(member, index) : null,
+            member: member
+                ? { index, name: member.name, role: member.role, title: member.title, personality }
+                : null
+        }
+    };
+}
+
+// v3.2: the quip and board reaction for `summary`, the quarter played from `run` (the run BEFORE that quarter: its
+// seed, startingCash, mandate and history). Each pool's earlier uses are recomputed from run.history, so the lines
+// depend only on the saved run and the summary: a resumed run shows the same lines. No line repeats in a run while
+// its pool has unused lines (the Simple pools hold at least 8, one per quarter).
+export function quarterFeedback(run, summary, { quips, members = [] }) {
+    const ctx = { seed: run.seed, startingCash: run.startingCash, mandate: run.mandate ?? null, members, quips };
+    const uses = new Map();
+    let moodBefore = BALANCE.startMood;
+    for (const earlier of run.history || []) {
+        for (const id of feedbackStep(ctx, earlier, moodBefore, uses).pools) uses.set(id, (uses.get(id) || 0) + 1);
+        moodBefore = earlier.boardMoodAfter;
+    }
+    const { quip, boardReaction } = feedbackStep(ctx, summary, moodBefore, uses);
+    return { quip, boardReaction };
 }
 
 export function chairmanAppears(summary, startingCash) {
@@ -238,10 +385,9 @@ export class RunController {
         if (buy && !this.canBuy(buy)) throw new Error(`Cannot buy power-up ${buy}`);
 
         const { run: next, summary } = simulateQuarter(run, decisions, this.market, { events: this.content.events || [] });
-        const rng = cosmeticRng(run.seed, summary.q);
-        const quipKey = resultQuipKey(summary, run.startingCash);
-        const quip = { key: quipKey, text: pickLine(rng, this.content.quips?.result?.[quipKey]) };
-        const boardReaction = this._boardReaction(next, summary, run.boardMood, rng);
+        const { quip, boardReaction } = quarterFeedback(run, summary, {
+            quips: this.content.quips, members: this._industry(run.industryId).boardMembers || []
+        });
         if (boardReaction.chairmanId && !next.chairmenMet.includes(boardReaction.chairmanId)) {
             next.chairmenMet = [...next.chairmenMet, boardReaction.chairmanId];
         }
@@ -385,32 +531,6 @@ export class RunController {
     }
 
     // ── Internals ────────────────────────────────────────────────────────
-
-    _boardReaction(run, summary, moodBefore, rng) {
-        const key = boardLineKey(summary, moodBefore);
-        const expression = expressionFor(key, summary);
-        const quips = this.content.quips || {};
-        const members = this._industry(run.industryId).boardMembers || [];
-        const index = members.length ? Math.floor(rng.next() * members.length) : -1;
-        const member = index >= 0 ? members[index] : null;
-        const personality = PERSONALITIES.includes(member?.personality) ? member.personality : 'operational';
-
-        const chairmanId = chairmanFor(run.seed);
-        if (chairmanAppears(summary, run.startingCash) && !CHAIRMAN_YIELDS_TO.includes(key)) {
-            return {
-                speaker: 'chairman', key, expression, line: pickLine(rng, quips.chairman?.[chairmanId]),
-                chairmanId, spriteId: chairmanId, member: null
-            };
-        }
-        return {
-            speaker: 'board', key, expression, line: pickLine(rng, quips.board?.[personality]?.[key]),
-            chairmanId: null,
-            spriteId: member ? spriteIdForMember(member, index) : null,
-            member: member
-                ? { index, name: member.name, role: member.role, title: member.title, personality }
-                : null
-        };
-    }
 
     // The network half of finish(). `owner` is the run's player and gameId: the server progress is only written
     // while that player is still the registered one (api.putRemoteProgress uses the current token), and the

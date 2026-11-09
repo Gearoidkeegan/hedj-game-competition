@@ -279,33 +279,49 @@ new SceneLoop(canvas, getState: () => ({ industryId, sceneState }))   // .start(
 ```js
 drawSprite(ctx, spriteId, expression /* 'neutral'|'happy'|'angry' */, x, y, scale) -> void
 spriteIdForMember(member, index) -> string      // archetype from member.personality (aggressive|cautious|operational)
-CHAIRMAN_SPRITES                                // ids: jameson, musk, oleary, dimon, buffett, jobs, dorsey, ackman
+CHAIRMAN_SPRITES                                // ids: jameson, musk, oleary, dimon, buffett, jobs, dorsey, ackman;
+                                                // v3.2: label = the Pro parody name (BoardAI.getCEODisplayName)
 ```
 
-## Quips (D1, `data/quips.json`)
+## Quips (D1, v3.2; `data/quips.json`)
 
 ```json
-{ "result": { "bigSave": [], "bigMiss": [], "overHedged": [], "nearBankrupt": [], "calm": [], "boom": [] },
-  "board": { "aggressive": { "moodUp": [], "moodDown": [], "redZone": [], "luckyBreach": [], "breachLoss": [] },
-             "cautious":   { "moodUp": [], "moodDown": [], "redZone": [], "luckyBreach": [], "breachLoss": [] },
-             "operational":{ "moodUp": [], "moodDown": [], "redZone": [], "luckyBreach": [], "breachLoss": [] } },
-  "chairman": { "jameson": [], "musk": [], "oleary": [], "dimon": [], "buffett": [], "jobs": [], "dorsey": [], "ackman": [] },
+{ "result": { "nearBankrupt": [], "overHedged": [], "bigSave": [], "bigMiss": [], "boom": [], "storm": [], "calm": [] },
+  "board": { "aggressive": { "moodUp": [], "moodDown": [], "redZone": [], "overLucky": [], "underLucky": [],
+                             "overLoss": [], "underLoss": [], "inPolicyBad": [], "noPolicyHedgeLoss": [],
+                             "noPolicyHedgeWin": [], "noPolicyNudge": [], "policyAdopted": [], "wrongFocus": [],
+                             "luckyBreach": [], "breachLoss": [] },
+             "cautious": { "...": "the same keys" }, "operational": { "...": "the same keys" } },
+  "chairman": { "jameson": { "positive": [], "negative": [], "offPolicy": { "over": [], "under": [] } },
+                "...": "musk, oleary, dimon, buffett, jobs, dorsey, ackman: the same shape" },
   "gameOverTitles": [ { "min": 0, "title": "", "line": "" } ],
-  "bankrupt": [], "fired": [] }
+  "bankrupt": [], "fired": [], "boardIntro": { "band": [], "noHedge": [], "none": [] } }
 ```
 
-Every string is 90 characters or fewer. `gameOverTitles` is sorted by `min` and starts at 0.
+Every string is 90 characters or fewer, unique in the file, and follows the anti-AI-style checklist (no em dashes; only
+Jameson and ElonUsk use exclamation marks). `gameOverTitles` is sorted by `min` and starts at 0. Simple's result and
+board pools hold at least 8 lines (one per quarter); each chairman has at least 8 `positive`, 8 `negative` and 6
+`offPolicy` lines each way. `luckyBreach` and `breachLoss` are Pro's direction-free breach lines (Pro summaries carry no
+band or cover); Simple never uses them.
 
-Result-quip selection rules (B3):
+The outcome (v3.2, `outcomeFor(summary, startingCash, mandate)` in RunController.js):
 
-- `bigSave`: total `hedgeImpact` > 2% of starting cash.
-- `bigMiss`: `benchmarkDelta - playerDelta` > 2% of starting cash.
-- `overHedged`: any line with `lines[].hedgeRatio × forecastNotional > 1.15 × realisedNotional` (`hedgeRatio` is the
-  applied ratio after clamping, not the requested one).
-- `nearBankrupt`: `cashAfter < redLine`.
-- otherwise `calm`, or `boom` on a large favourable move.
+- `policyState`: `adopted` (a proposal this quarter) | `wrongFocus` | `none` | `in` | `over` | `under` (an off-policy
+  quarter's `riskCover` above the band's max, or below it; a noHedge board's breach is always `over`). `off` only when
+  the direction is unknown (no band given, or no `riskCover`, as on Pro).
+- `quarter`: `good` | `bad` | `flat`, `marketResult` (exposures plus hedges) against ±0.5% of starting cash.
+- `hedge`: `won` | `lost` | `none`, `Σ lines[].hedgeImpact` against ±0.5% of starting cash.
 
-Board line selection (B1; D3 writes the lines). First match wins:
+Result-quip selection (v3.2), first match wins. The quip is about the market and the hedge only, never the board, the
+policy or luck, so it can't contradict the facts line:
+
+1. `nearBankrupt`: `cashAfter < redLine`.
+2. `overHedged`: any line with `lines[].hedgeRatio × forecastNotional > 1.15 × realisedNotional` (`hedgeRatio` is the
+   applied ratio after clamping, not the requested one).
+3. `bigSave` when the hedge `won`; `bigMiss` when it `lost`.
+4. `boom` for a `good` quarter, `storm` for a `bad` one, and `calm` only for a `flat` quarter with no hedge result.
+
+Board line selection (B1; v3.2 `boardLineKey(summary, moodBefore, mandate)`). First match wins:
 
 1. `summary.policyAdopted` set → `policyAdopted` (the board welcomes the proposal).
 1a. `summary.wrongFocus === true` → `wrongFocus` (v3.1: the small thing hedged far more than the big one), on a band or
@@ -313,16 +329,34 @@ Board line selection (B1; D3 writes the lines). First match wins:
    breach or, on a no-policy board, a hedge loss; otherwise neutral.
 2. `policy === 'none'` → `noPolicyHedgeLoss` if `Σ lines[].hedgeImpact < 0`; `noPolicyHedgeWin` if `> 0`; otherwise
    `noPolicyNudge` (no hedge: the board presses for a policy).
-3. `breach === 'loss'` → `breachLoss`. A heavy, scathing telling-off; the angry sprite always wins over other moods.
-4. `breach === 'lucky'` → `luckyBreach`: mixed, "it worked, but that wasn't the policy".
+3. `breach === 'loss'` → `overLoss` or `underLoss` by the breach's direction (`breachLoss` when it is unknown, as on
+   Pro). A heavy, scathing telling-off that names the breach; the angry sprite always wins over other moods.
+4. `breach === 'lucky'` → `overLucky` or `underLucky` (`luckyBreach` when unknown): mixed, and it names the breach
+   ("you went past the board's limit", "you hedged less than the board asked for") rather than leaning on luck.
 5. `policy === 'in'` and `marketResult < 0` → `inPolicyBad`: critical but mild.
 6. Otherwise `redZone` (`cashAfter < redLine`), `moodUp` or `moodDown` by mood change.
 
-Tone: `luckyBreach` is mixed (some praise, some criticism); `breachLoss` is the harshest in the game (the board is furious,
-with HR hints). A9: an in-policy loss is critical but mild; the no-policy board is hyper-focused on the hedge's own P&L
-(`Σ lines[].hedgeImpact`) and hardest to please, and the player's first step there is to propose a policy. `fired`
-follows from overall results: a sinking board mood, or one severe off-policy loss (A8). Running out of cash is
-`bankrupt` ("CFO replaced").
+The chairman (`chairmanAppears`: Q1, Q4, Q8, or a gap to the benchmark above 3% of starting cash) speaks instead of the
+board member, in the tone `chairmanTone(key, outcome)` gives:
+
+- he yields to `policyAdopted`, `wrongFocus` and the losing breaches (`overLoss`, `underLoss`, `breachLoss`);
+- on `overLucky` and `underLucky` he speaks only an `offPolicy.over` or `offPolicy.under` line, which names the breach
+  (neutral sprite); on Pro's direction-free `luckyBreach` he yields;
+- otherwise `positive` (happy sprite) on a `good` quarter and `negative` (angry sprite) on a `bad` one; on a `flat` quarter
+  `negative` for `inPolicyBad`, `noPolicyHedgeLoss`, `redZone` and `moodDown`, `positive` for the rest.
+
+No repeats (v3.2): each pool (`result.<key>`, `board.<personality>.<key>`, `chairman.<id>.<tone>`,
+`chairman.<id>.offPolicy.<dir>`) has its own permutation, seeded by the run seed and the pool id (`linePick`), and a
+quarter takes the line at its pool's use count, recomputed from `run.history` (`quarterFeedback`). The same saved run
+therefore shows the same lines after RESUME, and no line repeats in a run while its pool has unused lines. The chairman
+yields to the board when his pool for the tone has no unused line left. All of this is cosmetic (`cosmeticRng`), never
+the simulation RNG.
+
+Tone: `overLucky`/`underLucky` are mixed (some praise, some criticism); `overLoss`/`underLoss` are the harshest in the
+game (the board is furious, with HR hints). A9: an in-policy loss is critical but mild; the no-policy board is
+hyper-focused on the hedge's own P&L (`Σ lines[].hedgeImpact`) and hardest to please, and the player's first step there
+is to propose a policy. `fired` follows from overall results: a sinking board mood, or one severe off-policy loss (A8).
+Running out of cash is `bankrupt` ("CFO replaced").
 
 ## Events and power-ups (A4)
 
