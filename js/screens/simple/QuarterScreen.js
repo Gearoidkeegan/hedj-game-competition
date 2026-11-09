@@ -16,11 +16,14 @@ import { bandText, chairmanFor, cosmeticRng } from './RunController.js';
 import { exposureTitle, exposureCopy, exposureRisk, lockedReason } from '../../ui/labels.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
+import { avatarMood } from '../../engine/sim/avatarMood.js';
+import { avatarCanvas, moodLabel, storedAvatar } from './AvatarPicker.js';
 
 export const OFF_POLICY_PROMPT = "Outside the board's policy — run anyway?";
 const EVENT_FIRST = 'Choose how to respond to the event first';
 const NUDGE_SALT = 20;   // RunController uses cosmetic salts 0..9
 const SPRITE_SCALE = 2;  // 32px sprites drawn at 64px
+export const AVATAR_PX = 48;   // the player's character beside the cash meter (v3.1)
 const PERSONALITIES = ['aggressive', 'cautious', 'operational'];
 // Board mood below this shows in red (quarter and result screens).
 export const LOW_MOOD = 30;
@@ -69,6 +72,14 @@ export function sceneStateFor(run) {
         }
     }
     return { mood, cashLevel: clamp01(run.cash / (1.5 * run.startingCash)), highlight };
+}
+
+// The cash meter's host with the player's character beside it (v3.1), or the host alone when no character is
+// stored (a run saved before characters existed). `mood` is avatarMood() of the state to show.
+export function withAvatar(meterHost, mood) {
+    const id = storedAvatar();
+    if (!id) return meterHost;
+    return h('div', { class: 'q-cash-row' }, avatarCanvas(id, mood, AVATAR_PX, 'av-face', moodLabel(mood)), meterHost);
 }
 
 function policyText(run) {
@@ -125,7 +136,7 @@ export class QuarterScreen {
                 h('h1', { class: 'q-quarter', text: `Quarter ${run.quarter + 1} of ${run.maxQuarters}` }),
                 h('span', { class: `q-mood${run.boardMood < LOW_MOOD ? ' is-low' : ''}`, text: `Board mood ${Math.round(run.boardMood)}` })),
             this.industry ? h('p', { class: 'q-company', text: this.industry.name }) : null,
-            this.meterHost);
+            withAvatar(this.meterHost, avatarMood(run)));
 
         this.sceneCanvas = h('canvas', { class: 'q-scene-canvas', 'aria-hidden': 'true' });
         const body = h('div', { class: 'q-body' },

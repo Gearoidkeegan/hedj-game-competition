@@ -3,7 +3,9 @@
 //   - the cash meter counts from last quarter's cash to the new figure;
 //   - the scene strip plays in the mood of this quarter's result;
 //   - one line per exposure, "Dollar +6%. Your hedge saved €1.2m", revealed one by one;
-//   - one board member (or the chairman) with the expression and line RunController picked, plus the result quip.
+//   - one board member (or the chairman) with the expression and line RunController picked, plus the result quip;
+//   - the player's character (v3.1) beside the meter: the face from before the quarter, then, once everything is
+//     revealed, the face from after it, so it reacts to the quarter.
 // A tap on the screen skips the reveal; once everything is shown, a tap moves on. NEXT always moves on. The screen
 // never moves on by itself (R53), and taps in the first TAP_GUARD_MS after mount are ignored, so the second tap of
 // a double tap on RUN can't land on NEXT. After the last quarter it goes to the Simple game over.
@@ -18,7 +20,9 @@ import { BALANCE } from '../../engine/sim/balance.js';
 import { moveLabel } from '../../ui/labels.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
-import { sceneStateFor, LOW_MOOD } from './QuarterScreen.js';
+import { sceneStateFor, LOW_MOOD, withAvatar } from './QuarterScreen.js';
+import { avatarMood } from '../../engine/sim/avatarMood.js';
+import { paintAvatar } from './AvatarPicker.js';
 
 export const METER_MS = 1200;       // cash count-up
 const LINE_START_MS = 900;          // first exposure line
@@ -115,12 +119,17 @@ export class ResultScreen {
         this.cashBefore = prev ? prev.cashAfter : run.startingCash;
 
         this.meterHost = h('div', { class: 'q-cash' });
+        this.moodBefore = avatarMood({ cash: this.cashBefore, redLine: run.redLine, startingCash: run.startingCash,
+            boardMood: moodBefore, status: 'active' });
+        this.moodAfter = avatarMood(run);
+        const cashArea = withAvatar(this.meterHost, this.moodBefore);
+        this.avatarEl = cashArea === this.meterHost ? null : cashArea.querySelector('.av-face');
         const head = h('header', { class: 'q-head' },
             h('div', { class: 'q-head-row' },
                 h('h1', { class: 'q-quarter', text: `Quarter ${summary.q} results` }),
                 h('span', { class: `q-mood r-mood${run.boardMood < LOW_MOOD ? ' is-low' : ''}`,
                     text: `Board mood ${Math.round(run.boardMood)} (${moodDelta >= 0 ? '+' : ''}${moodDelta})` })),
-            this.meterHost);
+            cashArea);
 
         this.sceneCanvas = h('canvas', { class: 'q-scene-canvas', 'aria-hidden': 'true' });
         this.lineEls = (summary.lines || []).map(l => {
@@ -200,6 +209,7 @@ export class ResultScreen {
         this.revealed = true;
         for (const el of this.lineEls) el.hidden = false;
         this.boardEl.hidden = false;
+        if (this.avatarEl) paintAvatar(this.avatarEl, this.avatarEl.getAttribute('data-avatar'), this.moodAfter);
     }
 
     _advance() {
@@ -245,5 +255,6 @@ export class ResultScreen {
         if (this.meter) this.meter.destroy();
         this.meter = null;
         this.spriteCanvas = null;
+        this.avatarEl = null;
     }
 }

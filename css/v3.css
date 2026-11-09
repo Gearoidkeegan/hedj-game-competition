@@ -657,3 +657,28 @@
     .board-screen .board-member-role { overflow-wrap: anywhere; }
     .board-screen .quarter-bar { flex-wrap: wrap; row-gap: 4px; }
 }
+
+/* ---------- Player character (v3.1) ---------- */
+/* The canvases are drawn at the device pixel ratio; CSS sets their size. */
+.av-face { display: block; width: 48px; height: 48px; image-rendering: pixelated; }
+.q-cash-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: center; }
+.go-avatar { width: 64px; height: 64px; margin: 0 auto 6px; }
+.t-more-one { display: grid; }
+.t-more .t-character { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.t-character-face { width: 24px; height: 24px; }
+
+/* Picker: four pictures a row, a radio group; fits 360px wide. */
+.av-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.av-option {
+    display: grid;
+    place-items: center;
+    min-height: 44px;
+    padding: 4px;
+    background: var(--v3-panel);
+    border: 2px solid var(--v3-line);
+    cursor: pointer;
+}
+.av-option:hover { background: var(--v3-panel-2); }
+.av-option[aria-checked="true"] { border-color: var(--v3-gold); background: var(--v3-gold-soft); }
+.v3 .av-option:focus-visible { outline: 2px solid var(--v3-cyan); outline-offset: 2px; }
+.av-pic { display: block; width: 100%; max-width: 64px; height: auto; aspect-ratio: 1; image-rendering: pixelated; }

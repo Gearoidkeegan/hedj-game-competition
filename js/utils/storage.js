@@ -1,7 +1,7 @@
 import { emptyProgress, mergeProgress, parseSave } from '../engine/sim/progress.js';
 
-// localStorage persistence: the guide flag, competition registration, and (v3) per-player runs, progress and
-// the offline score queue.
+// localStorage persistence: the guide flag, competition registration, and (v3) per-player runs, progress, the
+// character (v3.1) and the offline score queue.
 
 const GUIDE_SEEN_KEY = 'hedj_has_seen_guide';
 const REGISTRATION_KEY = 'hedj_comp_registration';
@@ -135,6 +135,34 @@ export function getProgress(email) {
 
 export function saveProgress(email, progress) {
     return writeJson(playerKey(email, 'progress'), progress);
+}
+
+// v3.1: the player character, per player (the guest in free play). Device-local only: it is not part of the
+// progress and is never sent to /progress (Ruling V1). The caller checks the id is a known avatar.
+// A pick that couldn't be written (storage full or blocked) is remembered for this page load, so the picker
+// doesn't come back straight away.
+const avatarFallback = new Map();
+
+export function getAvatar(email) {
+    const key = playerKey(email, 'avatar');
+    try {
+        const v = store().getItem(key);
+        if (typeof v === 'string' && v) return v;
+    } catch { /* storage unavailable */ }
+    return avatarFallback.get(key) ?? null;
+}
+
+export function saveAvatar(email, avatarId) {
+    const key = playerKey(email, 'avatar');
+    try {
+        store().setItem(key, String(avatarId));
+        avatarFallback.delete(key);
+        return true;
+    } catch (e) {
+        console.warn('Failed to save the character:', e);
+        avatarFallback.set(key, String(avatarId));
+        return false;
+    }
 }
 
 export function getQueuedScores() {

@@ -4,6 +4,7 @@
 // player's namespaced save and progress. Player strings are set with textContent (R7); no innerHTML.
 // Free play (R66): the local guest's progress and RESUME, a PRACTICE MODE line instead of the player line, no
 // rank or top 3, and the last event's leaderboard only when it has entries.
+// v3.1: CHARACTER (for a registered player or the guest) reopens the character picker, then comes back here.
 
 import * as apiModule from '../utils/api.js';
 import { getRegistration, clearRegistration, hasSeenGuide, isFreePlay } from '../utils/storage.js';
@@ -14,6 +15,7 @@ import { soundFX } from '../ui/SoundFX.js';
 import { h } from '../ui/dom.js';
 import { badgeLabel, nextUnlockHint, unlockRuleText } from '../ui/labels.js';
 import { startRun } from './simple/IndustryScreen.js';
+import { avatarCanvas, storedAvatar } from './simple/AvatarPicker.js';
 
 const TEASER_SIZE = 3;
 const TODAY_LIMIT = 50;   // the backend's maximum
@@ -185,7 +187,21 @@ export class TitleScreen {
                     this.crisisList.hidden = !this.crisisOpen;
                 }, this.crises.length > 0)),
             this.crisisList,
-            h('button', { class: 'btn t-howto', type: 'button', text: 'HOW TO PLAY', on: { click: () => this.app.showScreen('howtoplay') } }));
+            h('div', { class: (this.reg || this.free) ? 't-more-row' : 't-more-one' },
+                (this.reg || this.free) ? this._characterButton() : null,
+                h('button', { class: 'btn t-howto', type: 'button', text: 'HOW TO PLAY', on: { click: () => this.app.showScreen('howtoplay') } })));
+    }
+
+    _characterButton() {
+        const id = storedAvatar();
+        return h('button', { class: 'btn t-character', type: 'button', on: { click: () => this._character() } },
+            id ? avatarCanvas(id, 'happy', 24, 'av-face t-character-face') : null,
+            h('span', { text: 'CHARACTER' }));
+    }
+
+    _character() {
+        if (this.app.screens?.avatar) this.app.screens.avatar.nextScreen = 'title';
+        this.app.showScreen('avatar');
     }
 
     // ── Painting async data ───────────────────────────────────────────────
