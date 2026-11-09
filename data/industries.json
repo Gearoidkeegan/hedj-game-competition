@@ -21,7 +21,7 @@
                     "physicalNotional": 120000,
                     "physicalUnit": "mT",
                     "budgetRateSpread": 0.05,
-                    "description": "Jet fuel costs — 120,000 metric tonnes/qtr (Jet CIF NWE, $/tonne; Brent-linked proxy)",
+                    "description": "Jet fuel costs: 120,000 metric tonnes/qtr (Jet CIF NWE, $/tonne; Brent-linked proxy)",
                     "volatilityHint": "high",
                     "unlockQuarter": 0
                 },
@@ -487,7 +487,7 @@
                     "physicalNotional": 1800000,
                     "physicalUnit": "bbl",
                     "budgetRateSpread": 0.05,
-                    "description": "Crude oil production revenue — 1,800,000 barrels/qtr (Brent benchmark, $/bbl)",
+                    "description": "Crude oil production revenue: 1,800,000 barrels/qtr (Brent benchmark, $/bbl)",
                     "unlockQuarter": 0
                 },
                 {
