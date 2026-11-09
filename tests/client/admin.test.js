@@ -7,7 +7,7 @@ import { initAdmin } from '../../js/admin.js';
 
 const IDS = ['admin-key-input', 'btn-login', 'auth-msg', 'auth-section', 'data-section', 'stat-visits', 'stat-plays',
     'stat-regs', 'm-unique', 'm-runs', 'm-return', 'm-multiday', 'btn-download-csv', 'btn-refresh', 'player-count',
-    'players-msg', 'players-table-wrap', 'players-tbody'];
+    'players-msg', 'players-table-wrap', 'players-tbody', 'event-status'];
 const PRIZE = [['simple', 'event'], ['pro', 'event'], ['simple', 'today'], ['pro', 'today']];
 
 function page() {
@@ -35,7 +35,8 @@ const DATA = {
         { playerName: 'Ann <b>', email: 'a@x.ie', company: 'A&Co', registeredAt: '2026-11-08T10:00:00Z', marketingConsent: true },
         { playerName: 'Bo', email: 'b@x.ie', company: 'B', registeredAt: '', marketingConsent: false }
     ] },
-    '/api/admin/metrics': { uniquePlayers: 2, runsPerPlayer: 2.5, returnRate: 0.5, multiDayRate: 0.25 }
+    '/api/admin/metrics': { uniquePlayers: 2, runsPerPlayer: 2.5, returnRate: 0.5, multiDayRate: 0.25 },
+    '/api/event': { live: false, startIso: null, endIso: null }
 };
 
 function env({ status = 200, stored = '' } = {}) {
@@ -67,8 +68,10 @@ test('UNLOCK with a key loads stats and players, escaping player text', async ()
     doc.getElementById('admin-key-input').value = '  secret ';
     doc.getElementById('btn-login').click();
     await settle();
-    assert.deepEqual(e.calls.map(c => c.url).sort(), ['/api/admin/metrics', '/api/admin/players', '/api/analytics']);
-    assert.ok(e.calls.every(c => c.key === 'secret'));
+    assert.deepEqual(e.calls.map(c => c.url).sort(), ['/api/admin/metrics', '/api/admin/players', '/api/analytics', '/api/event']);
+    assert.ok(e.calls.filter(c => c.url !== '/api/event').every(c => c.key === 'secret'));
+    assert.equal(e.calls.find(c => c.url === '/api/event').key, undefined, 'the public status needs no key');
+    assert.equal(doc.getElementById('event-status').textContent, 'Free play: no live event');
     assert.equal(e.store.get('hedj_admin_key'), 'secret');
     assert.equal(doc.getElementById('data-section').style.display, 'block');
     assert.equal(doc.getElementById('auth-section').style.display, 'none');
@@ -91,7 +94,7 @@ test('Enter in the key box logs in; an empty key does nothing', async () => {
     doc.getElementById('admin-key-input').value = 'k';
     key(doc.getElementById('admin-key-input'), 'Enter');
     await settle();
-    assert.equal(e.calls.length, 3);
+    assert.equal(e.calls.length, 4);
 });
 
 test('a rejected key shows INVALID ADMIN KEY and clears the stored key', async () => {
@@ -112,19 +115,19 @@ test('a stored session key auto-unlocks; REFRESH reloads; CSV and prize buttons 
     const admin = initAdmin({ document: doc, ...e });
     await admin.ready;
     assert.equal(doc.getElementById('admin-key-input').value, 'kept');
-    assert.equal(e.calls.length, 3);
+    assert.equal(e.calls.length, 4);
 
     doc.getElementById('btn-refresh').click();
     assert.equal(doc.getElementById('players-msg').textContent, 'LOADING...');
     await settle();
-    assert.equal(e.calls.length, 6);
+    assert.equal(e.calls.length, 8);
 
     doc.getElementById('btn-download-csv').click();
     assert.match(e.saved[0], /^Name,Email,Company,Registered At,Marketing Consent\r\n"Ann <b>","a@x\.ie","A&Co",/);
 
     for (const b of doc.body.querySelectorAll('[data-prize-mode]')) b.click();
     await settle();
-    const prizeUrls = e.calls.slice(6).map(c => c.url);
+    const prizeUrls = e.calls.slice(8).map(c => c.url);
     assert.deepEqual(prizeUrls, PRIZE.map(([m, p]) => `/api/admin/prize?mode=${m}&period=${p}&limit=10`));
     assert.equal(e.saved.length, 5);
     assert.equal(e.alerts.length, 0);
@@ -160,4 +163,30 @@ test('DOWNLOAD CSV neutralises formula cells with the same R20 rule as the serve
     const expected = players.map(p => [p.playerName, p.email, p.company, p.registeredAt, p.marketingConsent ? 'Yes' : 'No']
         .map(serverCsvEscape).join(','));
     assert.deepEqual(e.saved[0].split('\r\n').slice(1), expected);
+});
+
+// R66: the admin page says whether the competition is live, from the public GET /api/event.
+test('event status: free play, live with its dates, or unavailable; the page unlocks either way', async () => {
+    const run = async event => {
+        const doc = page();
+        const e = env({ stored: 'kept' });
+        const realFetch = e.fetch;
+        e.fetch = async (url, opts) => {
+            if (url !== '/api/event') return realFetch(url, opts);
+            if (event instanceof Error) throw event;
+            assert.equal(opts?.cache, 'no-store');
+            return { ok: true, status: 200, json: async () => event };
+        };
+        const admin = initAdmin({ document: doc, ...e });
+        await admin.ready;
+        await settle();
+        assert.equal(doc.getElementById('data-section').style.display, 'block');
+        return doc.getElementById('event-status').textContent;
+    };
+    assert.equal(await run({ live: false, startIso: null, endIso: null }), 'Free play: no live event');
+    const live = await run({ live: true, startIso: '2026-11-20T09:00:00Z', endIso: '2026-11-21T18:00:00Z' });
+    assert.match(live, /^Live: \S.*–\S/);
+    assert.ok(live.includes('20') && live.includes('21'), live);
+    assert.equal(await run({ live: true, startIso: null, endIso: null }), 'Live: no start date–no end date');
+    assert.equal(await run(new Error('offline')), 'Event status unavailable');
 });

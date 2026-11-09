@@ -2,6 +2,8 @@
 // script, no on*= handlers). Behaviour is unchanged from the inline version.
 // initAdmin takes its browser dependencies as optional arguments so Node tests can drive it with a fake DOM.
 
+import { normaliseEvent } from './utils/eventStatus.js';
+
 const API = '/api';
 
 export function initAdmin(env = {}) {
@@ -41,9 +43,22 @@ export function initAdmin(env = {}) {
         return res.json();
     }
 
+    // R66: live or free play, from the public GET /api/event. Never blocks the unlock.
+    async function loadEventStatus() {
+        const el = $('event-status');
+        try {
+            const res = await fetchFn(`${API}/event`, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            el.textContent = eventStatusText(normaliseEvent(await res.json()));
+        } catch {
+            el.textContent = 'Event status unavailable';
+        }
+    }
+
     async function loadAll() {
         const authMsg = $('auth-msg');
         authMsg.style.display = 'none';
+        const status = loadEventStatus();
         try {
             const [analyticsData, playersResult, metrics] = await Promise.all([
                 apiFetch('/analytics'),
@@ -70,6 +85,7 @@ export function initAdmin(env = {}) {
             playersData = playersResult.players || [];
             $('stat-regs').textContent = playersData.length.toLocaleString();
             renderPlayers(playersData);
+            await status;
 
         } catch (err) {
             if (err.message.includes('401') || err.message.includes('403')) {
@@ -189,6 +205,12 @@ export function csvEscape(v) {
     let str = typeof v === 'string' ? v : String(v ?? '');
     if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
     return `"${str.replace(/"/g, '""')}"`;
+}
+
+// "Free play: no live event", or "Live: <start>–<end>".
+export function eventStatusText(event) {
+    if (!event.live) return 'Free play: no live event';
+    return `Live: ${event.startIso ? formatDate(event.startIso) : 'no start date'}–${event.endIso ? formatDate(event.endIso) : 'no end date'}`;
 }
 
 function esc(s) {
