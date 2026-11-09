@@ -274,3 +274,96 @@ test('no quarter to show: a BACK TO TITLE button', () => {
     q('.q-back').click();
     assert.deepEqual(app.shown, ['title']);
 });
+
+// ── Market charts ─────────────────────────────────────────────────────────
+
+// A manual requestAnimationFrame clock, to watch the charts play.
+function fakeRaf() {
+    let t = 0, id = 0, q = [];
+    return {
+        requestAnimationFrame: fn => { q.push([++id, fn]); return id; },
+        cancelAnimationFrame: i => { q = q.filter(([k]) => k !== i); },
+        tick(ms) { t += ms; const run = q; q = []; for (const [, fn] of run) fn(t); },
+        get pending() { return q.length; }
+    };
+}
+
+function mountAnimated(app) {
+    const timers = fakeTimers();
+    const raf = fakeRaf();
+    const screen = new ResultScreen(app, { setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout,
+        now: () => timers.time, requestAnimationFrame: raf.requestAnimationFrame, cancelAnimationFrame: raf.cancelAnimationFrame });
+    const el = screen.render();
+    dom.document.body.appendChild(el);
+    screen.mount();
+    timers.advance(TAP_GUARD_MS);
+    return { screen, el, timers, raf, q: s => el.querySelector(s), qa: s => el.querySelectorAll(s) };
+}
+
+test('each exposure line gets a chart row with a Hedged caption when hedged, and nothing else but canvases', () => {
+    const { rc, result } = playOne();
+    const lines = result.summary.lines.map((l, i) => ({ ...l, hedgeRatio: i === 0 ? 0.75 : 0 }));
+    const { qa, timers } = mountResult(appWith(rc, { ...result, summary: { ...result.summary, lines } }));
+    const rows = qa('.r-chart-row');
+    assert.ok(rows.length > 0, 'charts present for real market data');
+    assert.ok(rows.every(r => r.hidden), 'hidden until their line reveals');
+    timers.advance(4000);
+    assert.ok(rows.every(r => !r.hidden));
+    assert.equal(qa('.r-chart canvas').length, rows.length, 'one canvas per row');
+    assert.deepEqual(qa('.r-chart-caption').map(c => c.textContent), ['Hedged 75%']);
+    // The only text in a chart row is the caption: no date, year or price can sit beside the canvas.
+    assert.deepEqual(rows.map(r => r.textContent).filter(Boolean), ['Hedged 75%']);
+});
+
+test('the charts play their full run: the board waits for the last chart, a tap completes everything', () => {
+    const { rc, result } = playOne();
+    const { q, qa, timers, raf, screen } = mountAnimated(appWith(rc, result));
+    const n = qa('.r-chart-row').length;
+    assert.ok(n >= 2);
+    const base = raf.pending;   // the scene and the cash meter
+    timers.advance(2400);   // every line is up and the old 0.5 s board delay has passed
+    assert.ok(qa('.r-line').every(l => !l.hidden));
+    assert.equal(q('.r-board').hidden, true, 'the board does not cut the charts short');
+    assert.equal(screen.charts.length, n);
+    assert.equal(raf.pending, base + 1, 'one extra frame loop for all the charts, not one each');
+    raf.tick(16); raf.tick(900);
+    assert.equal(q('.r-board').hidden, true, 'still playing');
+    for (let i = 0; i < 10; i++) raf.tick(400);
+    assert.equal(q('.r-board').hidden, false, 'board shows after the last chart finishes');
+    assert.ok(raf.pending <= base, 'chart loop stopped');
+});
+
+test('a tap during the charts finishes them and shows the board, without advancing', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    const { q, timers, raf, screen } = mountAnimated(app);
+    timers.advance(1200);
+    const running = raf.pending;
+    raf.tick(16); raf.tick(300);
+    q('.r-body').click();
+    assert.equal(q('.r-board').hidden, false);
+    assert.ok(screen.rows.every(r => !r.chart || r.chart.done), 'every chart finished');
+    assert.equal(raf.pending, running - 1, 'the chart loop stopped');
+    q('.r-body').click();
+    assert.deepEqual(app.shown, ['quarter'], 'the next tap moves on');
+});
+
+test('leaving the screen cancels the chart loop', () => {
+    const { rc, result } = playOne();
+    const { timers, raf, screen } = mountAnimated(appWith(rc, result));
+    timers.advance(1200);
+    assert.ok(raf.pending > 0);
+    screen.unmount();
+    assert.equal(raf.pending, 0);
+});
+
+test('a missing market dataset leaves the line without a chart and does not throw', () => {
+    const { rc, result } = playOne();
+    const app = appWith(rc, result);
+    app.runController = { market: { getDataset: () => null } };
+    const { qa, timers, q } = mountResult(app);
+    timers.advance(4000);
+    assert.equal(qa('.r-chart-row').length, 0);
+    assert.ok(qa('.r-line').every(l => !l.hidden));
+    assert.equal(q('.r-board').hidden, false, 'the board still shows with no charts');
+});

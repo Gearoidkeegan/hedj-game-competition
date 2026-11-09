@@ -541,3 +541,12 @@ test('R53: RUN ignores taps in the first 600 ms after mount (a double tap from N
     assert.equal(played.length, 1);
     assert.deepEqual(app.shown, ['result']);
 });
+
+test('each exposure card has a static sparkline when market data exists', () => {
+    const { qa, screen } = setup(SEED.band2550);
+    const cards = qa('.exp-card');
+    assert.ok(cards.length > 0);
+    assert.ok(cards.every(c => c.querySelector('.exp-spark canvas')), 'one sparkline per card');
+    assert.deepEqual(qa('.exp-spark').map(s => s.textContent).filter(Boolean), [], 'a sparkline holds a canvas and no text');
+    screen.unmount();
+});

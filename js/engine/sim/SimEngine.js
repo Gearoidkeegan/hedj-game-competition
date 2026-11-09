@@ -26,7 +26,7 @@ export function isRunOver(run) {
 }
 
 // Calendar position of run quarter index i (0-based from the start year's Q1).
-function calendar(startYear, i) {
+export function calendar(startYear, i) {
     return { year: startYear + Math.floor(i / 4), quarter: (i % 4) + 1 };
 }
 

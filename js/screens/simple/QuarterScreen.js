@@ -16,6 +16,7 @@ import { bandText, chairmanFor, cosmeticRng } from './RunController.js';
 import { exposureTitle, exposureCopy, exposureRisk, lockedReason } from '../../ui/labels.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
+import { chartSeries, chartInverted, mountPriceChart } from '../../ui/PriceChart.js';
 
 export const OFF_POLICY_PROMPT = "Outside the board's policy — run anyway?";
 const EVENT_FIRST = 'Choose how to respond to the event first';
@@ -86,6 +87,9 @@ export class QuarterScreen {
         this.scene = null;
         this.meter = null;
         this.dials = new Map();
+        this.sparks = [];
+        this.charts = [];
+        this.env = env;
         this.decisions = null;
         this.confirming = false;
         this.busy = false;
@@ -168,6 +172,14 @@ export class QuarterScreen {
             this.scene = null;
         }
         this._drawSprite();
+        // Sparklines need the card's laid-out width, so they mount here rather than in render().
+        for (const { host, series } of this.sparks) {
+            try {
+                this.charts.push(mountPriceChart(host, { ...series, variant: 'spark', tone: 'neutral', env: this.env }));
+            } catch (err) {
+                console.warn('QuarterScreen: sparkline unavailable', err);
+            }
+        }
     }
 
     unmount() {
@@ -263,6 +275,23 @@ export class QuarterScreen {
             h('div', { class: 'q-policy-opts' }, this.policyBtns));
     }
 
+    // A small static trend line of the year up to this quarter's start. Nothing after the start, no labels.
+    _sparkRow(run, exp) {
+        const market = this.rc?.market;
+        if (!market?.getDataset) return null;
+        let series = null;
+        try {
+            series = chartSeries(market.getDataset(exp.underlying), run.startYear, run.quarter,
+                { upTo: 'start', invert: chartInverted(exp) });
+        } catch (err) {
+            console.warn('QuarterScreen: sparkline unavailable', err);
+        }
+        if (!series) return null;
+        const host = h('div', { class: 'exp-spark', 'aria-hidden': 'true' });
+        this.sparks.push({ host, series });
+        return host;
+    }
+
     _exposureCard(run, exp) {
         const dialHost = h('div', { class: 'exp-dial' });
         const forecastEl = h('span', { class: 'exp-forecast' });
@@ -272,6 +301,7 @@ export class QuarterScreen {
                 forecastEl),
             h('p', { class: 'exp-copy', text: exposureCopy(exp, run.baseCurrency) }),
             h('p', { class: 'exp-risk', text: exposureRisk(exp) }),
+            this._sparkRow(run, exp),
             dialHost);
         const dial = new HedgeDial(dialHost, {
             value: this.decisions.hedges[exp.id] ?? 0,
@@ -434,6 +464,9 @@ export class QuarterScreen {
     }
 
     _teardown() {
+        for (const c of this.charts || []) c.destroy();
+        this.charts = [];
+        this.sparks = [];
         if (this.scene) this.scene.stop();
         this.scene = null;
         if (this.meter) this.meter.destroy();

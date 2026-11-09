@@ -19,12 +19,14 @@ import { moveLabel } from '../../ui/labels.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
 import { sceneStateFor, LOW_MOOD } from './QuarterScreen.js';
+import { chartSeries, chartInverted, chartLabel, mountPriceChart, createChartTicker, CHART_MS } from '../../ui/PriceChart.js';
 
 export const METER_MS = 1200;       // cash count-up
 const LINE_START_MS = 900;          // first exposure line
 const LINE_STEP_MS = 450;           // between lines
 const BOARD_AFTER_MS = 500;         // board card after the last line
 const SPRITE_SCALE = 2;             // 32px sprites drawn at 64px
+const CHART_GRACE_MS = 300;       // slack before a stalled chart loop is forced to its end
 const NOISE = 0.5;                  // money below half a unit is no impact
 
 // The move of the exposure's foreign currency (or price, or rate) as the player feels it. FX rates are quoted
@@ -89,6 +91,10 @@ export class ResultScreen {
         this.scene = null;
         this.done = false;
         this.revealed = false;
+        this.charts = [];
+        this.rows = [];
+        this.ticker = null;
+        this.boardReady = false;
     }
 
     get rc() { return this.app.runController; }
@@ -97,6 +103,8 @@ export class ResultScreen {
         this._teardown();
         this.done = false;
         this.revealed = false;
+        this.boardReady = false;
+        this.charts = [];
         this.el = h('div', { class: 'screen active v3 result-screen' });
         const lq = this.app.lastQuarter;
         if (!lq?.run || !lq?.summary) {
@@ -123,14 +131,18 @@ export class ResultScreen {
             this.meterHost);
 
         this.sceneCanvas = h('canvas', { class: 'q-scene-canvas', 'aria-hidden': 'true' });
-        this.lineEls = (summary.lines || []).map(l => {
+        this.lineEls = [];
+        this.rows = [];
+        for (const l of summary.lines || []) {
             const exposure = run.exposures.find(e => e.id === l.exposureId);
             // The tone follows the net effect of the line (exposure plus hedge), not the hedge alone.
             const net = (Number.isFinite(l.exposureImpact) ? l.exposureImpact : 0) + (Number.isFinite(l.hedgeImpact) ? l.hedgeImpact : 0);
             const tone = net >= NOISE ? 'is-up' : net <= -NOISE ? 'is-down' : '';
-            return h('li', { class: `r-line ${tone}`.trim(), 'data-exposure': l.exposureId, hidden: true,
+            const el = h('li', { class: `r-line ${tone}`.trim(), 'data-exposure': l.exposureId, hidden: true,
                 text: resultLine(exposure, l, run.baseCurrency) });
-        });
+            this.lineEls.push(el);
+            this.rows.push({ line: el, chart: this._chartRow(run, summary, exposure, l) });
+        }
 
         const reaction = boardReaction || {};
         const expression = reaction.expression || 'neutral';
@@ -148,7 +160,7 @@ export class ResultScreen {
         this.body = h('div', { class: 'q-body r-body', on: { click: this.tapGuard.wrap((e) => this._onTap(e)) } },
             h('div', { class: 'q-scene r-scene' }, this.sceneCanvas),
             quip?.text ? h('p', { class: 'r-quip', text: quip.text }) : null,
-            h('ul', { class: 'r-lines', 'aria-live': 'polite' }, this.lineEls),
+            h('ul', { class: 'r-lines', 'aria-live': 'polite' }, this.rows.flatMap(r => (r.chart ? [r.line, r.chart.li] : [r.line]))),
             this.boardEl);
 
         this.nextBtn = h('button', { class: 'btn btn-gold q-run r-next', type: 'button', text: 'NEXT',
@@ -178,9 +190,14 @@ export class ResultScreen {
         }
         this._drawSprite();
 
-        this.lineEls.forEach((el, i) => this._after(LINE_START_MS + i * LINE_STEP_MS, () => { el.hidden = false; }));
+        this.ticker = createChartTicker(env);
+        this.rows.forEach((row, i) => this._after(LINE_START_MS + i * LINE_STEP_MS, () => this._showRow(row)));
         const boardAt = LINE_START_MS + Math.max(0, this.lineEls.length - 1) * LINE_STEP_MS + BOARD_AFTER_MS;
-        this._after(boardAt, () => this._revealAll());
+        // The board line waits for the last chart to finish its run; a player tap completes everything at once.
+        this._after(boardAt, () => { this.boardReady = true; this._maybeShowBoard(); });
+        // Safety net if the frame loop stalls: finish the charts shortly after they should have ended.
+        const lastLineAt = LINE_START_MS + Math.max(0, this.lineEls.length - 1) * LINE_STEP_MS;
+        this._after(lastLineAt + CHART_MS + CHART_GRACE_MS, () => this._revealAll());
     }
 
     unmount() {
@@ -195,11 +212,67 @@ export class ResultScreen {
         else this._advance();
     }
 
+    // A tap: show every line, finish every chart, show the board.
     _revealAll() {
         if (this.revealed || !this.el) return;
+        for (const row of this.rows) this._showRow(row);
+        for (const c of [...this.charts]) c.skip();
+        this._showBoard();
+    }
+
+    _showBoard() {
+        if (this.revealed || !this.el) return;
         this.revealed = true;
-        for (const el of this.lineEls) el.hidden = false;
         this.boardEl.hidden = false;
+    }
+
+    // Natural reveal: once the last line is up and every chart has finished playing.
+    _maybeShowBoard() {
+        if (this.revealed || !this.boardReady || this.done) return;
+        if (this.rows.some(r => r.chart && !r.chart.done)) return;
+        for (const row of this.rows) this._showRow(row);
+        this._showBoard();
+    }
+
+    // The chart's host row, for an exposure with usable market data (otherwise null and the line stands alone).
+    // The run has already moved on, so the quarter just played is summary.q - 1.
+    _chartRow(run, summary, exposure, l) {
+        const market = this.app.runController?.market;
+        if (!exposure || !market?.getDataset) return null;
+        let series = null;
+        try {
+            series = chartSeries(market.getDataset(exposure.underlying), run.startYear, (summary.q ?? run.quarter) - 1,
+                { invert: chartInverted(exposure) });
+        } catch (err) {
+            console.warn('ResultScreen: chart unavailable', err);
+        }
+        if (!series) return null;
+        const hedge = Number.isFinite(l.hedgeRatio) ? l.hedgeRatio : 0;
+        const impact = Number.isFinite(l.exposureImpact) ? l.exposureImpact : 0;
+        const host = h('div', { class: 'r-chart', 'aria-hidden': 'true' });
+        const li = h('li', { class: 'r-chart-row', hidden: true }, host,
+            hedge > 0 ? h('p', { class: 'r-chart-caption', text: `Hedged ${Math.round(hedge * 100)}%` }) : null);
+        return {
+            li, host, series, hedge,
+            tone: impact <= -NOISE ? 'down' : impact >= NOISE ? 'up' : 'neutral',
+            label: chartLabel(exposure, l.movePct)
+        };
+    }
+
+    _showRow(row) {
+        row.line.hidden = false;
+        const c = row.chart;
+        if (!c || !c.li.hidden) return;
+        c.li.hidden = false;
+        try {
+            this.charts.push(mountPriceChart(c.host, {
+                ...c.series, hedgeRatio: c.hedge, tone: c.tone, label: c.label, env: this.env, ticker: this.ticker,
+                onDone: () => { c.done = true; this._maybeShowBoard(); }
+            }));
+        } catch (err) {
+            c.done = true;
+            console.warn('ResultScreen: chart unavailable', err);
+        }
     }
 
     _advance() {
@@ -240,6 +313,10 @@ export class ResultScreen {
 
     _teardown() {
         this._clearTimers();
+        for (const c of this.charts || []) c.destroy();
+        this.charts = [];
+        if (this.ticker) this.ticker.destroy();
+        this.ticker = null;
         if (this.scene) this.scene.stop();
         this.scene = null;
         if (this.meter) this.meter.destroy();
