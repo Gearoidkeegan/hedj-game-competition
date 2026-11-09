@@ -10,6 +10,11 @@ no-op and the site sync is idempotent. The frontend job never runs after a faile
 deploys never overlap. You can also run it by hand: Actions → "Deploy Competition (backend, then frontend)" → Run
 workflow → `both`, `backend` or `frontend`.
 
+**Live or free play (R66).** The backend decides from `COMP_EVENT_ID` and the event dates. The competition is live
+only while `COMP_EVENT_ID` is set and now is between `COMP_EVENT_START_ISO` (if set) and `COMP_EVENT_END_ISO` (if
+set). Any other time the site runs in **free play**: anyone can play without registering, nothing is submitted, and
+no personal data is collected. See "Between events" after section H.
+
 Names used below:
 
 | Thing | Value |
@@ -67,17 +72,20 @@ Names used below:
       The IAM role's OIDC trust needs no change: it is the same repo and the same `main` branch, and only the workflow
       file name changed. The admin key must not contain a double quote (`"`) or a backslash (`\`): the deploy passes
       it to SAM inside double quotes and refuses such a key. Spaces, commas and other symbols are fine.
-- [ ] **B2. Set the event variables to test values first** (Settings → … → Variables):
+- [ ] **B2. Set the event variables for the dry run** (Settings → … → Variables): `COMP_EVENT_ID=test` with no dates,
+      so the test event is live from the first deploy until you switch (H1).
       ```sh
       gh variable set COMP_EVENT_ID --body test
       gh variable set COMP_TOKEN_TTL_HOURS --body 120
-      gh variable delete COMP_EVENT_END_ISO 2>/dev/null || true   # empty for the test event
+      gh variable delete COMP_EVENT_START_ISO 2>/dev/null || true   # no dates for the dry run
+      gh variable delete COMP_EVENT_END_ISO 2>/dev/null || true
       gh variable list
       ```
-      `COMP_EVENT_ID` **must be set before you merge**: a push to `main` fails the backend job if it is unset (only a
-      manual run falls back to `test`). An unset TTL means `120` and an unset end date means "no end date". The event
-      id may only contain letters, digits, `_` and `-` (up to 40 characters), and the end date must be UTC in the form
-      `2026-11-20T18:00:00Z` (or `…T18:00Z`); the deploy refuses anything else.
+      Set `COMP_EVENT_ID` before you merge if you want the dry run straight away: unset, the deploy runs **free play**
+      (no registration, no scores). An unset TTL means `120`; an unset start date means "open as soon as the id is
+      set" and an unset end date means "no end date". The event id may only contain letters, digits, `_` and `-` (up
+      to 40 characters). Both dates must be UTC in the form `2026-11-20T18:00:00Z` (or `…T18:00Z`), and the start must
+      be before the end; the deploy refuses anything else.
 - [ ] **B3. Note:** there is no event id in the frontend. The backend's `EventId` alone selects the leaderboard, so the
       two can never disagree.
 
@@ -85,9 +93,10 @@ Names used below:
 
 - [ ] **C1. Merge the v3 branch into `main`** (via the pull request). This starts "Deploy Competition (backend, then
       frontend)". Open it in the Actions tab.
-- [ ] **C2. Watch the backend job.** Its log should show `Deploying EventId=test EventEndIso=<empty> TokenTtlHours=120`.
-      CloudFormation then adds the `HCompBest` table with its `ByScore` index, the progress function and the admin
-      routes. The existing tables are not replaced; they only gain `DeletionPolicy: Retain` and
+- [ ] **C2. Watch the backend job.** Its log should show
+      `Deploying EventId=test EventStartIso=<empty> EventEndIso=<empty> TokenTtlHours=120`.
+      CloudFormation then adds the `HCompBest` table with its `ByScore` index, the progress and event functions and the
+      admin routes. The existing tables are not replaced; they only gain `DeletionPolicy: Retain` and
       `UpdateReplacePolicy: Retain` (a metadata change), so from now on no stack change can delete their data.
       **If this deploy fails and CloudFormation rolls back,** the new `HCompBest-hedj-competition-backend` table may be
       left behind outside the stack (it is Retain too). It is empty: delete it before you retry, or the retry fails with
@@ -101,8 +110,11 @@ Names used below:
 - [ ] **C4. Smoke-test the API:**
       ```sh
       curl -fsS "https://competition.hedj.eu/api/leaderboard?mode=simple&period=event&limit=3"; echo
+      curl -fsSi "https://competition.hedj.eu/api/event"; echo
       ```
-      Expect valid JSON with an empty list (the `test` event has no scores yet).
+      Expect valid JSON with an empty list (the `test` event has no scores yet), then
+      `{"live":true,"startIso":null,"endIso":null}` with `Cache-Control: no-store` (and no CloudFront `Age` header:
+      `/api/event` must never be cached).
 
 ## D. Deploy the frontend
 
@@ -260,7 +272,7 @@ name and email, or obvious test ones, so you can spot them in the CSV later. Ope
       stall when the tab comes back to the foreground.
 - [ ] **Admin:** `https://competition.hedj.eu/admin.html`. Unlock with the key; the visits, plays, registrations and
       engagement figures look plausible; DOWNLOAD CSV works; all four prize CSV buttons download files; REFRESH works;
-      a wrong key shows INVALID ADMIN KEY.
+      a wrong key shows INVALID ADMIN KEY. The overview says `Live: no start date–no end date` for the test event.
 
 ### G9. Clean up after the dry run
 - [ ] Make sure no test phone has a queued score waiting. Open each one online once, or clear its site data.
@@ -270,16 +282,19 @@ name and email, or obvious test ones, so you can spot them in the CSV later. Ope
 
 - [ ] **H1. Set the real values:**
       ```sh
-      gh variable set COMP_EVENT_ID --body <event-id>               # e.g. hedj-expo-2026; letters, digits, _ and - only
-      gh variable set COMP_EVENT_END_ISO --body <end, ISO-8601 UTC> # e.g. 2026-11-20T18:00:00Z (Z, no offset)
+      gh variable set COMP_EVENT_ID --body <event-id>                   # e.g. hedj-expo-2026; letters, digits, _ and - only
+      gh variable set COMP_EVENT_START_ISO --body <start, ISO-8601 UTC> # e.g. 2026-11-19T08:00:00Z (Z, no offset)
+      gh variable set COMP_EVENT_END_ISO --body <end, ISO-8601 UTC>     # e.g. 2026-11-20T18:00:00Z
       gh variable set COMP_TOKEN_TTL_HOURS --body 120
       ```
-      Once the event starts, don't change `COMP_EVENT_ID` again. A new id starts an empty leaderboard. Players and
-      score rows expire 90 days after the end date.
+      The site switches by itself: free play until the start, live from the start, free play again from the end.
+      Scores from runs started before the end are still accepted for 2 hours after it. Once the event starts, don't
+      change `COMP_EVENT_ID` again. A new id starts an empty leaderboard. Players and score rows expire 90 days after
+      the end date.
 
-      **Never delete `COMP_EVENT_ID` after this point.** If it is unset, every push to `main` fails its backend job (and
-      so skips the frontend) instead of switching the live event to `test`. Only a manual run
-      (`gh workflow run deploy.yml`) falls back to `test`, so don't start one while the variable is missing.
+      **Deleting `COMP_EVENT_ID` now means free play.** The next deploy no longer fails; it passes `EventId=""`, and
+      the backend stops taking registrations and scores. **Deleted during the event, it closes the competition** at
+      the next push to `main` or manual run, so leave it alone until the event is over.
 - [ ] **H2. Redeploy the backend only:**
       ```sh
       gh workflow run deploy.yml -f target=backend
@@ -312,6 +327,19 @@ name and email, or obvious test ones, so you can spot them in the CSV later. Ope
       ```
       Expect `0` for both tables. (`date -d` is GNU date: Linux, or Git Bash on Windows. `jq` builds the key so an
       email is never pasted into JSON by hand.)
+
+## Between events
+
+- **What players see.** Free play: PLAY goes straight to the industries, with no registration. Progress (personal best,
+  unlocks, RESUME) is kept on the phone only, and nothing is submitted. The title and game over say "Practice mode",
+  with the next start date once `COMP_EVENT_START_ISO` is set for a future event. The stand page shows the last
+  event's boards under FINAL RESULTS, and the admin page says `Free play: no live event`.
+- **Nothing to change after the end date.** The switch to free play happens at `COMP_EVENT_END_ISO` by itself; no
+  deploy is needed.
+- **The old board stays visible** (title "Last event's leaderboard", stand FINAL RESULTS, prize CSVs) until
+  `COMP_EVENT_ID` changes.
+- **Next event:** set a new `COMP_EVENT_ID` and both dates (as in H1), then run
+  `gh workflow run deploy.yml -f target=backend`. Until the new start the site stays in free play and shows the date.
 
 ## I. Print the QR code
 
