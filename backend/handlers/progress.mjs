@@ -3,6 +3,7 @@ import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { json, parseBody, errorResponse, headerValue, HttpError } from '../lib/http.mjs';
 import { loadPlayer } from '../lib/auth.mjs';
 import { mergeProgress } from '../lib/progress.mjs';
+import { requireLive } from '../lib/event.mjs';
 
 export function createHandler(deps) {
     const { ddb, env, now } = deps;
@@ -11,6 +12,7 @@ export function createHandler(deps) {
         try {
             const method = event?.requestContext?.http?.method || 'GET';
             if (method !== 'GET' && method !== 'PUT') throw new HttpError(405, 'Method not allowed');
+            requireLive(env, now());   // free play (R66): progress is never synced outside a live competition
 
             const player = await loadPlayer(ddb, env.PLAYERS_TABLE,
                 headerValue(event, 'x-player-email'), headerValue(event, 'x-game-token'), now());

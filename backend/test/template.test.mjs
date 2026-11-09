@@ -107,3 +107,25 @@ test('the admin key is only in the environment of the two functions that check i
         if (name !== 'AnalyticsFunction' && name !== 'AdminFunction') assert.ok(!b.includes('ADMIN_KEY'), name);
     }
 });
+
+// ── Free play (Task FP) ──────────────────────────────────────────────────
+
+test('EventStartIso is a parameter beside EventEndIso, passed to every function as EVENT_START_ISO', () => {
+    const params = yaml.split('Parameters:')[1].split('Globals:')[0];
+    assert.match(params, /\n  EventStartIso:\r?\n    Type: String\r?\n    Default: ''/);
+    assert.match(params, /\n  EventId:\r?\n    Type: String\r?\n    Default: ''/, 'an empty EventId is free play');
+    const globals = yaml.split('Globals:')[1].split('Resources:')[0];
+    assert.ok(globals.includes('EVENT_START_ISO: !Ref EventStartIso'));
+    assert.ok(globals.includes('EVENT_END_ISO: !Ref EventEndIso'));
+});
+
+test('GET /event: its own function on the public throttle, with no table access', () => {
+    const block = yaml.split('  EventFunction:')[1].split('Outputs:')[0].split(/\r?\n  [A-Z]\w+:\r?\n/)[0];
+    assert.ok(block.includes('Handler: handlers/event.handler'));
+    assert.match(block, /Path: \/event\s+Method: GET/);
+    assert.ok(!/Polic/.test(block), 'no policies: it reads no table');
+    assert.ok(!/HComp/.test(block));
+    assert.ok(!block.includes('ADMIN_KEY'));
+    const routes = yaml.split('RouteSettings:')[1].split('CorsConfiguration:')[0];
+    assert.ok(!routes.includes('/event'), 'the default public throttle, like /leaderboard');
+});

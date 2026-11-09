@@ -22,7 +22,7 @@ const PRIZE_MAX_LIMIT = 200;
 
 export function createHandler(deps) {
     const { ddb, env, now } = deps;
-    const eventId = env.EVENT_ID || 'test';
+    const eventId = env.EVENT_ID;   // empty: no event, so the prize export has no rows
 
     async function scanAll(table) {
         const items = [];
@@ -82,6 +82,8 @@ export function createHandler(deps) {
         if (period !== 'event' && period !== 'today') return json(400, { error: 'period must be event or today' });
         const rawLimit = parseInt(q.limit ?? PRIZE_DEFAULT_LIMIT, 10);
         const limit = Math.max(1, Math.min(Number.isNaN(rawLimit) ? PRIZE_DEFAULT_LIMIT : rawLimit, PRIZE_MAX_LIMIT));
+        const header = 'rank,playerName,company,email,score,marketingConsent';
+        if (!eventId) return csvResponse([header], `prize-${mode}-${period}.csv`);
         const board = `${eventId}#${mode}#${period === 'today' ? dublinDate(now()) : 'all'}`;
 
         const result = await ddb.send(new QueryCommand({
@@ -100,7 +102,7 @@ export function createHandler(deps) {
             rows.push([i + 1, item.playerName, item.company, item.email, item.score, player?.marketingConsent === true ? 'Yes' : 'No']
                 .map(csvEscape).join(','));
         }
-        return csvResponse(['rank,playerName,company,email,score,marketingConsent', ...rows], `prize-${mode}-${period}.csv`);
+        return csvResponse([header, ...rows], `prize-${mode}-${period}.csv`);
     }
 
     return async function handler(event) {

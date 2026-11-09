@@ -8,7 +8,7 @@ const MAX_LIMIT = 50;
 
 export function createHandler(deps) {
     const { ddb, env, now } = deps;
-    const eventId = env.EVENT_ID || 'test';
+    const eventId = env.EVENT_ID;
 
     return async function handler(event) {
         const q = event?.queryStringParameters || {};
@@ -19,6 +19,8 @@ export function createHandler(deps) {
 
         const rawLimit = parseInt(q.limit ?? DEFAULT_LIMIT, 10);
         const limit = Math.max(1, Math.min(Number.isNaN(rawLimit) ? DEFAULT_LIMIT : rawLimit, MAX_LIMIT));
+        // No event configured: nothing to show. With one, its board stays readable after the end (R66).
+        if (!eventId) return json(200, { entries: [] }, { 'Cache-Control': 'public, max-age=30' });
         const board = `${eventId}#${mode}#${period === 'today' ? dublinDate(now()) : 'all'}`;
 
         const result = await ddb.send(new QueryCommand({
