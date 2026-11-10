@@ -41,7 +41,7 @@
             "name": "Interest Rate Swap",
             "type": "swap",
             "assetClass": "ir",
-            "description": "Convert floating rate debt to fixed. Locked in for the term — unwinding is expensive.",
+            "description": "Convert floating rate debt to fixed. Locked in for the term, so unwinding is expensive.",
             "availableTenors": [4, 8, 12, 16],
             "tenorUnit": "quarters",
             "upfrontCost": false,

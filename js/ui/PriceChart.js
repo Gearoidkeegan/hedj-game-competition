@@ -1,13 +1,19 @@
-// PriceChart: the real market line behind a Simple-mode exposure. Shape and % move only: no axes, ticks, dates,
-// years or price levels (the start year stays secret until game over).
+// PriceChart: the real market line behind a Simple-mode exposure. Shape and % move only: no dates, years, month
+// names or price levels (the start year stays secret until game over). The only text is the end label (the % move)
+// and the faint gridline labels, which are a % (pp for interest rates) change from the quarter start.
 //
-//   chartSeries(dataset, startYear, quarter, opts) -> { history, quarter } | null     pure
-//   drawPriceChart(ctx, { history, quarter, progress, hedgeRatio, tone, label, w, h, variant, colors })
+//   chartSeries(dataset, startYear, quarter, opts) -> { history, quarter, source } | null     pure
+//   gridLines(lo, hi, px, scale) -> [{ value, label }]                                        pure
+//   drawPriceChart(ctx, { history, quarter, progress, hedgeRatio, tone, label, scale, w, h, variant, colors })
 //   mountPriceChart(container, opts) -> { skip(), destroy() }
 //
 // `quarter` is the 0-based run quarter (the engine's calendar index). The monthly dataset is keyed YYYY-MM-01.
 // history = up to 12 months ending on the quarter's start month; quarter = that start plus the 3 months after it
 // (the last one is the next quarter's start, which is the rate the engine settles the quarter at).
+//
+// v3.2: with opts.weekly (MarketEngine.getWeekly) the same windows are drawn from weekly closes, pinned so each
+// window starts and ends exactly on the engine's monthly values (see pinnedWindow). Missing or patchy weekly data
+// falls back to the monthly series for the whole chart.
 
 import { calendar } from '../engine/sim/SimEngine.js';
 
@@ -18,9 +24,70 @@ const DEFAULT_MS = CHART_MS;
 const PAD = { top: 8, bottom: 8, left: 4, right: 4 };
 const SPARK_PAD = { top: 2, bottom: 2, left: 1, right: 1 };
 const LABEL_FONT = 'bold 14px system-ui, sans-serif';
+const GRID_FONT = '12px system-ui, sans-serif';
+const HISTORY_SHARE = 0.4;          // of the plot width, when a chart shows both history and the quarter
+const MIN_GRID_PX = 16;             // between gridlines: room for a 12 px label
+const MAX_GRID_LINES = 5;
+const DAY = 864e5;
+const WEEK = 7 * DAY;
+const MAX_GAP = 21 * DAY;           // weekly points further apart than this: use the monthly data instead
 
 const keyFor = idx => `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}-01`;
 const usable = v => typeof v === 'number' && Number.isFinite(v);
+
+// When the monthly value for month `idx` was observed: mid-month for a monthly average, the last day for a month-end
+// close (the weekly file says which, per series).
+function anchorTime(idx, anchor) {
+    const y = Math.floor(idx / 12);
+    const m = idx % 12;
+    return anchor === 'end' ? Date.UTC(y, m + 1, 0) : Date.UTC(y, m, 15);
+}
+
+// Weekly closes between the monthly values of months aIdx and bIdx, pinned to them: a correction factor that runs
+// linearly from A / raw(start) to B / raw(end) scales every weekly point, and the ends are A and B exactly. raw(t) is
+// the last weekly close at or before t, so a window never uses a price from after its end. null when the weekly
+// data has a gap longer than MAX_GAP in the window (or no close near its ends).
+function pinnedWindow(wk, flip, aIdx, bIdx, A, B) {
+    const ta = anchorTime(aIdx, wk.anchor);
+    const tb = anchorTime(bIdx, wk.anchor);
+    const value = i => {
+        const x = i >= 0 && i < wk.v.length ? wk.v[i] : null;
+        const v = usable(x) && x > 0 ? flip(x) : NaN;
+        return usable(v) ? v : null;
+    };
+    const rawAt = t => {
+        for (let i = Math.floor((t - wk.t0) / WEEK); i >= 0 && t - (wk.t0 + i * WEEK) <= MAX_GAP; i--) {
+            const v = value(i);
+            if (v !== null) return v;
+        }
+        return null;
+    };
+    const ra = rawAt(ta);
+    const rb = rawAt(tb);
+    if (ra === null || rb === null) return null;
+    const ca = A / ra;
+    const cb = B / rb;
+    const out = [A];
+    let prev = ta;
+    for (let i = Math.max(0, Math.floor((ta - wk.t0) / WEEK) + 1); wk.t0 + i * WEEK < tb; i++) {
+        const t = wk.t0 + i * WEEK;
+        if (t <= ta) continue;
+        const v = value(i);
+        if (v === null) continue;
+        if (t - prev > MAX_GAP) return null;
+        const p = v * (ca + (cb - ca) * ((t - ta) / (tb - ta)));
+        if (!usable(p)) return null;
+        out.push(p);
+        prev = t;
+    }
+    if (tb - prev > MAX_GAP) return null;
+    out.push(B);
+    return out;
+}
+
+function usableWeekly(wk) {
+    return !!wk && typeof wk === 'object' && usable(wk.t0) && Array.isArray(wk.v) && wk.v.length > 0;
+}
 
 export function chartSeries(dataset, startYear, quarter, opts = {}) {
     if (!dataset || typeof dataset !== 'object' || !Number.isFinite(startYear) || !Number.isFinite(quarter)) return null;
@@ -32,13 +99,39 @@ export function chartSeries(dataset, startYear, quarter, opts = {}) {
         const v = usable(raw) ? flip(raw) : NaN;
         return usable(v) ? v : null;
     };
+    if (usableWeekly(opts.weekly)) {
+        const weekly = weeklySeries(opts.weekly, flip, at, m0, opts.upTo === 'start');
+        if (weekly) return weekly;
+    }
+    return monthlySeries(at, m0, opts.upTo === 'start');
+}
+
+// The weekly version of the monthly windows below, or null (then the chart uses the monthly series).
+function weeklySeries(wk, flip, at, m0, upToStart) {
+    const S = at(m0);
+    if (S === null) return null;
+    let aIdx = null;
+    for (let i = m0 - (HISTORY_MONTHS - 1); i < m0; i++) {
+        if (at(i) !== null) { aIdx = i; break; }
+    }
+    const history = aIdx === null ? [S] : pinnedWindow(wk, flip, aIdx, m0, at(aIdx), S);
+    if (!history) return null;
+    if (upToStart) return history.length >= 2 ? { history, quarter: [], source: 'weekly' } : null;
+    const E = at(m0 + QUARTER_MONTHS);
+    if (E === null) return null;
+    const q = pinnedWindow(wk, flip, m0, m0 + QUARTER_MONTHS, S, E);
+    return q ? { history, quarter: q, source: 'weekly' } : null;
+}
+
+// The v3.1 monthly windows (and the fallback when weekly data is missing or patchy).
+function monthlySeries(at, m0, upToStart) {
     const history = [];
     for (let i = m0 - (HISTORY_MONTHS - 1); i <= m0; i++) {
         const v = at(i);
         if (v !== null) history.push(v);
     }
-    if (opts.upTo === 'start') {
-        return history.length >= 2 ? { history, quarter: [] } : null;
+    if (upToStart) {
+        return history.length >= 2 ? { history, quarter: [], source: 'monthly' } : null;
     }
     if (at(m0) === null) return null;
     const q = [];
@@ -46,7 +139,31 @@ export function chartSeries(dataset, startYear, quarter, opts = {}) {
         const v = at(i);
         if (v !== null) q.push(v);
     }
-    return q.length >= 2 ? { history, quarter: q } : null;
+    return q.length >= 2 ? { history, quarter: q, source: 'monthly' } : null;
+}
+
+// Horizontal gridlines for a chart whose values run from lo to hi (as a change from the quarter start: % or, for
+// interest rates, pp) over px pixels: the smallest sensible step that leaves room for a label between lines.
+const STEPS = { pct: [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000], pp: [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10] };
+export function gridLines(lo, hi, px, scale = 'pct') {
+    const unit = scale === 'pp' ? 'pp' : '%';
+    const steps = STEPS[scale === 'pp' ? 'pp' : 'pct'];
+    const fmt = v => {
+        if (v === 0) return `0${unit}`;
+        const a = Math.abs(v);
+        const s = Number.isInteger(a) ? String(a) : String(Number(a.toFixed(2)));
+        return `${v > 0 ? '+' : '-'}${s}${unit}`;
+    };
+    const span = hi - lo;
+    if (!usable(lo) || !usable(hi) || !(span > 0) || !(px > 0)) return [{ value: 0, label: fmt(0) }];
+    const count = step => Math.floor(hi / step + 1e-9) - Math.ceil(lo / step - 1e-9) + 1;
+    const step = steps.find(s => (s / span) * px >= MIN_GRID_PX && count(s) <= MAX_GRID_LINES) ?? steps[steps.length - 1];
+    const out = [];
+    for (let k = Math.ceil(lo / step - 1e-9); k * step <= hi + 1e-9 * step; k++) {
+        const value = Number((k * step).toFixed(4)) || 0;   // || 0: never -0
+        out.push({ value, label: fmt(value) });
+    }
+    return out.length ? out : [{ value: 0, label: fmt(0) }];
 }
 
 // Does the exposure's currency sit as the quote of the pair (EURUSD for dollars)? Then the chart shows the
@@ -114,8 +231,6 @@ export function drawPriceChart(ctx, opts = {}) {
         const m = ctx.measureText?.(opts.label)?.width;
         labelW = Math.ceil(Number.isFinite(m) ? m : opts.label.length * 9) + 10;
     }
-    const left = pad.left;
-    const right = Math.max(left + 1, w - (showLabel ? labelW : pad.right));
     const top = pad.top;
     const bottom = h - pad.bottom;
     const lo = Math.min(...all);
@@ -123,12 +238,36 @@ export function drawPriceChart(ctx, opts = {}) {
     const span = hi - lo;
     const yOf = v => (span > 0 ? bottom - ((v - lo) / span) * (bottom - top) : (top + bottom) / 2);
 
-    // History and the quarter share one month grid; the quarter starts on the last history point.
-    const qStart = history.length ? history.length - 1 : 0;
-    const total = qStart + Math.max(0, quarter.length - 1);
-    const xOf = i => (total > 0 ? left + (i / total) * (right - left) : left);
-    const hist = history.map((v, i) => [xOf(i), yOf(v)]);
-    const quar = quarter.map((v, j) => [xOf(qStart + j), yOf(v)]);
+    // Gridlines (result chart only): a change from the quarter start, in % (pp for an interest rate).
+    const pp = opts.scale === 'pp';
+    const base = quarter.length ? quarter[0] : history[history.length - 1];
+    let grid = [];
+    if (!spark && (pp || base > 0)) {
+        const delta = v => (pp ? (v - base) * 100 : (v / base - 1) * 100);
+        const level = d => (pp ? base + d / 100 : base * (1 + d / 100));
+        grid = gridLines(delta(lo), delta(hi), bottom - top, pp ? 'pp' : 'pct')
+            .map(g => ({ ...g, y: yOf(level(g.value)) }))
+            .filter(g => usable(g.y) && g.y >= top - 0.5 && g.y <= bottom + 0.5);
+    }
+    let gridW = 0;
+    if (grid.length) {
+        ctx.font = GRID_FONT;
+        for (const g of grid) {
+            const m = ctx.measureText?.(g.label)?.width;
+            gridW = Math.max(gridW, Math.ceil(Number.isFinite(m) ? m : g.label.length * 7) + 6);
+        }
+    }
+    const left = pad.left + gridW;
+    const right = Math.max(left + 1, w - (showLabel ? labelW : pad.right));
+
+    // The history takes HISTORY_SHARE of the width and the quarter the rest, so a weekly quarter has room to show
+    // its detail; a chart with only one of them uses the whole width.
+    const hasH = history.length > 1;
+    const hasQ = quarter.length > 1;
+    const split = hasH && hasQ ? left + (right - left) * HISTORY_SHARE : hasQ ? left : right;
+    const spread = (n, i, x0, x1) => (n > 1 ? x0 + (i / (n - 1)) * (x1 - x0) : x1);
+    const hist = history.map((v, i) => [spread(history.length, i, left, split), yOf(v)]);
+    const quar = quarter.map((v, j) => [spread(quarter.length, j, split, right), yOf(v)]);
 
     ctx.save();
     ctx.lineJoin = 'round';
@@ -138,6 +277,39 @@ export function drawPriceChart(ctx, opts = {}) {
         ctx.beginPath();
         pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
     };
+    const crisp = v => Math.round(v) + 0.5;
+
+    if (grid.length) {
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = colors.faint;
+        for (const g of grid) {
+            ctx.globalAlpha = g.value === 0 ? 0.3 : 0.15;
+            ctx.beginPath();
+            ctx.moveTo(left, crisp(g.y));
+            ctx.lineTo(right, crisp(g.y));
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 0.75;
+        ctx.font = GRID_FONT;
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = colors.faint;
+        for (const g of grid) ctx.fillText(g.label, 0, Math.min(Math.max(g.y, 7), h - 7));
+    }
+
+    // Three month markers across the quarter (the start of each month), no names.
+    if (!spark && hasQ) {
+        ctx.globalAlpha = 0.25;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = colors.faint;
+        for (let k = 0; k < QUARTER_MONTHS; k++) {
+            const x = crisp(split + ((right - split) * k) / QUARTER_MONTHS);
+            ctx.beginPath();
+            ctx.moveTo(x, top);
+            ctx.lineTo(x, bottom);
+            ctx.stroke();
+        }
+    }
 
     if (hist.length > 1) {
         ctx.globalAlpha = spark ? 1 : 0.4;
@@ -284,7 +456,7 @@ export function mountPriceChart(container, opts = {}) {
     let ctx = null;
     try { ctx = canvas.getContext('2d'); } catch { ctx = null; }
 
-    const cssH = opts.height || (spark ? 24 : 72);
+    const cssH = opts.height || (spark ? 24 : 110);
     const dpr = Math.min(3, g.devicePixelRatio || 1);
     let cssW = 0;
     const measure = () => Math.max(40, Math.floor(container.clientWidth || 280));

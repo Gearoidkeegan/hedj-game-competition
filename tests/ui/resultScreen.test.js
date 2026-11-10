@@ -2,7 +2,7 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { installFakeDom } from '../helpers/fakeDom.js';
 import { loadJson, loadMarketData, loadIndustries } from '../helpers/loadData.js';
-import { marketEngine } from '../../js/engine/MarketEngine.js';
+import { marketEngine, MarketEngineController } from '../../js/engine/MarketEngine.js';
 import * as storage from '../../js/utils/storage.js';
 import { RunController, boardLineKey, expressionFor } from '../../js/screens/simple/RunController.js';
 import {
@@ -188,7 +188,7 @@ test('renders the quarter: one line per exposure, the quip, the cash meter and a
     assert.equal(lines.length, result.summary.lines.length);
     for (const [i, l] of result.summary.lines.entries()) {
         assert.equal(lines[i].getAttribute('data-exposure'), l.exposureId);
-        assert.equal(lines[i].textContent, resultLine(result.run.exposures.find(e => e.id === l.exposureId), l, 'EUR'));
+        assert.equal(lines[i].querySelector('.r-line-text').textContent, resultLine(result.run.exposures.find(e => e.id === l.exposureId), l, 'EUR'));
     }
     assert.equal(q('.r-quip').textContent, result.quip.text);
     assert.ok(result.quip.text.length > 0);
@@ -301,9 +301,9 @@ function mountAnimated(app) {
     return { screen, el, timers, raf, q: s => el.querySelector(s), qa: s => el.querySelectorAll(s) };
 }
 
-test('each exposure line gets a chart row with a Hedged caption when hedged, and nothing else but canvases', () => {
+test('each exposure line gets a chart row with a hedged-vs-unhedged caption when hedged, and nothing else but canvases', () => {
     const { rc, result } = playOne();
-    const lines = result.summary.lines.map((l, i) => ({ ...l, hedgeRatio: i === 0 ? 0.75 : 0 }));
+    const lines = result.summary.lines.map((l, i) => (i === 0 ? { ...l, hedgeRatio: 0.75, exposureImpact: -9e6, hedgeImpact: 6.7e6 } : { ...l, hedgeRatio: 0 }));
     const { qa, timers } = mountResult(appWith(rc, { ...result, summary: { ...result.summary, lines } }));
     const rows = qa('.r-chart-row');
     assert.ok(rows.length > 0, 'charts present for real market data');
@@ -311,9 +311,11 @@ test('each exposure line gets a chart row with a Hedged caption when hedged, and
     timers.advance(4000);
     assert.ok(rows.every(r => !r.hidden));
     assert.equal(qa('.r-chart canvas').length, rows.length, 'one canvas per row');
-    assert.deepEqual(qa('.r-chart-caption').map(c => c.textContent), ['Hedged 75%']);
+    const caption = 'Unhedged -€9.0m · With 75% hedge -€2.3m';
+    assert.deepEqual(qa('.r-chart-caption').map(c => c.textContent), [caption]);
+    assert.ok(caption.length <= 90);
     // The only text in a chart row is the caption: no date, year or price can sit beside the canvas.
-    assert.deepEqual(rows.map(r => r.textContent).filter(Boolean), ['Hedged 75%']);
+    assert.deepEqual(rows.map(r => r.textContent).filter(Boolean), [caption]);
 });
 
 test('the charts play their full run: the board waits for the last chart, a tap completes everything', () => {
@@ -461,13 +463,60 @@ test('final I3: with more than 3 exposure lines the charts are compact', () => {
     many.q('.r-body').click();   // reveal: every chart mounts
     const heights = many.qa('.r-chart canvas').map(c => c.style.height);
     assert.ok(heights.length > 3);
-    assert.ok(heights.every(hh => hh === '56px'), heights.join(','));
+    assert.ok(heights.every(hh => hh === '80px'), heights.join(','));
     few.q('.r-body').click();
-    assert.ok(few.qa('.r-chart canvas').every(c => c.style.height === '72px'));
+    assert.ok(few.qa('.r-chart canvas').every(c => c.style.height === '110px'));
+});
+
+// ── v3.2 weekly charts ────────────────────────────────────────────────────
+
+function weeklyMarket() {
+    const m = new MarketEngineController();
+    m.loadFromObjects(loadMarketData());
+    m.loadWeeklyFromObjects({ fx: loadJson('data/market/fx-weekly.json'), commodities: loadJson('data/market/commodities-weekly.json') });
+    return m;
+}
+
+test('v3.2: with weekly data loaded the result charts are weekly, and their ends match the result line exactly', () => {
+    const market = weeklyMarket();
+    const rc = new RunController({ storage, market, content, now: () => 1_700_000_000_000 });
+    rc.start('airline', { seed: 3 });
+    const result = rc.playQuarter(rc.currentDecisionsDefaults());
+    const { screen } = mountResult(appWith(rc, result));
+    const charted = screen.rows.filter(r => r.chart);
+    assert.ok(charted.length >= 2, `${charted.length} charts`);
+    for (const [i, row] of screen.rows.entries()) {
+        const c = row.chart;
+        if (!c) continue;
+        const l = result.summary.lines[i];
+        const ex = result.run.exposures.find(e => e.id === l.exposureId);
+        const q = c.series.quarter;
+        if (ex.type === 'ir') {
+            assert.equal(c.series.source, 'monthly', 'interest rates stay monthly');
+            assert.equal(c.scale, 'pp');
+            assert.ok(Math.abs((q.at(-1) - q[0]) * 100 - l.movePct) < 1e-9);
+            continue;
+        }
+        assert.equal(c.series.source, 'weekly', ex.underlying);
+        assert.equal(c.scale, 'pct');
+        assert.ok(q.length > 10, `${ex.underlying}: ${q.length} points`);
+        const move = ex.underlying.endsWith(ex.unit) ? (q[0] / q.at(-1) - 1) * 100 : (q.at(-1) / q[0] - 1) * 100;
+        assert.ok(Math.abs(move - l.movePct) < 1e-9, `${ex.underlying}: chart ${move} vs result ${l.movePct}`);
+    }
+    screen.unmount();
 });
 
 test('final M1: the wrong-focus note does not claim the big exposure was unhedged', () => {
     assert.doesNotMatch(WRONG_FOCUS_RESULT, /left the big one open|unhedged/i);
     assert.match(WRONG_FOCUS_RESULT, /big/i);
     assert.ok(WRONG_FOCUS_RESULT.length <= 90);
+});
+
+test('v3.2: chartCaption gives both outcomes, signed, under 90 characters; nothing when unhedged', async () => {
+    const { chartCaption } = await import('../../js/screens/simple/ResultScreen.js');
+    assert.equal(chartCaption({ hedgeRatio: 0, exposureImpact: -9e6, hedgeImpact: 0 }, 'EUR'), null);
+    assert.equal(chartCaption({ hedgeRatio: 0.5, exposureImpact: 12e6, hedgeImpact: -14e6 }, 'USD'), 'Unhedged +$12.0m · With 50% hedge -$2.0m');
+    assert.equal(chartCaption({ hedgeRatio: 1, exposureImpact: 0.2, hedgeImpact: -0.1 }, 'EUR'), 'Unhedged €0 · With 100% hedge €0');
+    const long = chartCaption({ hedgeRatio: 0.333, exposureImpact: -1.23e12, hedgeImpact: NaN }, 'GBP');
+    assert.ok(long.length <= 90 && !/NaN|Infinity/.test(long), long);
 });

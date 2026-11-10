@@ -56,7 +56,7 @@ export class TitleScreen {
                 h('div', { class: 't-logo' },
                     h('img', { src: 'assets/images/hedj-logo.png', alt: 'Hedj', width: '72', height: '72' }),
                     h('h1', { text: 'Treasury Manager' }),
-                    h('p', { class: 't-tag', text: 'Eight quarters. One board. Can you keep your job?' })),
+                    h('p', { class: 't-tag', text: 'Eight quarters to prove you deserve the job.' })),
                 this.free ? this._practiceLine() : this._playerLine(),
                 this._menu(),
                 this.reg || this.free ? this._stats() : null,
@@ -209,7 +209,7 @@ export class TitleScreen {
     _paintStats(p) {
         if (!this.statsEl || !p) return;
         const set = (key, text) => { this.statsEl.querySelector(`[data-stat="${key}"] .t-stat-value`).textContent = text; };
-        set('best', p.best?.simple > 0 ? num(p.best.simple) : '—');
+        set('best', p.best?.simple > 0 ? num(p.best.simple) : '–');
         set('chairmen', `${(p.chairmenMet || []).length}/${CHAIRMEN_TOTAL}`);
         const next = nextUnlockHint(p, this.app.content);
         this.nextEl.textContent = next || 'Everything unlocked. Now beat your best.';
@@ -228,7 +228,7 @@ export class TitleScreen {
         if (this.statsEl && !this.free) {
             // The board carries no emails (GDPR), so "you" is the entry with your name and company.
             const me = this.reg && entries.find(e => e.playerName === this.reg.playerName && (e.company || '') === (this.reg.company || ''));
-            this.statsEl.querySelector('[data-stat="rank"] .t-stat-value').textContent = offline ? 'Offline' : me ? `#${me.rank}` : '—';
+            this.statsEl.querySelector('[data-stat="rank"] .t-stat-value').textContent = offline ? 'Offline' : me ? `#${me.rank}` : '–';
         }
     }
 

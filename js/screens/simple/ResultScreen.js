@@ -2,6 +2,7 @@
 // RunController.playQuarter result):
 //   - the cash meter counts from last quarter's cash to the new figure;
 //   - the scene strip plays in the mood of this quarter's result;
+//   - v3.2: a facts line (the policy status) and the cash breakdown open the result, shown at once;
 //   - one line per exposure, "Dollar +6%. Your hedge saved €1.2m", revealed one by one;
 //   - one board member (or the chairman) with the expression and line RunController picked, plus the result quip;
 //   - the player's character (v3.1) beside the meter: the face from before the quarter, then, once everything is
@@ -17,7 +18,7 @@ import { SceneLoop } from '../../ui/pixel/Scene.js';
 import { drawSprite, CHAIRMAN_SPRITES } from '../../ui/pixel/sprites.js';
 import { isRunOver } from '../../engine/sim/SimEngine.js';
 import { BALANCE } from '../../engine/sim/balance.js';
-import { moveLabel } from '../../ui/labels.js';
+import { cashBreakdown, factsLine, moveLabel, volumeText } from '../../ui/labels.js';
 import { formatCash } from '../../utils/formatters.js';
 import { createTapGuard } from '../../ui/tapGuard.js';
 import { sceneStateFor, LOW_MOOD, withAvatar } from './QuarterScreen.js';
@@ -35,8 +36,19 @@ const SPRITE_SCALE = 2;             // 32px sprites drawn at 64px
 const CHART_GRACE_MS = 300;       // slack before a stalled chart loop is forced to its end
 const NOISE = 0.5;                  // money below half a unit is no impact
 const COMPACT_AFTER = 3;            // more exposure lines than this: shorter charts, so the board stays near
-const CHART_PX = 72;                // result chart height (css .r-chart matches)
-const COMPACT_CHART_PX = 56;        // ...and with more than COMPACT_AFTER lines (css .r-lines.is-compact .r-chart)
+const CHART_PX = 110;               // result chart height (css .r-chart matches)
+const COMPACT_CHART_PX = 80;        // ...and with more than COMPACT_AFTER lines (css .r-lines.is-compact .r-chart)
+
+// v3.2 chart caption: the quarter's market result without and with the hedge, e.g.
+// "Unhedged -€9.0m · With 75% hedge -€2.3m".
+export function chartCaption(line, currency) {
+    const hedge = Number.isFinite(line?.hedgeRatio) ? line.hedgeRatio : 0;
+    if (!(hedge > 0)) return null;
+    const exposure = Number.isFinite(line?.exposureImpact) ? line.exposureImpact : 0;
+    const hedged = exposure + (Number.isFinite(line?.hedgeImpact) ? line.hedgeImpact : 0);
+    const signed = v => (Math.abs(v) < NOISE ? formatCash(0, currency) : `${v > 0 ? '+' : ''}${formatCash(v, currency)}`);
+    return `Unhedged ${signed(exposure)} · With ${Math.round(hedge * 100)}% hedge ${signed(hedged)}`;
+}
 
 // The move of the exposure's foreign currency (or price, or rate) as the player feels it. FX rates are quoted
 // base/quote: when the exposure's currency is the quote (EURUSD for dollars), a rising rate is a weaker dollar.
@@ -76,6 +88,27 @@ export function impactText(line, currency) {
 
 export function resultLine(exposure, line, currency) {
     return `${moveText(exposure, line?.movePct)}. ${impactText(line, currency)}`;
+}
+
+// v3.2: the opening line, the quarter's policy status ("In policy: 62% of risk covered (board wants 50–75%)").
+function factsEl(summary, mandate) {
+    const off = (summary.policy ?? (summary.inMandate === false ? 'off' : null)) === 'off';
+    return h('p', { class: `r-facts${off ? ' is-warn' : ''}`, text: factsLine(summary, mandate) });
+}
+
+// v3.2: where the cash went, "Operations +€28.0m · Market +€12.0m · Hedges -€14.0m · Add-ons -€3.0m", then
+// "Cash +€23.0m". Each part stays whole and the dot stays with the part before it, so the line wraps cleanly.
+// Nothing for a summary saved before v3.2.
+function breakdownEl(summary, currency) {
+    const b = cashBreakdown(summary, currency);
+    if (!b) return null;
+    const tone = v => (v > 0 ? ' is-up' : v < 0 ? ' is-down' : '');
+    return h('section', { class: 'r-breakdown', 'aria-label': 'Where the cash went' },
+        h('p', { class: 'r-parts' }, b.parts.flatMap((p, i) => [
+            i > 0 ? h('span', { class: 'r-sep', 'aria-hidden': 'true', text: '\u00a0· ' }) : null,
+            h('span', { class: `r-part${tone(p.value)}`, 'data-part': p.key, text: p.text })
+        ])),
+        h('p', { class: `r-cash-total${tone(b.total.value)}`, text: b.total.text }));
 }
 
 function speakerName(reaction) {
@@ -152,8 +185,10 @@ export class ResultScreen {
             // The tone follows the net effect of the line (exposure plus hedge), not the hedge alone.
             const net = (Number.isFinite(l.exposureImpact) ? l.exposureImpact : 0) + (Number.isFinite(l.hedgeImpact) ? l.hedgeImpact : 0);
             const tone = net >= NOISE ? 'is-up' : net <= -NOISE ? 'is-down' : '';
-            const el = h('li', { class: `r-line ${tone}`.trim(), 'data-exposure': l.exposureId, hidden: true,
-                text: resultLine(exposure, l, run.baseCurrency) });
+            const volume = volumeText(exposure, l);   // v3.2: realised volume against forecast
+            const el = h('li', { class: `r-line ${tone}`.trim(), 'data-exposure': l.exposureId, hidden: true },
+                h('span', { class: 'r-line-text', text: resultLine(exposure, l, run.baseCurrency) }),
+                volume ? h('span', { class: 'r-volume', text: volume }) : null);
             this.lineEls.push(el);
             this.rows.push({ line: el, chart: this._chartRow(run, summary, exposure, l) });
         }
@@ -174,6 +209,8 @@ export class ResultScreen {
             summary.wrongFocus === true ? h('p', { class: 'r-focus', text: WRONG_FOCUS_RESULT }) : null));
 
         this.body = h('div', { class: 'q-body r-body', on: { click: this.tapGuard.wrap((e) => this._onTap(e)) } },
+            factsEl(summary, run.mandate),
+            breakdownEl(summary, run.baseCurrency),
             h('div', { class: 'q-scene r-scene' }, this.sceneCanvas),
             quip?.text ? h('p', { class: 'r-quip', text: quip.text }) : null,
             // Final review I3: more than COMPACT_AFTER lines get shorter charts (css: .r-lines.is-compact).
@@ -273,8 +310,9 @@ export class ResultScreen {
         if (!exposure || !market?.getDataset) return null;
         let series = null;
         try {
+            // v3.2: weekly closes when they have loaded (chart only), otherwise the monthly series.
             series = chartSeries(market.getDataset(exposure.underlying), run.startYear, (summary.q ?? run.quarter) - 1,
-                { invert: chartInverted(exposure) });
+                { invert: chartInverted(exposure), weekly: market.getWeekly?.(exposure.underlying) ?? null });
         } catch (err) {
             console.warn('ResultScreen: chart unavailable', err);
         }
@@ -282,10 +320,11 @@ export class ResultScreen {
         const hedge = Number.isFinite(l.hedgeRatio) ? l.hedgeRatio : 0;
         const impact = Number.isFinite(l.exposureImpact) ? l.exposureImpact : 0;
         const host = h('div', { class: 'r-chart', 'aria-hidden': 'true' });
+        const caption = chartCaption(l, run.baseCurrency);
         const li = h('li', { class: 'r-chart-row', hidden: true }, host,
-            hedge > 0 ? h('p', { class: 'r-chart-caption', text: `Hedged ${Math.round(hedge * 100)}%` }) : null);
+            caption ? h('p', { class: 'r-chart-caption', text: caption }) : null);
         return {
-            li, host, series, hedge,
+            li, host, series, hedge, scale: exposure.type === 'ir' ? 'pp' : 'pct',
             tone: impact <= -NOISE ? 'down' : impact >= NOISE ? 'up' : 'neutral',
             label: chartLabel(exposure, l.movePct)
         };
@@ -298,7 +337,7 @@ export class ResultScreen {
         c.li.hidden = false;
         try {
             this.charts.push(mountPriceChart(c.host, {
-                ...c.series, hedgeRatio: c.hedge, tone: c.tone, label: c.label, env: this.env, ticker: this.ticker,
+                ...c.series, hedgeRatio: c.hedge, tone: c.tone, label: c.label, scale: c.scale, env: this.env, ticker: this.ticker,
                 height: this.rows.length > COMPACT_AFTER ? COMPACT_CHART_PX : CHART_PX,
                 onDone: () => { c.done = true; this._maybeShowBoard(); }
             }));

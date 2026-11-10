@@ -65,7 +65,7 @@ export class EventScreen {
         this.el.innerHTML = `
             <div class="quarter-bar">
                 <span class="company-name">${state.industry?.name || 'Company'}</span>
-                <span class="quarter-label">${formatQuarter(state.currentYearOffset, state.currentQuarter)} — EVENT</span>
+                <span class="quarter-label">${formatQuarter(state.currentYearOffset, state.currentQuarter)}: EVENT</span>
                 <span class="pixel-text" style="font-size:8px;color:var(--text-secondary)">${event.category?.toUpperCase() || 'EVENT'}</span>
             </div>
 
@@ -164,10 +164,10 @@ export class EventScreen {
 
     getCategoryIcon(category) {
         switch (category) {
-            case 'corporate': return '🏢';
-            case 'universal': return '⚠️';
-            case 'industry_specific': return '🏭';
-            default: return '📋';
+            case 'corporate': return 'CORPORATE';
+            case 'universal': return 'ALERT';
+            case 'industry_specific': return 'INDUSTRY';
+            default: return 'NOTICE';
         }
     }
 

@@ -100,6 +100,19 @@ export class App {
 
         // Always start at title screen
         this.showScreen('title');
+
+        // v3.2: the weekly chart data loads once the title is up (not awaited, so it never holds the title back).
+        this.loadChartData();
+    }
+
+    // Chart-only weekly prices (MarketEngine.loadWeekly). Until they arrive, or if they fail, the charts use the
+    // monthly data. Never throws, never rejects.
+    loadChartData() {
+        try {
+            marketEngine.loadWeekly('data/market')?.catch?.(() => {});
+        } catch {
+            // charts fall back to monthly
+        }
     }
 
     // The tab is back in view (see init). Never rejects.

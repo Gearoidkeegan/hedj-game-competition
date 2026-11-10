@@ -9,7 +9,8 @@
 //   meter.destroy()
 //
 // The bar spans 0 to 1.5 × starting cash, with a red-line marker. From the second set() on, the change since the
-// previous set() shows as a signed chip ("+€12.0m"). With animateMs > 0 the number and bar count to the new
+// previous set() shows as a signed chip ("+€12.0m"). With `deltaFrom` (v3.2, the quarter screen's add-on preview)
+// the chip shows the change from that fixed cash instead, and hides when there is none. With animateMs > 0 the number and bar count to the new
 // value (ease-out) using requestAnimationFrame; reduced motion, or no rAF, jumps straight there. A new set()
 // mid-animation finishes the previous promise and starts from the value on screen.
 // `env` lets tests inject requestAnimationFrame, cancelAnimationFrame, now and matchMedia.
@@ -51,7 +52,7 @@ export class CashMeter {
         el.replaceChildren(this.root);
     }
 
-    set({ cash, startingCash, redLine } = {}, animateMs = 0) {
+    set({ cash, startingCash, redLine, deltaFrom } = {}, animateMs = 0) {
         this._finishAnim();
         const prev = this.data ? this.value : null;
         this.data = { cash: fin(cash), startingCash: fin(startingCash), redLine: fin(redLine) };
@@ -64,10 +65,11 @@ export class CashMeter {
         this.state = this.data.redLine > 0 && this.value < this.data.redLine ? 'danger' : 'ok';
         this.root.classList.toggle('is-danger', this.state === 'danger');
 
-        if (prev === null) {
+        const base = Number.isFinite(deltaFrom) ? deltaFrom : prev;
+        const d = base === null ? 0 : this.value - base;
+        if (base === null || (Number.isFinite(deltaFrom) && d === 0)) {
             this.deltaEl.hidden = true;
         } else {
-            const d = this.value - prev;
             this.deltaEl.textContent = `${d >= 0 ? '+' : ''}${formatCash(d, this.currency)}`;
             this.deltaEl.classList.toggle('is-up', d >= 0);
             this.deltaEl.classList.toggle('is-down', d < 0);

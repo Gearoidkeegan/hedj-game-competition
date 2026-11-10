@@ -115,9 +115,9 @@ export class HedgeLadder {
                         <div class="hedge-ladder-bar-container" style="position:relative;height:14px;background:var(--panel-bg);border-radius:2px;overflow:hidden;">
                             <div style="height:100%;width:${barWidth}%;background:${barColor};border-radius:2px;"></div>
                         </div>
-                        <span class="pixel-text" style="font-size:8px;text-align:right;color:var(--text-muted);">—</span>
+                        <span class="pixel-text" style="font-size:8px;text-align:right;color:var(--text-muted);">–</span>
                         <span class="pixel-text" style="font-size:8px;text-align:right;color:var(--text-muted);">${pctDisplay}%</span>
-                        <span class="pixel-text" style="font-size:7px;text-align:right;color:var(--text-muted);">—</span>
+                        <span class="pixel-text" style="font-size:7px;text-align:right;color:var(--text-muted);">–</span>
                     </div>
                 `;
             } else {
@@ -213,7 +213,7 @@ export class HedgeLadder {
         if (abs >= 1e9) return `${(abs / 1e9).toFixed(1)}B`;
         if (abs >= 1e6) return `${(abs / 1e6).toFixed(1)}M`;
         if (abs >= 1e3) return `${(abs / 1e3).toFixed(0)}K`;
-        if (abs === 0) return '—';
+        if (abs === 0) return '–';
         return abs.toFixed(0);
     }
 }

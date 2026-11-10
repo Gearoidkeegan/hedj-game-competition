@@ -35,7 +35,7 @@
                     "hedge_forward_itm": {
                         "description": "Your forward is in the money. Mixed reactions from the board.",
                         "board_reactions": {
-                            "praise": "Smart move hedging early — the rate moved in our favour.",
+                            "praise": "Smart move hedging early. The rate moved in our favour.",
                             "criticism": "You got lucky. Hedging a contingent deal with a forward was reckless. What if it hadn't closed?"
                         },
                         "satisfaction_delta": 1
@@ -85,12 +85,12 @@
                         "description": "The option simply expires. Premium was the cost of prudence.",
                         "board_reactions": {
                             "mild_criticism": "We spent money on options for a deal that never closed.",
-                            "grudging_praise": "At least you used options — no breakage cost. That was smart."
+                            "grudging_praise": "At least you used options. No breakage cost. That was smart."
                         },
                         "satisfaction_delta": -1
                     },
                     "no_hedge": {
-                        "description": "Good call — no hedge needed for a deal that didn't happen.",
+                        "description": "Good call. No hedge needed for a deal that didn't happen.",
                         "board_reactions": {
                             "praise": "Prudent decision to wait. No unnecessary costs incurred."
                         },
@@ -107,7 +107,7 @@
             "type": "instant",
             "category": "universal",
             "title": "Revenue Warning",
-            "description": "Sales have come in 20% below forecast this quarter. Your revenue exposures have been reduced accordingly. Review your hedge book — you may now be over-hedged and should consider unwinding excess positions yourself.",
+            "description": "Sales have come in 20% below forecast this quarter. Your revenue exposures have been reduced accordingly. Review your hedge book. You may now be over-hedged and should consider unwinding excess positions yourself.",
             "choices": [
                 {
                     "id": "acknowledge",
@@ -142,7 +142,7 @@
             "name": "Major Margin Call",
             "type": "instant",
             "category": "universal",
-            "title": "Margin Call — Additional Collateral Required",
+            "title": "Margin Call: Additional Collateral Required",
             "description": "Market moves have triggered a significant margin call on your derivative positions. Cash must be posted immediately.",
             "choices": [
                 {
@@ -190,8 +190,8 @@
             "name": "Product Not Approved",
             "type": "instant",
             "category": "industry_specific",
-            "title": "FDA Rejection — Product Not Approved",
-            "description": "Your blockbuster drug has been rejected by the regulator. Projected USD revenue has evaporated — your revenue exposures have been wiped out. Any forward hedges you booked against this revenue are now naked positions; you'll need to unwind them yourself (and pay the breakage). Options would have simply expired.",
+            "title": "FDA Rejection: Product Not Approved",
+            "description": "Your blockbuster drug has been rejected by the regulator. Projected USD revenue has evaporated and your revenue exposures have been wiped out. Any forward hedges you booked against this revenue are now naked positions; you'll need to unwind them yourself (and pay the breakage). Options would have simply expired.",
             "choices": [
                 {
                     "id": "acknowledge",
@@ -200,7 +200,7 @@
                     "effect": { "revenue_shrink_pct": 1.0, "satisfaction_delta": -3 }
                 }
             ],
-            "board_note": "Options used for revenue hedging are praised here — no breakage. Forwards are criticised.",
+            "board_note": "Options used for revenue hedging are praised here: no breakage. Forwards are criticised.",
             "weight": 1.8,
             "industries": ["pharma"]
         },
@@ -210,7 +210,7 @@
             "type": "instant",
             "category": "industry_specific",
             "title": "Major Project Delayed 6 Months",
-            "description": "Your flagship project has been delayed by 6 months. Near-term materials and equipment exposures have shrunk by half — the work simply isn't happening yet. Your existing hedges still settle on the original schedule, leaving you over-hedged in the short term. Roll or unwind to match the new timeline.",
+            "description": "Your flagship project has been delayed by 6 months. Near-term materials and equipment exposures have shrunk by half. The work simply isn't happening yet. Your existing hedges still settle on the original schedule, leaving you over-hedged in the short term. Roll or unwind to match the new timeline.",
             "choices": [
                 {
                     "id": "acknowledge",
@@ -289,7 +289,7 @@
             "type": "instant",
             "category": "industry_specific",
             "title": "Supply Chain Disruption",
-            "description": "A major supply route has been disrupted. Your commodity prices have spiked 15%. Existing hedges have rallied in your favour, but any new coverage will be more expensive — review your book and decide whether to add more.",
+            "description": "A major supply route has been disrupted. Your commodity prices have spiked 15%. Existing hedges have rallied in your favour, but any new coverage will be more expensive. Review your book and decide whether to add more.",
             "choices": [
                 {
                     "id": "acknowledge",

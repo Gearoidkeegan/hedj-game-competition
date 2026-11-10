@@ -61,14 +61,14 @@ test('no policy: no band; a noHedge board: a zero-width band marked at 0', () =>
 test('nothing hedgeable (all locked or zero this quarter): a dash, an empty bar and a plain note, never NaN', () => {
     const { m, q, host } = meter();
     m.set({ cover: null, mandate: { min: 0.25, max: 0.5 }, wrongFocus: false, warn: false });
-    assert.equal(q('.rk-value').textContent, '—');
+    assert.equal(q('.rk-value').textContent, '–');
     assert.equal(q('.rk-fill').style.width, '0.0%');
     assert.equal(q('.rk-note').hidden, false);
     assert.equal(q('.rk-note').textContent, 'Nothing you can hedge yet');
     assert.equal(q('.risk-meter').getAttribute('aria-valuenow'), null);
     assert.ok(!host.textContent.includes('NaN'));
     m.set({ cover: NaN, mandate: null });
-    assert.equal(q('.rk-value').textContent, '—');
+    assert.equal(q('.rk-value').textContent, '–');
     assert.ok(!host.textContent.includes('NaN'));
 });
 

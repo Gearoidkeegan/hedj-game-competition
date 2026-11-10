@@ -58,7 +58,7 @@
                 {
                     "id": "keep_cash",
                     "label": "Keep the cash",
-                    "quip": "Cash is king. The supplier sends a passive-aggressive email.",
+                    "quip": "The cash stays put. The supplier sends a passive-aggressive email.",
                     "effects": { "cashPct": 0.01, "mood": -2 }
                 }
             ]
@@ -136,7 +136,7 @@
                 {
                     "id": "use_forward",
                     "label": "Use the forward rate",
-                    "quip": "Defensible, boring, correct. Half the board nods off.",
+                    "quip": "Defensible and dull. Half the board nods off.",
                     "effects": { "mood": 1, "varianceMult": 0.9 }
                 },
                 {
@@ -331,7 +331,7 @@
                 {
                     "id": "hold_for_flat_white",
                     "label": "Hold out for the flat white",
-                    "quip": "Superb flat white. Its true cost: one missed fixing.",
+                    "quip": "Superb flat white. It cost you one missed fixing.",
                     "effects": { "cashPct": -0.01, "mood": -2 }
                 }
             ]

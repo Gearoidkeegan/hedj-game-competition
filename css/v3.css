@@ -485,6 +485,26 @@
 }
 .r-line.is-up { border-left-color: var(--v3-green); }
 .r-line.is-down { border-left-color: var(--v3-red); }
+/* v3.2: realised volume against forecast, on its own line under the result line. */
+.r-line-text, .r-volume { display: block; }
+.r-volume { font-size: 18px; color: var(--v3-muted); }
+
+/* v3.2: the facts line and the cash breakdown open the result. Each part stays whole (nowrap) and the line breaks
+   only between parts, so it wraps cleanly at 360px. */
+.r-facts { font-size: 20px; color: var(--v3-text); }
+.r-facts.is-warn { color: var(--v3-amber); }
+.r-breakdown {
+    padding: 6px 10px;
+    background: var(--v3-panel);
+    border: 2px solid var(--v3-line);
+}
+.r-parts { font-size: 18px; color: var(--v3-muted); }
+.r-part { white-space: nowrap; }
+.r-part.is-up { color: var(--v3-green); }
+.r-part.is-down { color: var(--v3-red); }
+.r-cash-total { font-size: 22px; margin-top: 2px; }
+.r-cash-total.is-up { color: var(--v3-green); }
+.r-cash-total.is-down { color: var(--v3-red); }
 .r-board.is-angry { border-color: var(--v3-red); }
 .r-board.is-happy { border-color: var(--v3-green); }
 
@@ -662,10 +682,10 @@
 /* Market charts (Simple): the result screen draws one per exposure line, the quarter screen a sparkline per card. */
 .r-chart-row { list-style: none; margin: -2px 0 4px; padding: 4px 10px 6px; background: var(--v3-panel); border-left: 4px solid var(--v3-line); }
 .r-chart-row[hidden] { display: none; }
-.r-chart { width: 100%; height: 72px; }
-.r-lines.is-compact .r-chart { height: 56px; }   /* more than 3 lines: the board stays closer (final review I3) */
+.r-chart { width: 100%; height: 110px; }   /* v3.2: room for the weekly line, % gridlines and month markers */
+.r-lines.is-compact .r-chart { height: 80px; }   /* more than 3 lines: the board stays closer (final review I3) */
 .r-chart canvas, .exp-spark canvas { display: block; max-width: 100%; }
-.r-chart-caption { margin: 2px 0 0; font-size: 16px; color: var(--v3-gold); }
+.r-chart-caption { margin: 2px 0 0; font-size: 16px; line-height: 1.3; color: var(--v3-gold); }   /* VT323 under 16px is hard to read; a long caption wraps */
 .exp-spark { width: 100%; height: 24px; margin-top: 2px; }
 
 /* ---------- Player character (v3.1) ---------- */

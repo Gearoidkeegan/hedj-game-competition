@@ -2,7 +2,7 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { installFakeDom, key } from '../helpers/fakeDom.js';
 import { loadJson, loadMarketData, loadIndustries } from '../helpers/loadData.js';
-import { marketEngine } from '../../js/engine/MarketEngine.js';
+import { marketEngine, MarketEngineController } from '../../js/engine/MarketEngine.js';
 import { POLICY_OPTIONS } from '../../js/engine/sim/SimEngine.js';
 import * as storage from '../../js/utils/storage.js';
 import { RunController } from '../../js/screens/simple/RunController.js';
@@ -81,7 +81,7 @@ test('renders the cash meter, a 120px scene strip, one card per active exposure 
     const active = rc.run.exposures.filter(e => e.unlockQuarter <= 0).map(e => e.id);
     assert.deepEqual(qa('[data-exposure]').map(c => c.getAttribute('data-exposure')), active);
     assert.equal(card('fuel').querySelector('.exp-copy').textContent, 'You buy jet fuel in dollars');
-    assert.equal(card('usd-revenue').querySelector('.exp-forecast').textContent, 'Forecast accuracy 40%');
+    assert.equal(card('usd-revenue').querySelector('.exp-forecast').textContent, 'Forecast ±40%');
     assert.equal(run.textContent, 'RUN THE QUARTER');
     assert.equal(q('.q-quarter').textContent, 'Quarter 1 of 8');
     assert.equal(q('.q-policy').textContent, 'Board policy: cover 25–50% of your risk');
@@ -154,7 +154,7 @@ test('power-up slot: cards show blurb, cost and hedjLine; one pick at a time; ta
     assert.equal(fc.querySelector('.pu-cost').textContent, '€2.5m');
     fc.click();
     assert.equal(fc.getAttribute('aria-pressed'), 'true');
-    assert.equal(card('usd-revenue').querySelector('.exp-forecast').textContent, 'Forecast accuracy 40% → 60%');
+    assert.equal(card('usd-revenue').querySelector('.exp-forecast').textContent, 'Forecast ±40% → ±27%');
     q('[data-powerup="facilities"]').click();
     assert.equal(fc.getAttribute('aria-pressed'), 'false', 'picking another drops the first');
     assert.equal(card('usd-revenue').querySelector('[data-step="1"]').disabled, false, 'facilities lifts the cap at once');
@@ -168,7 +168,7 @@ test('power-up slot: cards show blurb, cost and hedjLine; one pick at a time; ta
 test('forecasting card shows the next module text from levels[forecastLevel]', () => {
     const { q } = setup(SEED.band2550, { patch: { forecastLevel: 1, powerUps: { owned: ['forecasting'], used: [] } } });
     assert.equal(q('[data-powerup="forecasting"] .pu-blurb').textContent, content.powerups.forecasting.levels[1]);
-    assert.equal(q('[data-exposure="usd-revenue"] .exp-forecast').textContent, 'Forecast accuracy 60%');
+    assert.equal(q('[data-exposure="usd-revenue"] .exp-forecast').textContent, 'Forecast ±27%');
 });
 
 test('an event card blocks RUN until one of its two choices is picked', () => {
@@ -303,7 +303,7 @@ test('R51: off-policy decisions need a confirm tap before RUN; ADJUST cancels', 
     const confirm = q('.q-confirm');
     assert.equal(confirm.hidden, false);
     assert.equal(confirm.querySelector('p').textContent, OFF_POLICY_PROMPT);
-    assert.equal(OFF_POLICY_PROMPT, "Outside the board's policy — run anyway?");
+    assert.equal(OFF_POLICY_PROMPT, "Outside the board's policy. Run anyway?");
     clock.t += TAP_GUARD_MS;   // opening the prompt re-arms the tap guard
     q('.q-adjust').click();
     assert.equal(confirm.hidden, true);
@@ -425,7 +425,7 @@ test('v3.1: nothing hedgeable this quarter: the meter shows a dash, never NaN, a
     const { rc, q, el } = setup(SEED.band2550);
     rc.run.exposures = rc.run.exposures.map(e => (e.id === 'usd-revenue' ? { ...e, quarterlyNotional: 0 } : e));
     q('[data-powerup="forecasting"]').click();   // any change repaints
-    assert.equal(q('.rk-value').textContent, '—');
+    assert.equal(q('.rk-value').textContent, '–');
     assert.equal(q('.risk-meter').classList.contains('is-warn'), false);
     assert.equal(q('.rk-note').textContent, 'Nothing you can hedge yet');
     assert.ok(!el.textContent.includes('NaN'));
@@ -648,6 +648,55 @@ test('each exposure card has a static sparkline when market data exists', () => 
     assert.ok(cards.every(c => c.querySelector('.exp-spark canvas')), 'one sparkline per card');
     assert.deepEqual(qa('.exp-spark').map(s => s.textContent).filter(Boolean), [], 'a sparkline holds a canvas and no text');
     screen.unmount();
+});
+
+// v3.2: weekly sparklines, and nothing from after the quarter start can reach them.
+function weeklyMarket(poisonAfterYear = null) {
+    const m = new MarketEngineController();
+    m.loadFromObjects(loadMarketData());
+    const fx = loadJson('data/market/fx-weekly.json');
+    const commodities = loadJson('data/market/commodities-weekly.json');
+    if (poisonAfterYear !== null) {
+        for (const group of [fx, commodities]) {
+            for (const [k, s] of Object.entries(group)) {
+                if (k === '_meta') continue;
+                // After the moment the engine's Q1 start rate was observed (mid-January, or the end of January).
+                const cut = s.anchor === 'end' ? Date.UTC(poisonAfterYear, 1, 0) : Date.UTC(poisonAfterYear, 0, 15);
+                const t0 = Date.parse(`${s.start}T00:00:00Z`);
+                s.v = s.v.map((x, i) => (t0 + i * 7 * 864e5 > cut ? 1e6 : x));
+            }
+        }
+    }
+    m.loadWeeklyFromObjects({ fx, commodities });
+    return m;
+}
+
+test('v3.2: with weekly data the sparklines are weekly, end on the start rate, and see nothing after it', () => {
+    const sparksFor = (market) => {
+        const rc = new RunController({ storage, market, content, now: () => 1_700_000_000_000 });
+        rc.start('airline', { seed: SEED.band2550 });
+        const app = { runController: rc, content, marketReady: Promise.resolve(), shown: [], toasts: [],
+            showScreen(id) { this.shown.push(id); }, showToast() {} };
+        const screen = new QuarterScreen(app, { now: () => 0 });
+        dom.document.body.appendChild(screen.render());
+        screen.mount();
+        const out = screen.sparks.map(s => ({ ...s.series, exposureId: s.exposureId }));
+        screen.unmount();
+        return { out, rc };
+    };
+    const { out, rc } = sparksFor(weeklyMarket());
+    const year = rc.run.startYear;   // seed 3: a year the weekly data covers
+    const poisoned = sparksFor(weeklyMarket(year)).out;
+    assert.ok(out.length >= 2, `${out.length} sparks`);
+    for (const [i, s] of out.entries()) {
+        const ex = rc.run.exposures.find(e => e.id === s.exposureId);
+        const rate = rc.market.getRate(ex.underlying, year, 1);
+        const start = ex.type === 'fx' && ex.underlying.endsWith(ex.unit) ? 1 / rate : rate;
+        assert.equal(s.history.at(-1), start, `${ex.underlying} ends on the start rate`);
+        assert.deepEqual(s.quarter, []);
+        assert.equal(s.source, ex.type === 'ir' ? 'monthly' : 'weekly', ex.underlying);
+        assert.deepEqual(poisoned[i].history, s.history, `${ex.underlying}: no point after the quarter start`);
+    }
 });
 
 // ── Fix round 1 ────────────────────────────────────────────────────────────

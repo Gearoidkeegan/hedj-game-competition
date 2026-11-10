@@ -169,3 +169,16 @@ test('forecasting module 3 copy matches the engine: no volume surprises at all (
     assert.ok(!/almost/i.test(module3), module3);
     assert.match(module3, /No volume surprises left\./);
 });
+
+// Final review: the power-up talks in the same forecast range the exposure cards show ("Forecast ±40% → ±27%"), so the
+// two numbers move the same way. The ranges come from the engine, not from the copy.
+test('forecasting module copy names the forecast ranges the exposure cards show', async () => {
+    const { forecastVariance } = await import('../../js/engine/sim/powerUps.js');
+    const { forecastRangeText } = await import('../../js/ui/labels.js');
+    const range = level => forecastRangeText(forecastVariance({ forecastLevel: level, powerUps: { owned: [], used: [] } }));
+    const card = loadJson('data/powerups.json').forecasting;
+    card.levels.forEach((text, i) => {
+        assert.ok(text.includes(`${range(i)} → ${range(i + 1)}`), `module ${i + 1}: ${text}`);
+    });
+    for (const text of [card.blurb, ...card.levels]) assert.doesNotMatch(text, /accuracy/i, text);
+});

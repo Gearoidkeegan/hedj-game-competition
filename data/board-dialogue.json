@@ -11,7 +11,7 @@
             "signature": "This is either genius or we're going to Mars. Either way, I'm tweeting about it."
         },
         "oleary": {
-            "name": "Michael O'Leary Type",
+            "name": "Michael O'Scary Type",
             "description": "Cost-obsessed, blunt, hates paying for anything",
             "signature": "If it costs money, I hate it. If it saves money, I love it. Simple."
         },
@@ -27,7 +27,7 @@
         },
         "jobs": {
             "name": "Steve Jobs Type",
-            "description": "Design obsessive, worships simplicity, reality distortion field, bans his kids' gadgets",
+            "description": "Design obsessive, worships simplicity, reality distortion field, hates clutter",
             "signature": "People don't know what they want until you show it to them."
         },
         "dorsey": {
@@ -50,11 +50,11 @@
             "Acceptable. Barely.",
             "The competitors would kill for these numbers. Keep it up.",
             "Even a broken clock is right twice a day. Well done... I think.",
-            "I'll admit it — I didn't think you had it in you.",
+            "I'll admit it. I didn't think you had it in you.",
             "My golf handicap is still better than your performance, but this'll do.",
             "The board is... not unhappy. That's high praise from us.",
             "Don't spend it all in one place. Actually, don't spend any of it.",
-            "Now THAT'S a quarter. Do it again. And again. And again.",
+            "Now THAT'S a quarter. Four more like it and we'll talk.",
             "The analysts will have to eat their words. I love it when they do that.",
             "I'd almost call that impressive. Almost. Let's not get carried away.",
             "Our biggest rival posted half this. Frame these numbers and hang them in their lobby.",
@@ -62,7 +62,7 @@
             "I'm going to take credit for this at the next investor call. You understand.",
             "Green on the screen. That's the only colour I respect.",
             "You've bought yourself one quarter of goodwill. Use it wisely.",
-            "I was sharpening the axe. You can put it back in the drawer — for now.",
+            "I was sharpening the axe. You can put it back in the drawer. For now.",
             "Finally earning that salary I keep complaining about."
         ],
         "bad_pnl": [
@@ -79,7 +79,7 @@
             "Do you even read the market reports, or do you just wing it?",
             "My blood pressure can't take another quarter like this.",
             "I've seen train wrecks with better outcomes than this.",
-            "Explain to me — slowly — how you managed to lose this much.",
+            "Explain to me, slowly, how you managed to lose this much.",
             "The competition is laughing at us. LAUGHING.",
             "I didn't claw my way to this boardroom to watch you torch our cash.",
             "Every red number on that screen is a year off my life.",
@@ -97,8 +97,8 @@
             "Treading water isn't a strategy.",
             "The market gave you opportunities and you just... sat there?",
             "Average. And in this business, average gets you fired.",
-            "You're not Michael O'Leary — you can't do whatever you want.",
-            "Flat. Boring. Forgettable. Just like our last three treasurers.",
+            "You're not Michael O'Scary. You can't do whatever you want.",
+            "Flat and forgettable. Just like our last three treasurers.",
             "I don't pay for 'fine.' I pay for 'spectacular.'",
             "Standing still is just losing slowly. Pick up the pace.",
             "A nothing quarter. The shareholders want a story, not a shrug.",
@@ -108,10 +108,10 @@
         "overtrading": [
             "Stop churning the book! You're not a day trader!",
             "Every trade costs money. Are you trying to bankrupt us in fees?",
-            "This isn't a video game — oh wait, it is. But still, stop trading so much!",
+            "This isn't a video game. Oh wait, it is. Still, stop trading so much!",
             "The trading desk called. They love you. You're their best customer.",
             "More trades than a secondhand car dealer. Calm down.",
-            "Are you being paid per click? Because it certainly looks like it.",
+            "Are you being paid per click? The trade count says yes.",
             "The brokers are buying yachts off your commissions. STOP.",
             "Twitchy fingers cost this company a fortune. Sit on your hands.",
             "Activity is not the same as achievement. Learn the difference.",
@@ -122,7 +122,7 @@
             "Options?! The premium alone could fund a small country.",
             "I don't like paying for things we might never use.",
             "That premium better be worth it. I have my doubts.",
-            "Premiums, premiums, premiums. Is everything in this business a toll booth?",
+            "Premiums everywhere. Is every part of this business a toll booth?",
             "We're haemorrhaging cash on protection we may never need.",
             "An option is just a bet you paid extra to place. Convince me otherwise.",
             "I'll tolerate the premium ONCE. Don't make a habit of it."
@@ -131,7 +131,7 @@
             "Fine, the options saved us. I'll give you that ONE time.",
             "Lucky you used options. Don't expect me to admit that in the minutes.",
             "The board acknowledges that options were... not the worst idea.",
-            "Alright, the premium earned its keep. Mark the calendar — I was almost wrong.",
+            "Alright, the premium earned its keep. Mark the calendar, I was almost wrong.",
             "Those options just paid for themselves. Don't let it inflate your ego.",
             "Hmph. The insurance paid out. Even a stopped clock, et cetera."
         ],
@@ -149,7 +149,7 @@
             "The policy exists for a REASON. Follow it!",
             "You're outside policy. I'm noting this in the minutes.",
             "Compliance called. They're not happy. Neither am I.",
-            "The hedging policy isn't a suggestion — it's a directive.",
+            "Call the hedging policy a suggestion again and see what happens.",
             "Rules are rules. Break them again and we'll have a very different meeting.",
             "I don't care how clever the trade was. It was OUTSIDE policy.",
             "The board sets the bands. You stay inside them. End of discussion.",
@@ -161,14 +161,14 @@
             "Even the interns know the difference between buy and sell.",
             "I'm speechless. Actually no, I have MANY words for this.",
             "You hedged BACKWARDS. We're now doubly exposed. Magnificent.",
-            "Left, right, up, down — pick a direction and at least get it CORRECT.",
+            "Left, right, up, down. Pick a direction and at least get it CORRECT.",
             "A child with a coin flip would've had a 50% better strike rate.",
             "Wrong-way risk you CREATED yourself. That's a new low."
         ],
         "good_diversification": [
             "Good spread across counterparties. At least you got that right.",
             "Diversification. Finally, some evidence of competence.",
-            "Spreading the risk around — I'll allow that you did something smart.",
+            "Spreading the risk around. I'll allow that it was smart.",
             "No single bank can sink us now. Acceptable defensive thinking."
         ],
         "poor_diversification": [
@@ -180,7 +180,7 @@
         "tms_positive": [
             "Finally investing in proper systems. About time.",
             "If it helps us see the numbers clearer, I'll allow it.",
-            "A system that stops you making errors? Worth every penny — barely.",
+            "A system that stops you making errors? Worth the money. Just.",
             "Fine. Better tools, fewer excuses. I'll be watching the results."
         ],
         "tms_overspend": [
@@ -215,7 +215,7 @@
             "I've double-checked the figures. They appear to be correct. Well done.",
             "Positive P&L is nice, but is it sustainable? That's my concern.",
             "The auditors will be pleased. That's what matters to me.",
-            "A solid result — assuming the reconciliations hold up under review.",
+            "A solid result, assuming the reconciliations hold up under review.",
             "I appreciate a clean quarter. Now let's make sure it wasn't luck.",
             "The hedge ratios held. That's the part that actually reassures me.",
             "Good. But I've already started worrying about the next downturn.",
@@ -377,7 +377,7 @@
             "Does all this trading actually help the business, or is it just noise?",
             "I don't care how many trades you do as long as my costs are hedged.",
             "Every time you trade, my team gets a new confirmation to process.",
-            "All this churn — does any of it keep the factory running?",
+            "All this churn. Does any of it keep the factory running?",
             "My back office is buried in your paperwork. Ease up.",
             "Trade less, hedge my costs more. That's all I'm asking."
         ],
@@ -387,7 +387,7 @@
             "Just tell me: are my costs hedged or not?",
             "If that premium keeps my input prices stable, I'll stop complaining.",
             "I don't speak options. I speak 'can I afford my raw materials?'",
-            "Pay the premium if you must — just don't touch the operations fund."
+            "Pay the premium if you must, but don't touch the operations fund."
         ],
         "margin_call": [
             "A margin call? That's cash we could be using to pay suppliers!",
@@ -440,12 +440,12 @@
             "big_loss": [
                 "I DON'T WANT EXCUSES! I WANT SOMEONE TO FIX THIS!",
                 "YOU'RE FIRED! Wait, no, I need someone to blame next quarter.",
-                "GET ME PICTURES OF— I mean GET ME BETTER NUMBERS!",
-                "This is a DISASTER! A CATASTROPHE! A— someone get me coffee.",
+                "GET ME PICTURES OF... I mean GET ME BETTER NUMBERS!",
+                "This is a DISASTER! A CATASTROPHE! A... someone get me coffee.",
                 "I want to see RED INK turn GREEN by Monday or heads will ROLL!",
                 "Do you hear that? That's the sound of my patience LEAVING THE BUILDING!",
                 "I've seen better results from a coin flip! At least a coin tries!",
-                "Get out of my office! No, stay! No — just FIX IT, whatever it is!"
+                "Get out of my office! No, stay! No. Just FIX IT, whatever it is!"
             ],
             "big_win": [
                 "Hmph. Not terrible. Don't expect me to say that again.",
@@ -462,7 +462,7 @@
                 "I didn't build this company by being NICE! Move faster!",
                 "Coffee's cold, profits are flat, and my temper is HOT. Sort it out!",
                 "I want results so good they make me speechless. And I'm NEVER speechless!",
-                "Stop reading market reports and START making money!",
+                "GET ME a headline I can print! 'TREASURER SAVES COMPANY'! Not the other one!",
                 "This boardroom runs on RESULTS and CAFFEINE. We're low on both!"
             ],
             "tms_comment": [
@@ -470,7 +470,7 @@
                 "If this system doesn't IMMEDIATELY show me better numbers, you're done!",
                 "I DON'T CARE ABOUT MODULES! I CARE ABOUT RESULTS!",
                 "A SCREEN told you to do that? I don't pay screens, I pay PEOPLE!",
-                "Software, software, software! Does it make money or just NOISE?!",
+                "Software! MORE software! Does it make money or just NOISE?!",
                 "Unplug it if it doesn't produce by Friday! ALL of it!"
             ]
         },
@@ -486,7 +486,7 @@
                 "I've decided this loss is actually beta-testing for a bigger win."
             ],
             "big_win": [
-                "To the moon! 🚀 Wait, wrong company.",
+                "To the moon! Wait, wrong company.",
                 "I knew our treasury strategy was genius. I thought of it myself.",
                 "This proves my thesis. Which I'll explain on a podcast later.",
                 "We're basically a tech company now. I'm changing the logo tonight.",
@@ -507,7 +507,7 @@
                 "Why are we buying off-the-shelf? We should build our own TMS. From scratch. In a weekend.",
                 "I've seen the TMS code. It's terrible. I could write better treasury software in my sleep.",
                 "What if the TMS was also a social network? Just thinking out loud.",
-                "Delete 80% of the TMS features. If we don't add 20% back, we didn't delete enough.",
+                "Delete half the TMS features. Then half of what's left. Then tweet about it.",
                 "I want the TMS to have a 'hardcore' mode. Make hedging feel dangerous.",
                 "The TMS should talk to my car, my rocket, and my fridge. Synergy."
             ]
@@ -518,7 +518,7 @@
                 "You know what this loss could have bought? Three planes.",
                 "If this were my airline, I'd charge the losses to the passengers.",
                 "Losing money is the one thing I will NEVER tolerate.",
-                "That loss is the most expensive thing we've bought all year — and we got NOTHING.",
+                "That loss is the most expensive thing we've bought all year. And we got NOTHING.",
                 "I'd fine you for this if I thought I could collect it.",
                 "We could have charged customers for that money. Instead you LOST it.",
                 "I've cancelled the office biscuits to recover this. That's how serious it is."
@@ -557,7 +557,7 @@
                 "The mark-to-market doesn't concern me. The risk management does.",
                 "We've been through worse. But I expect a plan by Monday.",
                 "I don't mind losing money. I mind not understanding WHY we lost it.",
-                "Show me the exposures that hurt us. We learn, we adjust, we move on.",
+                "Show me the exposures that hurt us. We fix those first.",
                 "A loss is tuition. The question is whether you actually learned anything.",
                 "This is a process failure, not a market failure. Let's be honest about that."
             ],
@@ -590,39 +590,39 @@
         },
         "buffett": {
             "big_loss": [
-                "Rule number one: never lose money. Rule number two: see rule one.",
+                "My rulebook is one page and the first line says don't lose the cash. Did you read it?",
                 "Short-term losses I can tolerate. Poor process I cannot.",
-                "The market is a voting machine short-term, weighing machine long-term.",
+                "In the short run the market sulks. In the long run it counts. You flinched at the sulk.",
                 "This too shall pass. But let's not make it a habit.",
-                "Only when the tide goes out do you discover who's been swimming naked.",
-                "I never look at where the puck is. I look at where it's going. Where's it going?",
-                "It takes 20 years to build a reputation and five minutes to ruin it.",
-                "Predicting rain doesn't count. Building arks does. We needed an ark."
+                "That hedge book was a sandcastle with a nice brochure. The tide hasn't read it.",
+                "I don't chase the ball. I wait where it lands. You chased it, and look where we are.",
+                "Our name with the banks took decades. One quarter like this gets it discussed at lunch.",
+                "Nobody is praised for noticing rain. The praise goes to whoever brought an umbrella."
             ],
             "big_win": [
-                "Be fearful when others are greedy. Don't get carried away.",
+                "A good quarter is a second burger. Enjoy it. Do not order a third.",
                 "Patient, disciplined hedging. That's all I ever ask for.",
                 "Good quarter. Now forget about it and focus on the next one.",
-                "The big money is made in the waiting, not the trading. Remember that.",
-                "Someone's sitting in the shade today because someone planted a tree long ago.",
-                "Our favourite holding period is forever. Don't squander a good position."
+                "The money sits quietly and grows. It's the trading that makes the noise. Remember that.",
+                "Somebody is enjoying a cold cola today because somebody was patient last year. You.",
+                "I hold a good position until the paint dries, then a while longer. Don't squander it."
             ],
             "general": [
-                "Price is what you pay. Value is what you get. Remember that.",
-                "Risk comes from not knowing what you're doing. Do you know?",
-                "I'd rather have a treasury that's approximately right than precisely wrong.",
-                "You only have to do a very few things right, so long as you don't do too many wrong.",
-                "Be patient. The stock market transfers money from the impatient to the patient.",
-                "Never test the depth of the river with both feet. Keep some powder dry.",
-                "Honesty is a very expensive gift. Don't expect it from cheap people.",
-                "In a chronically leaking boat, changing vessels beats patching leaks."
+                "The price is on the menu. Whether the burger was worth it, you find out an hour later.",
+                "Most risk is ignorance in a nice suit. Do you know what we hold?",
+                "Explain the hedge like you're ordering my lunch. Slowly, and with no acronyms.",
+                "You don't need many good ideas. You need to avoid the dumb ones for a very long time.",
+                "Patience is a muscle. You skipped the gym on every trade this quarter.",
+                "Dip one toe in the river before you jump. Keep a dry sock in reserve.",
+                "I once hired the cheapest adviser I could find. Priciest hire I ever made.",
+                "I've owned the same hat for thirty years. You've changed hedging strategy three times."
             ],
             "tms_comment": [
                 "I've never needed a computer to tell me what I already know. But you do you.",
                 "If it helps you think more clearly, I suppose it's a reasonable investment.",
                 "Systems don't make decisions. People do. Don't forget that.",
-                "The most important quality for an investor is temperament, not software.",
-                "Beware of geeks bearing formulas. A spreadsheet isn't a strategy.",
+                "What I want from a treasurer is temperament. Software can't supply it.",
+                "Spreadsheets are helpful. I still don't let mine sign cheques.",
                 "Fancy tools are fine. Just don't let them replace plain common sense."
             ]
         },
@@ -630,35 +630,35 @@
             "big_loss": [
                 "Unacceptable. Not the loss, the inelegance. A beautiful hedge book doesn't lose money.",
                 "The exposure isn't the product. The HEDGE is the product. And your product is ugly.",
+                "I wear one outfit every day to remove decisions. You have somehow created two hundred.",
                 "I don't let my kids use our treasury system. Looking at these numbers, I was right.",
-                "Simplify. Too many positions, too many banks, too much complexity. Strip it back.",
-                "Real treasurers ship results. This isn't shipping. This is a prototype that caught fire.",
+                "A hedge book should be a finished product. This one is a prototype that caught fire.",
                 "A loss this messy tells me the thinking behind it was messy. Fix the thinking first.",
                 "I don't want a hedge book. I want THE hedge book. The one everyone copies. This isn't it.",
-                "Deciding what NOT to hedge is as important as deciding what to hedge. You decided wrong."
+                "Half of design is what you leave out. You left out the wrong half of the book."
             ],
             "big_win": [
                 "Simplicity. One clear strategy, beautifully executed. That's what separates us.",
-                "This is what happens when you aim for insanely great instead of merely adequate.",
-                "The people who are crazy enough to think they can change the P&L... are the ones who do.",
+                "This is what happens when you refuse the merely adequate. One more thing: repeat it.",
+                "Someone has to be unreasonable about the P&L. Today it was you. Annoyingly.",
                 "That's the feeling. A strategy so simple it looks obvious in hindsight.",
-                "Beautiful. Not because of the number — because of the clarity behind it.",
-                "Now THIS I'd let my kids use. Don't tell them, it'll go to your head."
+                "Beautiful. The number is fine. It's the clarity behind it that I love.",
+                "Now THIS I'd put on a slide. One slide. Don't let it go to your head."
             ],
             "general": [
                 "We need to reimagine hedging from the ground up. Start with the business, work back.",
-                "Design is how it works. And this treasury desk doesn't work the way I envisioned.",
-                "I wouldn't let my own children use this hedge book. Think about what that means.",
-                "You're holding it wrong. The hedge book, I mean. Metaphorically.",
-                "Innovation is saying no to a thousand trades. Focus. What's the ONE position that matters?",
-                "We're here to put a dent in the universe. Not to post a mediocre P&L.",
-                "Stay hungry. Stay foolish. But for heaven's sake, stay HEDGED.",
+                "Pretty is easy. Working is the hard part. This treasury desk manages neither.",
+                "I would not demo this hedge book. Not even to a friendly crowd. Think about that.",
+                "You're reading it wrong. The hedge book, I mean. Metaphorically.",
+                "Say no to nine trades out of ten. Focus. What's the ONE position that matters?",
+                "We're here to change how treasurers think. Not to post a mediocre P&L.",
+                "Be bold. Be bold in a black turtleneck if you like. But for heaven's sake, be HEDGED.",
                 "Reviewing this hedge book should feel effortless. Right now it feels like homework."
             ],
             "tms_comment": [
                 "The TMS interface is hideous. The functionality is acceptable. Ship it, then redesign.",
-                "Why does treasury software look designed by accountants? Because it was. Think different.",
-                "My kids aren't allowed to use any TMS. Not because of the data. Because of the fonts.",
+                "Why does treasury software look designed by accountants? Because it was. Start over.",
+                "The data is fine. The fonts are a crime. Fix the fonts and we have a product.",
                 "A great TMS should disappear. You shouldn't notice it. You should just... know.",
                 "Too many buttons. Too many menus. If it takes a manual, we've already failed.",
                 "I'd take one perfectly designed screen over a hundred mediocre dashboards."
@@ -666,7 +666,7 @@
         },
         "dorsey": {
             "big_loss": [
-                "Deep breath with me. In... out... Now, these losses. They're part of the journey.",
+                "Deep breath with me. In... out... Now, these losses. They're weather, not climate.",
                 "In my 5am ice bath I reflected on impermanence. Gains pass. Losses pass. Policy endures.",
                 "Maybe the loss is a lesson the market is teaching us. I journaled about it at 4:30am.",
                 "Forty minutes in the sauna gave me clarity. Let's align our chakras. I mean hedge ratios.",
@@ -709,7 +709,7 @@
                 "Some context. In 2004 I was down for 18 months. I wrote 340 slides. I was right. Patience.",
                 "This loss vindicates what I said at the last three meetings. I have the transcripts.",
                 "Before anyone panics: a 31-page memo, 'Why This Loss Is Bullish'. I'll read the abstract.",
-                "I've written a 19-page self-critique. Spoiler: I was mostly right. See Appendix C.",
+                "I've written a 19-page self-critique. I was mostly right. See Appendix C.",
                 "A teachable moment. I've blocked out ninety minutes. I have slides and a laser pointer.",
                 "The market is wrong about us. I held a position 22 months with this conviction. Slide one."
             ],
@@ -724,7 +724,7 @@
             "general": [
                 "A concise memo on our hedging: 35 pages. The executive summary is only six. I'll wait.",
                 "Our hedge ratio is in policy but suboptimal. I've modelled 14 scenarios. Sharing screen.",
-                "One more thing. Several more things. My posts on sector FX are getting huge engagement.",
+                "One quick point. Several quick points. My posts on sector FX are getting huge engagement.",
                 "A brief point. Well, comprehensive: 22 pages, double-spaced. Starting with 1971.",
                 "Agenda item: 'A Comprehensive Reframing of Our Counterparty Philosophy'. It has chapters.",
                 "90 emails with academics on basis risk, now in a binder at each seat. No reading ahead.",

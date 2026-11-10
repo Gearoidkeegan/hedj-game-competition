@@ -7,7 +7,8 @@ import { emptyProgress } from '../../js/engine/sim/progress.js';
 import { CHAIRMAN_SPRITES } from '../../js/ui/pixel/sprites.js';
 import * as storage from '../../js/utils/storage.js';
 import {
-    RunController, boardLineKey, resultQuipKey, chairmanFor, CHAIRMAN_QUARTERS, CHAIRMAN_YIELDS_TO, expressionFor
+    RunController, boardLineKey, resultQuipKey, chairmanFor, CHAIRMAN_QUARTERS, CHAIRMAN_YIELDS_TO, expressionFor,
+    chairmanTone, outcomeFor
 } from '../../js/screens/simple/RunController.js';
 
 marketEngine.loadFromObjects(loadMarketData());
@@ -233,11 +234,15 @@ test('the chairman speaks at Q1, Q4 and Q8 unless the board must answer a propos
         assert.ok(quip.text.length > 0, `quip for ${quip.key}`);
         assert.ok(['neutral', 'happy', 'angry'].includes(b.expression));
         const big = Math.abs(s.playerDelta - s.benchmarkDelta) > 0.03 * rc.run.startingCash;
-        const due = (CHAIRMAN_QUARTERS.includes(s.q) || big) && !CHAIRMAN_YIELDS_TO.includes(b.key);
+        // v3.2: the chairman's tone follows the outcome; he yields to a proposal, the wrong focus and losing breaches.
+        const tone = chairmanTone(b.key, outcomeFor(s, rc.run.startingCash, rc.run.mandate), s.cashAfter < s.redLine);
+        const due = (CHAIRMAN_QUARTERS.includes(s.q) || big) && !CHAIRMAN_YIELDS_TO.includes(b.key) && tone !== null;
         assert.equal(b.speaker, due ? 'chairman' : 'board', `Q${s.q}`);
         if (due) {
             assert.equal(b.chairmanId, persona);
-            assert.ok(content.quips.chairman[persona].includes(b.line));
+            const pools = content.quips.chairman[persona];
+            const pool = tone === 'offPolicy' ? pools.offPolicy[b.key.startsWith('over') ? 'over' : 'under'] : pools[tone];
+            assert.ok(pool.includes(b.line), `Q${s.q} ${tone}: ${b.line}`);
         } else {
             assert.ok(content.quips.board[b.member.personality][b.key].includes(b.line));
         }
@@ -302,16 +307,22 @@ test('v3.1 wrong focus: a Q1 wrong-focus quarter gets the board wrongFocus line,
     assert.equal(b.expression, r.summary.breach === 'loss' ? 'angry' : 'neutral');
 });
 
-test('result quip selection follows the D1 rules', () => {
+test('result quip selection follows the v3.2 outcome rules', () => {
     const S = 1000;
     const line = (o = {}) => ({ hedgeImpact: 0, exposureImpact: 0, hedgeRatio: 0, forecastNotional: 100, realisedNotional: 100, ...o });
-    const base = { playerDelta: 0, benchmarkDelta: 0, cashAfter: 500, redLine: 200, lines: [line()] };
-    const key = over => resultQuipKey({ ...base, ...over }, S);
-    assert.equal(key({ lines: [line({ hedgeImpact: 21 })] }), 'bigSave');
-    assert.equal(key({ benchmarkDelta: 30, playerDelta: 5 }), 'bigMiss');
+    const base = { cashAfter: 500, redLine: 200, lines: [line()] };
+    const key = over => {
+        const s = { ...base, ...over };
+        const market = s.lines.reduce((t, l) => t + l.exposureImpact + l.hedgeImpact, 0);
+        return resultQuipKey({ ...s, marketResult: market }, S);
+    };
+    assert.equal(key({ cashAfter: 100, lines: [line({ hedgeImpact: 21 })] }), 'nearBankrupt');
     assert.equal(key({ lines: [line({ hedgeRatio: 1, realisedNotional: 80 })] }), 'overHedged');
-    assert.equal(key({ cashAfter: 100 }), 'nearBankrupt');
+    assert.equal(key({ lines: [line({ hedgeImpact: 21, exposureImpact: -30 })] }), 'bigSave');
+    assert.equal(key({ lines: [line({ hedgeImpact: -21, exposureImpact: 30 })] }), 'bigMiss');
     assert.equal(key({ lines: [line({ exposureImpact: 25 })] }), 'boom');
+    assert.equal(key({ lines: [line({ exposureImpact: -25 })] }), 'storm');
+    assert.equal(key({ lines: [line({ exposureImpact: 4, hedgeImpact: -4 })] }), 'calm', 'under 0.5% each way');
     assert.equal(key({}), 'calm');
 });
 
