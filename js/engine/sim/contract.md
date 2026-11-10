@@ -337,12 +337,13 @@ Board line selection (B1; v3.2 `boardLineKey(summary, moodBefore, mandate)`). Fi
 6. Otherwise `redZone` (`cashAfter < redLine`), `moodUp` or `moodDown` by mood change.
 
 The chairman (`chairmanAppears`: Q1, Q4, Q8, or a gap to the benchmark above 3% of starting cash) speaks instead of the
-board member, in the tone `chairmanTone(key, outcome)` gives:
+board member, in the tone `chairmanTone(key, outcome, cashAfter < redLine)` gives:
 
 - he yields to `policyAdopted`, `wrongFocus` and the losing breaches (`overLoss`, `underLoss`, `breachLoss`);
+- cash under the red line (`cashAfter < redLine`, the `nearBankrupt` quip's test) is always `negative` (angry sprite),
+  on any board and for any key he speaks to, whatever the market did, so he never cheers beside a `nearBankrupt` quip;
 - on `overLucky` and `underLucky` he speaks only an `offPolicy.over` or `offPolicy.under` line, which names the breach
   (neutral sprite); on Pro's direction-free `luckyBreach` he yields;
-- `redZone` is always `negative` (angry sprite), whatever the market did, so he never cheers beside a `nearBankrupt` quip;
 - otherwise `positive` (happy sprite) on a `good` quarter and `negative` (angry sprite) on a `bad` one; on a `flat` quarter
   `negative` for `inPolicyBad`, `noPolicyHedgeLoss` and `moodDown`, `positive` for the rest.
 - His `positive` and `negative` lines never presume hedges (they also fire with none, on a no-policy or noHedge board)

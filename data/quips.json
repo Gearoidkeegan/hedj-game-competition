@@ -25,37 +25,37 @@
             "Your forwards earned their keep. Expect zero thanks and one extra audit question.",
             "The market swung at you and the hedge swung back.",
             "A textbook save. Someone will put it in a textbook and misspell your name.",
-            "The hedge made money because the exposure lost it. That's the whole idea, working.",
+            "The hedge came out ahead. The whole idea, working, for once where people can see it.",
             "Treasury is briefly the most popular department in the building. Enjoy the ten minutes.",
             "Hedged before the move. Write down what you did, because someone will ask.",
             "The forwards came good. Frame the confirmation and hang it by the coffee machine."
         ],
         "bigMiss": [
-            "The market went your way and the hedge politely handed some of it back.",
-            "You bought an umbrella and it was sunny. The umbrella still cost money.",
+            "The hedge result came back negative. Politely, but negative.",
+            "You bought an umbrella and didn't need it this time. The umbrella still cost money.",
             "Opportunity cost never shows on an invoice. It shows up in every meeting after.",
             "The hedge did its job. This quarter, its job was to cost money.",
-            "Somewhere a speculator is buying a boat with the move you hedged away.",
-            "Insurance that didn't pay out. The house is fine, and the premium is gone.",
-            "The forwards lost roughly what the exposure gained. Correct, and still annoying.",
+            "The hedge lost money. Somewhere a bank's dealing desk is pricing up a boat.",
+            "Insurance that didn't pay out this time. The premium still left the building.",
+            "The forwards finished in the red. That's allowed, and it's still annoying.",
             "Hindsight says leave it open. Hindsight has never had to explain a bad quarter."
         ],
         "boom": [
             "The market moved your way. Act like you planned it. Everyone else does.",
             "A tailwind quarter. Accept the compliments and deflect the questions.",
-            "A big favourable move. The CEO will call it 'strategy' on the earnings call.",
-            "Windfall. Sales will claim it by Friday, procurement by Thursday.",
+            "A favourable move. The CEO will call it 'strategy' on the earnings call.",
+            "The market chipped in. Sales will claim it by Friday, procurement by Thursday.",
             "Lovely move. Enjoy it before someone asks you to forecast the next one.",
-            "The rate went your way and the open exposure kept the gain. Nice while it lasts.",
+            "Your exposures moved the right way, and the gain stayed with you. Nice while it lasts.",
             "Money from the market, no thanks to anyone in particular. Bank it quickly.",
             "The market was kind this time. It never sends notice before it stops."
         ],
         "storm": [
             "The market moved against you, and the numbers noticed before anyone else did.",
-            "The rate went the wrong way, and this quarter took the hit.",
-            "That move cost real money. This will be a long conversation.",
+            "Prices moved the wrong way, and this quarter took the hit.",
+            "That move cost money. Expect a long conversation about it.",
             "A bad move in the market, and it sent the bill straight to you.",
-            "The forecast was fine. The rate wasn't.",
+            "The market had other plans for this quarter. It didn't share them.",
             "The market took a bite out of the quarter and didn't say sorry.",
             "Rough quarter. Even the umbrella stand looks worried.",
             "The market took its cut this quarter. It never asks first."
@@ -66,7 +66,7 @@
             "Calm, like the coffee queue five minutes before the keynote ends.",
             "Volatility took the quarter off. Probably stuck in the lanyard queue.",
             "Small moves, small numbers. Exactly how a treasurer likes it.",
-            "Rates barely twitched. The dealing room is reduced to discussing lunch.",
+            "Prices barely twitched. The dealing room is reduced to discussing lunch.",
             "A flat quarter. Your bank's FX salesperson is crying into a tote bag.",
             "Nothing moved enough to mention, so this sentence is the whole story."
         ]

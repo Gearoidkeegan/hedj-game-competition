@@ -157,13 +157,13 @@ export function resultQuipKey(summary, startingCash) {
     return quarter === 'good' ? 'boom' : quarter === 'bad' ? 'storm' : 'calm';
 }
 
-// The chairman's tone: null when he yields to the board line, 'offPolicy' on a breach whose market result held up,
-// otherwise 'positive' or 'negative' by the quarter (a flat quarter goes by the board key). Cash under the red line
-// is always 'negative', whatever the market did, so he never cheers beside a nearBankrupt quip.
-export function chairmanTone(key, outcome) {
+// The chairman's tone: null when he yields to the board line, 'negative' when cash ended under the red line (any
+// key, any board, whatever the market did, so he never cheers beside a nearBankrupt quip), 'offPolicy' on a breach
+// whose market result held up, otherwise 'positive' or 'negative' by the quarter (a flat quarter goes by the key).
+export function chairmanTone(key, outcome, belowRedLine = false) {
     if (CHAIRMAN_YIELDS_TO.includes(key)) return null;
+    if (belowRedLine || key === 'redZone') return 'negative';
     if (OFF_POLICY_KEYS.has(key)) return 'offPolicy';
-    if (key === 'redZone') return 'negative';
     if (outcome.quarter === 'good') return 'positive';
     if (outcome.quarter === 'bad') return 'negative';
     return FLAT_NEGATIVE_KEYS.has(key) ? 'negative' : 'positive';
@@ -196,7 +196,7 @@ function feedbackStep(ctx, summary, moodBefore, uses) {
 
     if (chairmanAppears(summary, startingCash)) {
         const chairmanId = chairmanFor(seed);
-        const tone = chairmanTone(key, outcomeFor(summary, startingCash, mandate));
+        const tone = chairmanTone(key, outcomeFor(summary, startingCash, mandate), summary.cashAfter < summary.redLine);
         const pool = chairmanPool(quips, chairmanId, tone, key);
         if (pool && Array.isArray(pool.lines) && count(pool.id) < pool.lines.length) {
             return {

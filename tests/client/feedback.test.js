@@ -196,6 +196,30 @@ test('a red-zone quarter gets a negative chairman line even when the market was 
     assert.equal(b.expression, 'angry');
 });
 
+// Final review: the no-policy keys are chosen before redZone, so the chairman checks the red line himself. Under it he
+// is negative on any board and any key he speaks to, never cheering beside a nearBankrupt quip.
+test('under the red line the chairman is negative on a no-policy board too, whatever the key', () => {
+    assert.equal(chairmanTone('noPolicyHedgeWin', { quarter: 'good' }, true), 'negative');
+    assert.equal(chairmanTone('noPolicyNudge', { quarter: 'good' }, true), 'negative');
+    assert.equal(chairmanTone('moodUp', { quarter: 'good' }, true), 'negative');
+    assert.equal(chairmanTone('overLucky', { quarter: 'good' }, true), 'negative', 'no "it came good" beside the red line');
+    assert.equal(chairmanTone('policyAdopted', { quarter: 'good' }, true), null, 'he still yields');
+    assert.equal(chairmanTone('noPolicyHedgeWin', { quarter: 'good' }), 'positive', 'above the red line nothing changes');
+    const r = run({ mandate: null });
+    const persona = chairmanFor(r.seed);
+    for (const [hedgeImpact, key] of [[0.01 * S, 'noPolicyHedgeWin'], [0, 'noPolicyNudge']]) {
+        const s = summary({ q: 4, policy: 'none', inMandate: false, cashAfter: 0.1 * S,
+            lines: [line({ exposureImpact: 0.02 * S, hedgeImpact, hedgeRatio: hedgeImpact ? 0.5 : 0 })] });
+        const { quip, boardReaction: b } = feedback(r, s);
+        assert.equal(quip.key, 'nearBankrupt', key);
+        assert.equal(b.key, key);
+        assert.equal(b.speaker, 'chairman', key);
+        assert.equal(b.tone, 'negative', key);
+        assert.ok(quips.chairman[persona].negative.includes(b.line), b.line);
+        assert.equal(b.expression, 'angry', key);
+    }
+});
+
 // ── The user's two playtest cases ───────────────────────────────────────
 
 // Case 1: no hedge, a 50–75% board, the market made 2% of starting cash. Not "Uneventful", and the reaction says the

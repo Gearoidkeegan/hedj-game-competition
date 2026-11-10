@@ -235,7 +235,7 @@ test('the chairman speaks at Q1, Q4 and Q8 unless the board must answer a propos
         assert.ok(['neutral', 'happy', 'angry'].includes(b.expression));
         const big = Math.abs(s.playerDelta - s.benchmarkDelta) > 0.03 * rc.run.startingCash;
         // v3.2: the chairman's tone follows the outcome; he yields to a proposal, the wrong focus and losing breaches.
-        const tone = chairmanTone(b.key, outcomeFor(s, rc.run.startingCash, rc.run.mandate));
+        const tone = chairmanTone(b.key, outcomeFor(s, rc.run.startingCash, rc.run.mandate), s.cashAfter < s.redLine);
         const due = (CHAIRMAN_QUARTERS.includes(s.q) || big) && !CHAIRMAN_YIELDS_TO.includes(b.key) && tone !== null;
         assert.equal(b.speaker, due ? 'chairman' : 'board', `Q${s.q}`);
         if (due) {

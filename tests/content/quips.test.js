@@ -158,6 +158,21 @@ test('storm quips stay true for a hedged player whose hedge result was small', (
     }
 });
 
+// Final review: bigSave and bigMiss go by the total hedge result, and boom and storm fire from 0.5% of starting cash,
+// so with several exposures the breakdown can show the market either way, beside any volume line. The quips speak
+// about the hedge result only, claim nothing about the forecast or a big move, and fit FX and commodity quarters.
+test('result quips claim nothing about market direction, the forecast or the size of the move', () => {
+    const r = loadJson('data/quips.json').result;
+    const HEDGE_ONLY = /\b(market went your way|exposure (gained|lost)|sunny|house is fine|move you hedged)\b/i;
+    for (const key of ['bigSave', 'bigMiss']) {
+        for (const l of r[key]) assert.ok(!HEDGE_ONLY.test(l), `result.${key}: ${l}`);
+    }
+    const SIZE_OR_RATE = /\b(big|huge|windfall|real money|rates?|forecast was|open exposure)\b/i;
+    for (const key of ['boom', 'storm', 'calm']) {
+        for (const l of r[key]) assert.ok(!SIZE_OR_RATE.test(l), `result.${key}: ${l}`);
+    }
+});
+
 test('every line in quips.json is unique, so no two pools can show the same line in a run', () => {
     const seen = new Set();
     const dupes = [];
