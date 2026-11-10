@@ -23,3 +23,10 @@ test('the CRT overlay is switched off at 768px and below', () => {
     const css = readFileSync(new URL('responsive.css', dir), 'utf8');
     assert.match(css, /@media \(max-width: 768px\) \{\s*#game-viewport::after \{ display: none; \}/);
 });
+
+test('the Simple chart caption stays at 16px: VT323 is hard to read any smaller (final review)', () => {
+    const css = readFileSync(new URL('v3.css', dir), 'utf8');
+    const rule = css.match(/\.r-chart-caption \{[^}]*\}/);
+    assert.ok(rule, '.r-chart-caption rule');
+    assert.match(rule[0], /font-size: 16px;/);
+});

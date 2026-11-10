@@ -1,11 +1,11 @@
 {
     "forecasting": {
         "name": "Cash Forecasting",
-        "blurb": "Three modules lift forecast accuracy to 100%. Fewer nasty volume shocks.",
+        "blurb": "Three modules shrink the forecast range from ±40% to nothing. Fewer nasty volume shocks.",
         "levels": [
-            "Module 1: forecast accuracy 40% to 60%. Surprises shrink a little.",
-            "Module 2: forecast accuracy 60% to 80%. The shocks get smaller.",
-            "Module 3: forecast accuracy 80% to 100%. No volume surprises left."
+            "Module 1: forecast range ±40% → ±27%. Surprises shrink a little.",
+            "Module 2: forecast range ±27% → ±13%. The shocks get smaller.",
+            "Module 3: forecast range ±13% → ±0%. No volume surprises left."
         ],
         "hedjLine": "In real life, Hedj turns messy cash forecasts into numbers you can hedge against."
     },
